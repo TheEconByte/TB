@@ -1,8 +1,8 @@
-# 검수된 자금 공고 카탈로그
+# 자금 공고 카탈로그
 
 이 폴더는 사람이 공식 원문을 확인한 자금·지원 공고를 버전이 고정된 JSON으로 보관한다. 사용자 화면이나 웹 요청이 외부 공고를 수집하지 않으며, 운영자가 검증·적재 명령을 직접 실행한다.
 
-- `catalog.json`: 현재 검수 카탈로그. `catalogKey` + `catalogVersion`으로 식별하고, 파일 바이트의 SHA-256을 릴리스 checksum으로 쓴다.
+- `catalog.json`: 현재 카탈로그. `catalogKey` + `catalogVersion`으로 식별하고, 파일 바이트의 SHA-256을 릴리스 checksum으로 쓴다.
 - 스키마는 `app/src/features/funding/schema.ts`, 규칙 검사는 `app/src/features/funding/validation.ts`, 후보 판정은 `app/src/features/funding/eligibility.ts`에 있다.
 
 ## 운영 명령
@@ -45,3 +45,4 @@ npm --prefix app run funding:load
 - 2026-09-09에 확인했던 강북창업지원센터 입주 모집은 다시 확인하지 않아 검수 기한 경과 상태로 남겼고, 현재 후보에서 제외된다.
 - 서울여성 창업아이디어 공모전 등 2026-09-09 검토 항목은 이번 검수에서 다시 확인하지 않아 카탈로그에 넣지 않았다.
 - 검수자(`reviewer`)는 아직 지정되지 않아 `UNASSIGNED`이며, `funding:validate`는 경고로 표시하고 `funding:load`는 그대로 적재한다. 이 상품들은 현재 후보가 아니라 추가 확인으로 분류된다.
+- 2026-09-23에 조건별 근거(`evidence`) 추가를 반영해 `catalogVersion`을 `2026-09-23.1`, 상품 버전을 `1.0.1`로 올렸다. 검수 내용과 검수일은 같다.

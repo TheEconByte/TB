@@ -151,8 +151,8 @@ export function FundingCandidatesErrorPanel({ error }: { readonly error: Funding
       <div className="empty-panel" role="status">
         <h2>활성 자금 카탈로그가 없습니다.</h2>
         <p>
-          운영자가 검수한 카탈로그를 <code>npm --prefix app run funding:load</code>로 활성화하기 전까지는 후보를 조회할
-          수 없습니다. 카탈로그가 없는 상태를 후보 0건으로 대신 표시하지 않습니다.
+          운영자가 카탈로그를 <code>npm --prefix app run funding:load</code>로 적재하기 전까지는 후보를 조회할 수
+          없습니다. 카탈로그가 없는 상태를 후보 0건으로 대신 표시하지 않습니다.
         </p>
       </div>
     );
@@ -249,7 +249,7 @@ export function FundingCandidatesPanel({
       {summary.total === 0 && (
         <div className="empty-panel" role="status">
           <h2>활성 카탈로그에 상품이 없습니다.</h2>
-          <p>검수된 상품이 적재되지 않았습니다. 후보 0건과 카탈로그 없음은 다른 상태입니다.</p>
+          <p>카탈로그에 적재된 상품이 없습니다. 후보 0건과 카탈로그 없음은 다른 상태입니다.</p>
         </div>
       )}
 
