@@ -1,0 +1,380 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  plans         Plan[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Plan {
+  id                 String       @id @default(cuid())
+  userId             String
+  title              String
+  inputJson          Json         @db.JsonB
+  inputSchemaVersion String
+  // 자금 후보 판정용 조건(사업단계·자치구·업종·용도). 재무 계산 입력(inputJson)과
+  // 분리해 계산 키와 저장된 결과 스냅샷을 바꾸지 않는다. 입력 전에는 NULL이다.
+  fundingProfileJson Json?        @db.JsonB
+  // 입지·업종·면적·층·상가 유형은 재무 계산 입력과 별도로 보존한다.
+  // 관측 상권값을 개인 재무 가정으로 자동 반영하지 않기 위한 경계다.
+  businessProfileJson Json?       @db.JsonB
+  // 상품 확정 조건을 대출 가정으로 적용했을 때 어느 상품 버전·카탈로그를 썼는지
+  // 보존한다. 사용자가 직접 입력한 값과 구분하며 계산 입력(inputJson)과 별도다.
+  loanAssumptionJson Json?        @db.JsonB
+  revision           Int          @default(1)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results            PlanResult[]
+
+  @@index([userId, updatedAt])
+  @@map("plans")
+}
+
+model PlanResult {
+  id                 String   @id @default(cuid())
+  planId             String
+  inputRevision      Int
+  inputSchemaVersion String
+  inputSnapshot      Json     @db.JsonB
+  resultJson         Json     @db.JsonB
+  calculationVersion String
+  calculationKey     String   @unique
+  // 이 결과를 만들 때 반영된 상품 확정 조건의 출처. 계산 시점의 계획에서 복사해
+  // 나중에 카탈로그가 바뀌어도 어떤 상품 조건이 반영됐는지 추적할 수 있게 한다.
+  loanAssumptionJson Json?    @db.JsonB
+  calculatedAt       DateTime @default(now())
+  plan               Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, inputRevision, inputSchemaVersion, calculationVersion])
+  @@index([planId, calculatedAt])
+  @@map("plan_results")
+}
+
+enum MarketReleaseStatus {
+  PENDING
+  ACTIVE
+  SUPERSEDED
+  FAILED
+}
+
+// One official data bundle. Only a fully validated release becomes ACTIVE, and
+// activating a new release only flips status so older rows stay readable.
+model MarketRelease {
+  id                String              @id @default(cuid())
+  releaseKey        String              @unique
+  label             String
+  status            MarketReleaseStatus @default(PENDING)
+  schemaVersion     String
+  definitionVersion String
+  sourceUrl         String
+  basisPeriod       String
+  basisPeriodLabel  String
+  retrievedAt       DateTime
+  files             Json                @db.JsonB
+  validationSummary Json                @db.JsonB
+  areaCount         Int                 @default(0)
+  quarterlyRowCount Int                 @default(0)
+  activatedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  areas             MarketArea[]
+  industries        Industry[]
+
+  @@index([status, activatedAt])
+  @@map("market_releases")
+}
+
+// Commercial area attributes come from the area (boundary attribute) file only.
+// Boundaries themselves are never stored.
+model MarketArea {
+  id           String            @id @default(cuid())
+  releaseId    String
+  areaType     String
+  areaCode     String
+  sourceName   String
+  observedName String?
+  areaTypeName String
+  districtCode String
+  districtName String
+  createdAt    DateTime          @default(now())
+  release      MarketRelease     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  quarterly    MarketQuarterly[]
+
+  @@unique([releaseId, areaType, areaCode])
+  @@index([releaseId, districtCode, areaCode])
+  @@map("market_areas")
+}
+
+// Registry of every service-industry code found in the source files. Only codes
+// marked supported are exposed and imported into market_quarterly.
+model Industry {
+  releaseId             String
+  code                  String
+  sourceName            String
+  displayName           String
+  displayNameSource     String
+  sourceCategoryVersion String
+  isSupported           Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  release               MarketRelease     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  quarterly             MarketQuarterly[]
+
+  @@id([releaseId, code])
+  @@index([releaseId, isSupported])
+  @@map("industries")
+}
+
+// Observed quarterly indicator per join key. A null value means the source did
+// not provide that indicator and is never replaced with 0.
+model MarketQuarterly {
+  id                        String        @id @default(cuid())
+  releaseId                 String
+  quarter                   String
+  areaType                  String
+  areaCode                  String
+  industryCode              String
+  salesAmount               Decimal?      @db.Decimal(18, 0)
+  salesCount                Decimal?      @db.Decimal(18, 0)
+  // 서울시 추정매출 원본의 요일·시간대·성별·연령별 금액/건수.
+  // 고정된 v1 구조로 검증한 JSON이며, 자료가 없으면 NULL이다.
+  salesBreakdownJson         Json?         @db.JsonB
+  storeCount                Int?
+  similarIndustryStoreCount Int?
+  franchiseStoreCount       Int?
+  openedStoreCount          Int?
+  closedStoreCount          Int?
+  createdAt                 DateTime      @default(now())
+  area                      MarketArea    @relation(fields: [releaseId, areaType, areaCode], references: [releaseId, areaType, areaCode], onDelete: Cascade)
+  industry                  Industry      @relation(fields: [releaseId, industryCode], references: [releaseId, code], onDelete: Cascade)
+
+  @@unique([releaseId, quarter, areaType, areaCode, industryCode])
+  @@index([releaseId, areaCode, industryCode, quarter])
+  @@index([releaseId, industryCode])
+  @@map("market_quarterly")
+}
+
+enum BusinessDirectoryReleaseStatus {
+  PENDING
+  ACTIVE
+  SUPERSEDED
+  FAILED
+}
+
+// 소진공 상가(상권)정보 API를 운영자가 적재한 불변 스냅샷이다.
+model BusinessDirectoryRelease {
+  id                String                         @id @default(cuid())
+  releaseKey        String                         @unique
+  status            BusinessDirectoryReleaseStatus @default(PENDING)
+  schemaVersion     String
+  sourceUrl         String
+  retrievedAt       DateTime
+  sourceChecksum    String
+  sourceMetadata    Json                           @db.JsonB
+  validationSummary Json                            @db.JsonB
+  businessCount     Int                            @default(0)
+  activatedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  businesses        BusinessLocation[]
+
+  @@index([status, activatedAt])
+  @@map("business_directory_releases")
+}
+
+model BusinessLocation {
+  id                   String                   @id @default(cuid())
+  releaseId            String
+  sourceBusinessId     String
+  businessName         String
+  branchName           String?
+  largeCategoryCode    String
+  largeCategoryName    String
+  middleCategoryCode   String
+  middleCategoryName   String
+  smallCategoryCode    String
+  smallCategoryName    String
+  marketIndustryCode   String?
+  standardIndustryCode String?
+  standardIndustryName String?
+  districtCode         String
+  districtName         String
+  administrativeDongCode String?
+  administrativeDongName String?
+  lotAddress           String?
+  roadAddress          String?
+  longitude            Decimal?                 @db.Decimal(11, 7)
+  latitude             Decimal?                 @db.Decimal(10, 7)
+  createdAt            DateTime                 @default(now())
+  release              BusinessDirectoryRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, sourceBusinessId])
+  @@index([releaseId, districtCode, smallCategoryCode])
+  @@index([releaseId, marketIndustryCode, smallCategoryCode])
+  @@map("business_locations")
+}
+
+enum FundingCatalogStatus {
+  PENDING
+  ACTIVE
+  SUPERSEDED
+  FAILED
+}
+
+enum FundingSupportType {
+  GRANT
+  GUARANTEE
+  LOAN
+  SPACE
+  PROGRAM
+}
+
+enum FundingApplicationStatus {
+  OPEN
+  CLOSED
+  UNKNOWN
+}
+
+// One human-reviewed catalog file. catalogChecksum is the SHA-256 of the file
+// bytes, so reloading the same file cannot create a second release. Only a fully
+// validated release becomes ACTIVE, and activation only flips status: the
+// previous release and every product version stay readable.
+model FundingCatalogRelease {
+  id                String                  @id @default(cuid())
+  catalogKey        String
+  catalogVersion    String
+  catalogChecksum   String                  @unique
+  status            FundingCatalogStatus    @default(PENDING)
+  schemaVersion     String
+  basisDate         DateTime                @db.Date
+  reviewedAt        DateTime?               @db.Date
+  reviewer          String
+  sourceDocuments   Json                    @db.JsonB
+  productVersions   Json                    @db.JsonB
+  validationSummary Json                    @db.JsonB
+  productCount      Int                     @default(0)
+  activatedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  products          FundingCatalogProduct[]
+
+  @@unique([catalogKey, catalogVersion])
+  @@index([status, activatedAt])
+  @@map("funding_catalog_releases")
+}
+
+// An immutable product version. A later catalog may cite the same version, and
+// then the row is reused instead of rewritten. The full validated JSON is kept
+// so a historical decision can be reproduced even after the catalog changes.
+model FundingProductVersion {
+  id                            String                @id @default(cuid())
+  productKey                    String
+  version                       String
+  name                          String
+  organization                  String
+  supportType                   FundingSupportType
+  observedApplicationStatus     FundingApplicationStatus
+  observedAt                    DateTime              @db.Date
+  reviewedAt                    DateTime?             @db.Date
+  nextReviewAt                  DateTime?             @db.Date
+  officialUrl                   String
+  publicLimit                   Decimal?              @db.Decimal(18, 0)
+  repaymentCalculationSupported Boolean               @default(false)
+  productJson                   Json                  @db.JsonB
+  createdAt                     DateTime              @default(now())
+  catalogs                      FundingCatalogProduct[]
+
+  @@unique([productKey, version])
+  @@index([supportType, observedApplicationStatus])
+  @@index([nextReviewAt])
+  @@map("funding_product_versions")
+}
+
+// A product version is immutable and may appear in multiple catalog releases.
+// This join preserves each release's exact ordered membership without copying
+// or re-parenting the version row.
+model FundingCatalogProduct {
+  catalogReleaseId String
+  productVersionId String
+  position         Int
+  release          FundingCatalogRelease @relation(fields: [catalogReleaseId], references: [id], onDelete: Cascade)
+  productVersion   FundingProductVersion  @relation(fields: [productVersionId], references: [id], onDelete: Restrict)
+
+  @@id([catalogReleaseId, productVersionId])
+  @@unique([catalogReleaseId, position])
+  @@index([productVersionId])
+  @@map("funding_catalog_products")
+}

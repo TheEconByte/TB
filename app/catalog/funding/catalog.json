@@ -1,0 +1,535 @@
+{
+  "catalogKey": "trendbench-funding-catalog",
+  "schemaVersion": "funding-catalog-v1.0.0",
+  "catalogVersion": "2026-09-20.1",
+  "basisDate": "2026-09-20",
+  "reviewer": "UNASSIGNED",
+  "notes": [
+    "2026-09-20 기준으로 기관 공식 공개 페이지에서 확인한 내용만 기록했습니다. 검색 결과 요약, 블로그, 언론 기사만으로 조건을 확정하지 않았습니다.",
+    "원문 PDF·첨부 파일을 내려받아 보관하지 않았으므로 모든 상품의 sourceDocumentRetrieved는 false, sourceChecksum은 null입니다. 대용량 원본은 Git에 추가하지 않습니다.",
+    "공고문 원문에서 확정 숫자로 확인되지 않은 금리·기간·한도는 0으로 채우지 않고 null 또는 UNKNOWN으로 보존했습니다.",
+    "검수자가 지정되지 않아(UNASSIGNED) 상태이며, 운영 공개 전에 실제 검수자와 다음 검토일을 지정해야 합니다.",
+    "이 카탈로그는 사용자별 매칭 API와 화면을 구현하기 전 단계입니다. 후보 판정 함수와 상태 구분만 제공합니다.",
+    "2026-09-09에 확인했던 서울여성 창업아이디어 공모전 등은 2026-09-20에 다시 확인하지 않아 카탈로그에 넣지 않았습니다. 접수 상태가 OPEN으로 확인된 상품도 이번 검수 범위에는 없습니다."
+  ],
+  "products": [
+    {
+      "productKey": "pre-startup-package-2026-2nd",
+      "version": "1.0.0",
+      "name": "2026년 창업지원사업 「예비창업패키지」 예비창업자 모집 수정공고(2차)",
+      "organization": "중소벤처기업부 · 창업진흥원",
+      "supportType": "GRANT",
+      "eligibleBusinessStages": ["PRE_REGISTRATION"],
+      "region": {
+        "scope": "UNKNOWN",
+        "districtCodes": [],
+        "note": "공고문에서 지역 조건을 확인하지 못했습니다. 전국 대상 여부와 지역 예외는 원문 확인이 필요합니다."
+      },
+      "purpose": {
+        "included": ["STARTUP_COST"],
+        "excluded": [],
+        "note": "사업화 자금과 창업 프로그램 지원으로 확인했습니다. 자금 용도 세부 구분은 공고문 확인이 필요합니다."
+      },
+      "industryConditions": {
+        "scope": "UNKNOWN",
+        "included": [],
+        "excluded": [],
+        "note": "혁신 기술·사업모델 중심 모집으로 확인되어 상권 업종 코드 매핑은 검수하지 않았습니다."
+      },
+      "applicationPeriod": {
+        "start": "2026-03-06",
+        "end": "2026-03-26",
+        "note": null
+      },
+      "observedApplicationStatus": "CLOSED",
+      "observedAt": "2026-09-20",
+      "reviewedAt": "2026-09-20",
+      "nextReviewAt": "2026-12-20",
+      "officialUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119859",
+      "sourceDocumentName": "기업마당 공고 상세 · 예비창업패키지 예비창업자 모집 수정공고(2차)",
+      "sourceDocumentRetrieved": false,
+      "sourceChecksum": null,
+      "publicLimit": null,
+      "interestCondition": null,
+      "interestRateConfirmed": false,
+      "repaymentCondition": null,
+      "repaymentMethod": "NOT_APPLICABLE",
+      "unsupportedCalculationReasons": [
+        "지원금(사업화 자금)은 대출 원금·상환 일정으로 변환하지 않습니다.",
+        "지원 한도가 원문에서 확정되지 않았습니다."
+      ],
+      "additionalChecks": [
+        "공고 기준일(2026-01-22) 현재 본인 명의 사업자등록증이 없고 법인 대표권을 보유하지 않아야 합니다. 예외 조건은 공고문 확인이 필요합니다.",
+        "모집 분야·평가 기준·지원 한도는 공고문과 신청 시스템에서 확인해야 합니다.",
+        "2026-03-26에 접수가 종료되어 현재 신청할 수 없습니다."
+      ],
+      "reviewer": "UNASSIGNED",
+      "evidence": [
+        {
+          "id": "bizinfo-pre-startup-identity",
+          "subject": "IDENTITY",
+          "summary": "기업마당 공고 상세에서 공고명과 사업화 자금·창업 프로그램 지원 내용을 확인했습니다. 원문 페이지를 직접 열람하지 않고 검색 결과 요약으로만 확인했으므로 원문 재확인이 필요합니다.",
+          "sourceUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119859",
+          "sourceDocumentName": "기업마당 공고 상세 · 예비창업패키지 예비창업자 모집 수정공고(2차)",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "bizinfo-pre-startup-period",
+          "subject": "APPLICATION_PERIOD",
+          "summary": "신청기간이 2026-03-06부터 2026-03-26까지로 안내되어 있고, 2026-09-20 기준 접수가 종료된 상태로 확인했습니다.",
+          "sourceUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119859",
+          "sourceDocumentName": "기업마당 공고 상세 · 예비창업패키지 예비창업자 모집 수정공고(2차)",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "bizinfo-pre-startup-stage",
+          "subject": "BUSINESS_STAGE",
+          "summary": "공고 기준일 현재 사업자등록이 없는 예비창업자를 대상으로 하고, 사업자등록 보유자는 대상이 아니라고 확인했습니다.",
+          "sourceUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119859",
+          "sourceDocumentName": "기업마당 공고 상세 · 예비창업패키지 예비창업자 모집 수정공고(2차)",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "bizinfo-pre-startup-purpose",
+          "subject": "PURPOSE",
+          "summary": "사업화 자금과 창업 프로그램 지원으로 안내되어 창업 준비 비용 용도로 기록했습니다. 세부 사용 범위는 원문 재확인이 필요합니다.",
+          "sourceUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119859",
+          "sourceDocumentName": "기업마당 공고 상세 · 예비창업패키지 예비창업자 모집 수정공고(2차)",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        }
+      ]
+    },
+    {
+      "productKey": "seoul-fund-2026-startup-company",
+      "version": "1.0.0",
+      "name": "2026년 서울시 중소기업육성자금 창업기업자금 융자지원",
+      "organization": "서울특별시 · 서울신용보증재단",
+      "supportType": "LOAN",
+      "eligibleBusinessStages": ["POST_REGISTRATION"],
+      "region": {
+        "scope": "SEOUL",
+        "districtCodes": [],
+        "note": "서울시 중소기업육성자금입니다. 서울 소재 요건과 자치구별 제한은 개별 자금 안내에서 확인해야 합니다."
+      },
+      "purpose": {
+        "included": [],
+        "excluded": [],
+        "note": "자금 용도(시설·운전)의 세부 구분을 원문에서 확정하지 못했습니다."
+      },
+      "industryConditions": {
+        "scope": "UNKNOWN",
+        "included": [],
+        "excluded": [],
+        "note": "제한업종 목록을 원문에서 확정하지 못했습니다."
+      },
+      "applicationPeriod": {
+        "start": null,
+        "end": null,
+        "note": "2026년 자금 소진 시까지 수시 접수로 안내되어 종료일이 없습니다. 잔여 예산에 따라 접수 여부가 달라집니다."
+      },
+      "observedApplicationStatus": "UNKNOWN",
+      "observedAt": "2026-09-20",
+      "reviewedAt": "2026-09-20",
+      "nextReviewAt": "2026-10-20",
+      "officialUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+      "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+      "sourceDocumentRetrieved": false,
+      "sourceChecksum": null,
+      "publicLimit": "100000000",
+      "interestCondition": null,
+      "interestRateConfirmed": false,
+      "repaymentCondition": null,
+      "repaymentMethod": "UNKNOWN",
+      "unsupportedCalculationReasons": [
+        "금리와 상환방식이 원문에서 확인되지 않았습니다.",
+        "자금별 금리와 대출기간은 개별 자금 안내에서 확인해야 합니다.",
+        "사업자등록 이후(창업 1년 이내) 기업만 신청할 수 있어 예비 창업자 대상이 아닙니다."
+      ],
+      "additionalChecks": [
+        "사업자등록 이후 창업 1년 이내 기업이 대상이어서 예비 창업자는 검토 대상이 아닙니다.",
+        "서울 소재 요건과 제한업종, 필요 서류는 개별 자금 안내와 공고문에서 확인해야 합니다.",
+        "보증·대출 심사 결과에 따라 승인 여부와 실제 금리가 결정되며 승인 확정이 아닙니다."
+      ],
+      "reviewer": "UNASSIGNED",
+      "evidence": [
+        {
+          "id": "seoul-fund-startup-identity",
+          "subject": "IDENTITY",
+          "summary": "서울시 공식 안내에서 2026년 중소기업육성자금 융자지원과 창업기업자금 최대 1억 원 한도를 확인했습니다. 원문 페이지를 직접 열람하지 않고 검색 결과 요약으로만 확인했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-startup-period",
+          "subject": "APPLICATION_PERIOD",
+          "summary": "2026년 자금 소진 시까지 수시 접수로 안내되어 고정된 마감일을 확인할 수 없었습니다. 2026-09-20 기준 접수 가능 여부는 잔여 예산에 따라 달라 UNKNOWN으로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-startup-stage",
+          "subject": "BUSINESS_STAGE",
+          "summary": "창업기업자금이 창업 1년 이내 기업을 대상으로 안내되어 사업자등록 이후에만 검토할 수 있는 상품으로 구분했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-startup-financial",
+          "subject": "FINANCIAL_CONDITION",
+          "summary": "최대 한도 1억 원은 확인했으나 금리, 대출기간, 상환방식은 공식 안내에서 확정 숫자로 확인하지 못해 null과 UNKNOWN으로 보존했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "bizinfo-seoul-fund-notice",
+          "subject": "ELIGIBILITY_CONDITION",
+          "summary": "기업마당 공고 상세에서 같은 서울시 중소기업육성자금 공고를 확인했습니다. 세부 자격과 제한업종은 원문에서 다시 확인해야 합니다.",
+          "sourceUrl": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117111",
+          "sourceDocumentName": "기업마당 공고 상세 · 서울시 중소기업육성자금 융자지원",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-startup-region",
+          "subject": "REGION",
+          "summary": "서울 소재 사업자등록을 마친 중소기업·소상공인을 공통 대상으로 안내하여 서울 범위로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        }
+      ]
+    },
+    {
+      "productKey": "seoul-fund-2026-inclusive-finance",
+      "version": "1.0.0",
+      "name": "2026년 서울시 중소기업육성자금 포용금융자금 융자지원",
+      "organization": "서울특별시 · 서울신용보증재단",
+      "supportType": "LOAN",
+      "eligibleBusinessStages": ["POST_REGISTRATION"],
+      "region": {
+        "scope": "SEOUL",
+        "districtCodes": [],
+        "note": "서울시 중소기업육성자금입니다. 서울 소재 요건은 개별 자금 안내에서 확인해야 합니다."
+      },
+      "purpose": {
+        "included": [],
+        "excluded": [],
+        "note": "자금 용도를 원문에서 확정하지 못했습니다."
+      },
+      "industryConditions": {
+        "scope": "UNKNOWN",
+        "included": [],
+        "excluded": [],
+        "note": "제한업종 목록을 원문에서 확정하지 못했습니다."
+      },
+      "applicationPeriod": {
+        "start": null,
+        "end": null,
+        "note": "2026년 자금 소진 시까지 수시 접수로 안내되어 종료일이 없습니다."
+      },
+      "observedApplicationStatus": "UNKNOWN",
+      "observedAt": "2026-09-20",
+      "reviewedAt": "2026-09-20",
+      "nextReviewAt": "2026-10-20",
+      "officialUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+      "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+      "sourceDocumentRetrieved": false,
+      "sourceChecksum": null,
+      "publicLimit": "30000000",
+      "interestCondition": null,
+      "interestRateConfirmed": false,
+      "repaymentCondition": null,
+      "repaymentMethod": "UNKNOWN",
+      "unsupportedCalculationReasons": [
+        "금리와 상환방식이 원문에서 확인되지 않았습니다.",
+        "신용평점 등 자격 요건 충족 여부가 심사로 결정됩니다."
+      ],
+      "additionalChecks": [
+        "신용평점 839점 이하 등 요건은 심사 기준이며 공고문 확인이 필요합니다.",
+        "사업자등록 이후에만 신청할 수 있어 예비 창업자는 검토 대상이 아닙니다."
+      ],
+      "reviewer": "UNASSIGNED",
+      "evidence": [
+        {
+          "id": "seoul-fund-inclusive-identity",
+          "subject": "IDENTITY",
+          "summary": "서울시 공식 안내에서 2026년 중소기업육성자금 포용금융자금과 최대 3천만 원 한도를 확인했습니다. 검색 결과 요약으로만 확인했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-inclusive-period",
+          "subject": "APPLICATION_PERIOD",
+          "summary": "자금 소진 시까지 수시 접수로 안내되어 2026-09-20 기준 접수 가능 여부를 확인할 수 없어 UNKNOWN으로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-inclusive-stage",
+          "subject": "BUSINESS_STAGE",
+          "summary": "중소기업육성자금은 사업자등록 이후 기업 대상으로 안내되어 등록 이후 검토 상품으로 구분했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-inclusive-financial",
+          "subject": "FINANCIAL_CONDITION",
+          "summary": "최대 한도 3천만 원과 신용평점 요건 언급을 확인했고, 금리와 상환방식은 확정 숫자로 확인하지 못해 null과 UNKNOWN으로 보존했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-inclusive-region",
+          "subject": "REGION",
+          "summary": "서울 소재 사업자등록을 마친 중소기업·소상공인을 공통 대상으로 안내하여 서울 범위로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        }
+      ]
+    },
+    {
+      "productKey": "seoul-fund-2026-emergency-self-employed",
+      "version": "1.0.0",
+      "name": "2026년 서울시 중소기업육성자금 긴급자영업자금 융자지원",
+      "organization": "서울특별시 · 서울신용보증재단",
+      "supportType": "LOAN",
+      "eligibleBusinessStages": ["POST_REGISTRATION"],
+      "region": {
+        "scope": "SEOUL",
+        "districtCodes": [],
+        "note": "서울시 중소기업육성자금입니다. 서울 소재 요건은 개별 자금 안내에서 확인해야 합니다."
+      },
+      "purpose": {
+        "included": [],
+        "excluded": [],
+        "note": "자금 용도를 원문에서 확정하지 못했습니다."
+      },
+      "industryConditions": {
+        "scope": "UNKNOWN",
+        "included": [],
+        "excluded": [],
+        "note": "제한업종 목록을 원문에서 확정하지 못했습니다."
+      },
+      "applicationPeriod": {
+        "start": null,
+        "end": null,
+        "note": "2026년 자금 소진 시까지 수시 접수로 안내되어 종료일이 없습니다."
+      },
+      "observedApplicationStatus": "UNKNOWN",
+      "observedAt": "2026-09-20",
+      "reviewedAt": "2026-09-20",
+      "nextReviewAt": "2026-10-20",
+      "officialUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+      "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+      "sourceDocumentRetrieved": false,
+      "sourceChecksum": null,
+      "publicLimit": "50000000",
+      "interestCondition": null,
+      "interestRateConfirmed": false,
+      "repaymentCondition": null,
+      "repaymentMethod": "UNKNOWN",
+      "unsupportedCalculationReasons": [
+        "금리와 상환방식이 원문에서 확인되지 않았습니다.",
+        "매출 급감·임차료 급증 등 사유 요건 충족 여부가 확인되지 않았습니다."
+      ],
+      "additionalChecks": [
+        "매출 급감·임차료 급증 등 사유 요건과 증빙은 공고문 확인이 필요합니다.",
+        "사업자등록 이후에만 신청할 수 있어 예비 창업자는 검토 대상이 아닙니다."
+      ],
+      "reviewer": "UNASSIGNED",
+      "evidence": [
+        {
+          "id": "seoul-fund-emergency-identity",
+          "subject": "IDENTITY",
+          "summary": "서울시 공식 안내에서 2026년 중소기업육성자금 긴급자영업자금과 최대 5천만 원 한도를 확인했습니다. 검색 결과 요약으로만 확인했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-emergency-period",
+          "subject": "APPLICATION_PERIOD",
+          "summary": "자금 소진 시까지 수시 접수로 안내되어 2026-09-20 기준 접수 가능 여부를 확인할 수 없어 UNKNOWN으로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-emergency-stage",
+          "subject": "BUSINESS_STAGE",
+          "summary": "사업을 운영 중인 자영업자 대상 자금으로 안내되어 등록 이후 검토 상품으로 구분했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-emergency-financial",
+          "subject": "FINANCIAL_CONDITION",
+          "summary": "최대 한도 5천만 원은 확인했으나 금리·대출기간·상환방식은 확정 숫자로 확인하지 못해 null과 UNKNOWN으로 보존했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        },
+        {
+          "id": "seoul-fund-emergency-region",
+          "subject": "REGION",
+          "summary": "서울 소재 사업자등록을 마친 중소기업·소상공인을 공통 대상으로 안내하여 서울 범위로 기록했습니다.",
+          "sourceUrl": "https://news.seoul.go.kr/economy/rearing-funds",
+          "sourceDocumentName": "서울특별시 중소기업육성자금 융자지원 안내",
+          "observedAt": "2026-09-20",
+          "retrievalMethod": "SEARCH_RESULT_SUMMARY",
+          "checksum": null
+        }
+      ]
+    },
+    {
+      "productKey": "gangbuk-startup-center-2026-h2-residency",
+      "version": "1.0.0",
+      "name": "2026년 강북창업지원센터 하반기 입주기업 모집",
+      "organization": "서울특별시 · 강북창업지원센터",
+      "supportType": "SPACE",
+      "eligibleBusinessStages": ["PRE_REGISTRATION", "POST_REGISTRATION"],
+      "region": {
+        "scope": "SEOUL",
+        "districtCodes": [],
+        "note": "서울 거주·생활권을 요건으로 안내되어 서울 범위로 기록했습니다. 자치구 우대 조건은 원문 확인이 필요합니다."
+      },
+      "purpose": {
+        "included": ["SPACE_RENT", "PROGRAM_TRAINING"],
+        "excluded": [],
+        "note": "공유사무실과 보육 프로그램 지원으로 확인했습니다."
+      },
+      "industryConditions": {
+        "scope": "UNKNOWN",
+        "included": [],
+        "excluded": [],
+        "note": "입주 업종 제한을 확인하지 못했습니다."
+      },
+      "applicationPeriod": {
+        "start": "2026-09-02",
+        "end": "2026-10-05",
+        "note": "게시 기간입니다. 실제 접수 일정과 선정 일정은 공고문 확인이 필요합니다."
+      },
+      "observedApplicationStatus": "UNKNOWN",
+      "observedAt": "2026-09-09",
+      "reviewedAt": "2026-09-09",
+      "nextReviewAt": "2026-09-16",
+      "officialUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+      "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+      "sourceDocumentRetrieved": false,
+      "sourceChecksum": null,
+      "publicLimit": null,
+      "interestCondition": null,
+      "interestRateConfirmed": false,
+      "repaymentCondition": null,
+      "repaymentMethod": "NOT_APPLICABLE",
+      "unsupportedCalculationReasons": [
+        "공간·보육 지원은 대출 원금·상환 일정으로 변환하지 않습니다.",
+        "입주 보증금·관리비·입주 기간 조건이 확인되지 않았습니다."
+      ],
+      "additionalChecks": [
+        "2026-09-02~2026-10-05 게시 공고를 2026-09-09에 확인했고 2026-09-20에 다시 확인하지 못했습니다.",
+        "입주 자격, 보육 프로그램 내용, 보증금·관리비 조건은 모집 공고문에서 확인해야 합니다."
+      ],
+      "reviewer": "UNASSIGNED",
+      "evidence": [
+        {
+          "id": "gangbuk-residency-identity",
+          "subject": "IDENTITY",
+          "summary": "서울시 청년몽땅정보통 공식 상세에서 강북창업지원센터 하반기 입주기업 모집과 공유사무실·보육 지원을 확인했습니다.",
+          "sourceUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+          "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+          "observedAt": "2026-09-09",
+          "retrievalMethod": "OFFICIAL_WEB_PAGE",
+          "checksum": null
+        },
+        {
+          "id": "gangbuk-residency-period",
+          "subject": "APPLICATION_PERIOD",
+          "summary": "2026-09-02부터 2026-10-05까지 게시된 공고로 확인했습니다. 2026-09-20 기준 접수 상태는 다시 확인하지 않아 UNKNOWN으로 기록했습니다.",
+          "sourceUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+          "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+          "observedAt": "2026-09-09",
+          "retrievalMethod": "OFFICIAL_WEB_PAGE",
+          "checksum": null
+        },
+        {
+          "id": "gangbuk-residency-stage",
+          "subject": "BUSINESS_STAGE",
+          "summary": "만 15세 이상 예비 창업자 또는 창업 5년 이내 창업자를 대상으로 안내되어 두 사업단계를 모두 기록했습니다.",
+          "sourceUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+          "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+          "observedAt": "2026-09-09",
+          "retrievalMethod": "OFFICIAL_WEB_PAGE",
+          "checksum": null
+        },
+        {
+          "id": "gangbuk-residency-region",
+          "subject": "REGION",
+          "summary": "서울 거주·생활권 요건으로 안내되어 서울 범위로 기록했습니다.",
+          "sourceUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+          "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+          "observedAt": "2026-09-09",
+          "retrievalMethod": "OFFICIAL_WEB_PAGE",
+          "checksum": null
+        },
+        {
+          "id": "gangbuk-residency-purpose",
+          "subject": "PURPOSE",
+          "summary": "공유입주사무실과 보육 프로그램을 지원한다고 안내되어 공간·임차 및 보육·교육 용도로 기록했습니다.",
+          "sourceUrl": "https://youth.seoul.go.kr/infoData/sprtInfo/view.do?key=2309130006&sprtInfoId=73559",
+          "sourceDocumentName": "서울시 청년몽땅정보통 · 강북창업지원센터 하반기 입주기업 모집",
+          "observedAt": "2026-09-09",
+          "retrievalMethod": "OFFICIAL_WEB_PAGE",
+          "checksum": null
+        }
+      ]
+    }
+  ]
+}

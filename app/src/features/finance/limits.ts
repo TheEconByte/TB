@@ -1,0 +1,3 @@
+export const MAX_MONEY_WON_DIGITS = 18;
+export const MAX_ANNUAL_INTEREST_RATE_PERCENT = 100;
+export const MAX_LOAN_TERM_MONTHS = 600;

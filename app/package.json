@@ -1,0 +1,67 @@
+{
+  "name": "trendbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "postinstall": "prisma generate",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node scripts/run-tests.ts unit",
+    "test:db": "node scripts/run-tests.ts database",
+    "verify": "node scripts/verify.ts",
+    "verify:fast": "node scripts/verify-fast.ts",
+    "verify:db": "node scripts/verify-db.ts",
+    "verify:ci": "node scripts/verify-ci.ts",
+    "verify:e2e": "playwright test",
+    "bootstrap": "node scripts/bootstrap.ts",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "market:load": "node --env-file-if-exists=.env.local scripts/load-market.ts",
+    "business:load": "node --env-file-if-exists=.env.local scripts/load-business-directory.ts",
+    "funding:validate": "node --env-file-if-exists=.env.local scripts/validate-funding-catalog.ts",
+    "funding:load": "node --env-file-if-exists=.env.local scripts/load-funding-catalog.ts"
+  },
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "dependencies": {
+    "@better-auth/prisma-adapter": "1.7.5",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "better-auth": "1.7.5",
+    "decimal.js": "10.6.0",
+    "next": "16.3.5",
+    "pg": "8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.1.11"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.5",
+    "prettier": "3.9.8",
+    "prisma": "7.10.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.4"
+  }
+}

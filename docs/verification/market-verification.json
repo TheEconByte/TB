@@ -1,0 +1,434 @@
+{
+  "scope": "2025 detailed checks plus 2024-2025 eight-quarter checks; no API authentication, database or application test",
+  "datasets": {
+    "sales": {
+      "rows": 85732,
+      "columns": 55,
+      "duplicates": 0,
+      "missing_key_rows": 0,
+      "unique_areas": 1577,
+      "quarters": [
+        "20251",
+        "20252",
+        "20253",
+        "20254"
+      ],
+      "null_cells": 0
+    },
+    "stores": {
+      "rows": 304775,
+      "columns": 14,
+      "duplicates": 0,
+      "missing_key_rows": 0,
+      "unique_areas": 1650,
+      "quarters": [
+        "20251",
+        "20252",
+        "20253",
+        "20254"
+      ],
+      "null_cells": 0
+    },
+    "areas": {
+      "rows": 1650,
+      "columns": 11,
+      "duplicates": 0,
+      "missing_key_rows": 0,
+      "unique_areas": 1650,
+      "quarters": null,
+      "null_cells": 0
+    }
+  },
+  "sales_stores_join": {
+    "right_only": 219043,
+    "both": 85732,
+    "left_only": 0
+  },
+  "sales_stores_name_mismatch": 0,
+  "sales_stores_industry_name_mismatch": 0,
+  "sales_area_join": {
+    "both": 85732,
+    "left_only": 0,
+    "right_only": 0
+  },
+  "sales_unmapped_areas": [],
+  "sales_area_name_mismatch": 32,
+  "sales_area_name_mismatch_examples": [
+    {
+      "area_code": "3110024",
+      "area_name": "혜화동주민센터",
+      "area_name_area": "혜회동주민센터"
+    }
+  ],
+  "stores_area_join": {
+    "both": 304775,
+    "left_only": 0,
+    "right_only": 0
+  },
+  "stores_unmapped_areas": [],
+  "stores_area_name_mismatch": 156,
+  "stores_area_name_mismatch_examples": [
+    {
+      "area_code": "3110024",
+      "area_name": "혜화동주민센터",
+      "area_name_area": "혜회동주민센터"
+    }
+  ],
+  "target_industries": [
+    {
+      "code": "CS100001",
+      "names": [
+        "한식음식점"
+      ],
+      "join": {
+        "both": 5620,
+        "right_only": 674,
+        "left_only": 0
+      },
+      "sales_area_count": 1418
+    },
+    {
+      "code": "CS100002",
+      "names": [
+        "중식음식점"
+      ],
+      "join": {
+        "right_only": 2592,
+        "both": 1781,
+        "left_only": 0
+      },
+      "sales_area_count": 473
+    },
+    {
+      "code": "CS100003",
+      "names": [
+        "일식음식점"
+      ],
+      "join": {
+        "right_only": 2559,
+        "both": 1363,
+        "left_only": 0
+      },
+      "sales_area_count": 360
+    },
+    {
+      "code": "CS100005",
+      "names": [
+        "제과점"
+      ],
+      "join": {
+        "right_only": 3094,
+        "both": 1690,
+        "left_only": 0
+      },
+      "sales_area_count": 450
+    },
+    {
+      "code": "CS100010",
+      "names": [
+        "커피-음료"
+      ],
+      "join": {
+        "both": 4296,
+        "right_only": 1788,
+        "left_only": 0
+      },
+      "sales_area_count": 1100
+    }
+  ],
+  "sample_candidates": [
+    {
+      "area_code": "3110127",
+      "area_name_sales": "성수1가1동주민센터"
+    },
+    {
+      "area_code": "3110131",
+      "area_name_sales": "성수동카페거리"
+    },
+    {
+      "area_code": "3110132",
+      "area_name_sales": "성수2가3동주민센터"
+    },
+    {
+      "area_code": "3110134",
+      "area_name_sales": "성수119안전센터"
+    },
+    {
+      "area_code": "3110137",
+      "area_name_sales": "성수초등학교"
+    },
+    {
+      "area_code": "3110562",
+      "area_name_sales": "연트럴파크(연남동주민센터)"
+    },
+    {
+      "area_code": "3120052",
+      "area_name_sales": "성수역"
+    },
+    {
+      "area_code": "3120104",
+      "area_name_sales": "연남동(홍대)"
+    },
+    {
+      "area_code": "3120195",
+      "area_name_sales": "성수대교남단"
+    }
+  ],
+  "sample": [
+    {
+      "quarter": "20251",
+      "area_type": "A",
+      "area_code": "3110127",
+      "area_name_sales": "성수1가1동주민센터",
+      "industry": "CS100010",
+      "industry_name_sales": "커피-음료",
+      "당월_매출_금액": "183367983",
+      "stor_co": "10",
+      "similr_induty_stor_co": "13",
+      "opbiz_stor_co": "0",
+      "clsbiz_stor_co": "0",
+      "frc_stor_co": "3",
+      "opbiz_rt": "0",
+      "clsbiz_rt": "0"
+    },
+    {
+      "quarter": "20252",
+      "area_type": "A",
+      "area_code": "3110127",
+      "area_name_sales": "성수1가1동주민센터",
+      "industry": "CS100010",
+      "industry_name_sales": "커피-음료",
+      "당월_매출_금액": "220443234",
+      "stor_co": "9",
+      "similr_induty_stor_co": "12",
+      "opbiz_stor_co": "0",
+      "clsbiz_stor_co": "1",
+      "frc_stor_co": "3",
+      "opbiz_rt": "0",
+      "clsbiz_rt": "8"
+    },
+    {
+      "quarter": "20253",
+      "area_type": "A",
+      "area_code": "3110127",
+      "area_name_sales": "성수1가1동주민센터",
+      "industry": "CS100010",
+      "industry_name_sales": "커피-음료",
+      "당월_매출_금액": "255984520",
+      "stor_co": "9",
+      "similr_induty_stor_co": "12",
+      "opbiz_stor_co": "0",
+      "clsbiz_stor_co": "0",
+      "frc_stor_co": "3",
+      "opbiz_rt": "0",
+      "clsbiz_rt": "0"
+    },
+    {
+      "quarter": "20254",
+      "area_type": "A",
+      "area_code": "3110127",
+      "area_name_sales": "성수1가1동주민센터",
+      "industry": "CS100010",
+      "industry_name_sales": "커피-음료",
+      "당월_매출_금액": "184219542",
+      "stor_co": "8",
+      "similr_induty_stor_co": "11",
+      "opbiz_stor_co": "0",
+      "clsbiz_stor_co": "1",
+      "frc_stor_co": "3",
+      "opbiz_rt": "0",
+      "clsbiz_rt": "9"
+    }
+  ],
+  "sample_area_attributes": [
+    {
+      "area_type": "A",
+      "TRDAR_SE_1": "골목상권",
+      "area_code": "3110127",
+      "area_name": "성수1가1동주민센터",
+      "XCNTS_VALU": "204367",
+      "YDNTS_VALU": "449119",
+      "SIGNGU_CD": "11200",
+      "SIGNGU_CD_": "성동구",
+      "ADSTRD_CD": "11200650",
+      "ADSTRD_CD_": "성수1가1동",
+      "RELM_AR": "38774"
+    }
+  ],
+  "sales_negative_amounts": 0,
+  "sales_zero_amounts": 0,
+  "manifest": [
+    {
+      "file": "areas.zip",
+      "bytes": 2123078,
+      "sha256": "38bb8fab4e45a1171af4989cd7fa1275f68e5d644aa770f5431ce7ccc38384dd"
+    },
+    {
+      "file": "sales-2024.zip",
+      "bytes": 14288976,
+      "sha256": "97e7cde3a3291a8fd623f7b5268ea4b01a666027ae20da2ddf804ddae22288c5"
+    },
+    {
+      "file": "sales-2025.zip",
+      "bytes": 14035292,
+      "sha256": "c907f3d386d62b89f45781e6e6172328ee91b1b8dd2c621e4171e437bee1c6b2"
+    },
+    {
+      "file": "stores-2024.zip",
+      "bytes": 2155369,
+      "sha256": "969b7c38e5f3cc8630970e4ca8b85ef1c20d485982f64a90de990b13b38ca5ff"
+    },
+    {
+      "file": "stores-2025.zip",
+      "bytes": 2119809,
+      "sha256": "133bfc6ce79e13ee5b289490e4667dfba46a0af5d0d71df360a0d324e030a4e6"
+    }
+  ],
+  "eight_quarters": {
+    "sales": {
+      "rows": 172911,
+      "columns": 55,
+      "duplicates": 0,
+      "missing_key_rows": 0,
+      "unique_areas": 1583,
+      "quarters": [
+        "20241",
+        "20242",
+        "20243",
+        "20244",
+        "20251",
+        "20252",
+        "20253",
+        "20254"
+      ],
+      "null_cells": 0
+    },
+    "stores": {
+      "rows": 611664,
+      "columns": 14,
+      "duplicates": 0,
+      "missing_key_rows": 0,
+      "unique_areas": 1650,
+      "quarters": [
+        "20241",
+        "20242",
+        "20243",
+        "20244",
+        "20251",
+        "20252",
+        "20253",
+        "20254"
+      ],
+      "null_cells": 0
+    },
+    "join": {
+      "right_only": 438753,
+      "both": 172911,
+      "left_only": 0
+    },
+    "sales24_rows": 87179,
+    "stores24_rows": 306889,
+    "area_join_missing_rows": 0,
+    "coffee_areas_with_all_8_quarters": 1022,
+    "coffee_areas_observed": 1127,
+    "sample": [
+      {
+        "quarter": "20241",
+        "당월_매출_금액": "166652371",
+        "stor_co": "10",
+        "similr_induty_stor_co": "13",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "0"
+      },
+      {
+        "quarter": "20242",
+        "당월_매출_금액": "159475273",
+        "stor_co": "11",
+        "similr_induty_stor_co": "14",
+        "opbiz_stor_co": "1",
+        "clsbiz_stor_co": "0"
+      },
+      {
+        "quarter": "20243",
+        "당월_매출_금액": "155928466",
+        "stor_co": "11",
+        "similr_induty_stor_co": "14",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "0"
+      },
+      {
+        "quarter": "20244",
+        "당월_매출_금액": "229353124",
+        "stor_co": "10",
+        "similr_induty_stor_co": "13",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "1"
+      },
+      {
+        "quarter": "20251",
+        "당월_매출_금액": "183367983",
+        "stor_co": "10",
+        "similr_induty_stor_co": "13",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "0"
+      },
+      {
+        "quarter": "20252",
+        "당월_매출_금액": "220443234",
+        "stor_co": "9",
+        "similr_induty_stor_co": "12",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "1"
+      },
+      {
+        "quarter": "20253",
+        "당월_매출_금액": "255984520",
+        "stor_co": "9",
+        "similr_induty_stor_co": "12",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "0"
+      },
+      {
+        "quarter": "20254",
+        "당월_매출_금액": "184219542",
+        "stor_co": "8",
+        "similr_induty_stor_co": "11",
+        "opbiz_stor_co": "0",
+        "clsbiz_stor_co": "1"
+      }
+    ]
+  },
+  "store_counts_additive_identity_mismatches": 0,
+  "source_downloads": {
+    "endpoint": "https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?useCache=false",
+    "method": "POST",
+    "form_defaults": {
+      "seqNo": "",
+      "infSeq": "3"
+    },
+    "files": {
+      "sales-2024.zip": {
+        "infId": "OA-15572",
+        "seq": "50"
+      },
+      "sales-2025.zip": {
+        "infId": "OA-15572",
+        "seq": "51"
+      },
+      "stores-2024.zip": {
+        "infId": "OA-15577",
+        "seq": "19"
+      },
+      "stores-2025.zip": {
+        "infId": "OA-15577",
+        "seq": "20"
+      },
+      "areas.zip": {
+        "infId": "OA-15560",
+        "seq": "5"
+      }
+    }
+  },
+  "download_date": "2026-09-09",
+  "verified_date": "2026-09-10"
+}

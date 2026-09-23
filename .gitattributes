@@ -1,0 +1,20 @@
+# 저장소와 작업 트리 모두 LF로 고정한다. OS·편집기·AI 도구마다 줄바꿈이 달라 파일 전체가 diff가 되는 것을 막는다.
+* text=auto eol=lf
+
+# Windows 전용 스크립트만 CRLF를 유지한다.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 바이너리
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.dbf binary
+*.shp binary
+*.xlsx binary
