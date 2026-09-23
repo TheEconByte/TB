@@ -13,7 +13,7 @@ body:
     id: scope
     attributes:
       label: 범위
-      description: 수정할 경로와 하지 않을 일. AGENTS.md §5 공유 파일이나 §3 데이터·계산 계약을 건드리면 적는다.
+      description: 수정할 경로와 하지 않을 일. DB schema·의존성 파일이나 AGENTS.md §3 데이터·계산 계약을 건드리면 적는다.
       placeholder: |
         수정: app/src/features/market/, docs/domains/market.md
         하지 않음:
