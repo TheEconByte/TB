@@ -1,6 +1,6 @@
 # 실제 데이터·API 구현 가능성 검증
 
-> 역사·검증 근거: 이 문서는 2026-09-09~10에 수행한 원본 검증을 보존한다. 이후 서울시 확장 릴리스와 소진공 운영 스냅샷이 적재되었다. 현재 ACTIVE 릴리스와 구현 가능 범위는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)를 따른다.
+> 역사·검증 근거: 이 문서는 2026-09-09~10에 수행한 원본 검증을 보존한다. 이후 서울시 확장 릴리스와 소진공 운영 스냅샷이 적재되었다. 현재 ACTIVE 릴리스와 구현 가능 범위는 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)를 따른다.
 
 원본 입수·공고 확인: 2026-09-09. 연도별 열 매핑 재검증 및 문서 작성: 2026-09-10.
 
@@ -118,9 +118,9 @@ CSV의 기간 열은 분기인데 금액 열은 `당월_매출_금액`이다. �
 
 ## 6. 재현 자료와 남은 검증
 
-- [검사 스크립트](verification/verify_market.py): pandas 기반 읽기·결합 검사. 운영 적재기가 아니다.
-- [검사 결과](verification/market-verification.json): 행 수, 중복·누락, 결합 범위, 실제 표본, 원본 SHA-256, 다운로드 파라미터.
-- 원본 파일 보관 위치: 저장소 루트의 `data/raw/`(Git 제외). 준비 방법은 [검증 도구 안내](verification/README.md)를 따른다.
+- [검사 스크립트](../verification/verify_market.py): pandas 기반 읽기·결합 검사. 운영 적재기가 아니다.
+- [검사 결과](../verification/market-verification.json): 행 수, 중복·누락, 결합 범위, 실제 표본, 원본 SHA-256, 다운로드 파라미터.
+- 원본 파일 보관 위치: 저장소 루트의 `data/raw/`(Git 제외). 준비 방법은 [검증 도구 안내](../verification/README.md)를 따른다.
 
 재실행 예시:
 

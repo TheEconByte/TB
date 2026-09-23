@@ -45,7 +45,7 @@
   - 서로 다른 도메인 작업은 서로 다른 문서를 고친다.
   - 파괴적 명령이 사람 확인 없이 실행되지 않는다.
 - 비용·위험:
-  - 최초 1회 전체 포맷 commit이 생긴다. `.git-blame-ignore-revs`에 등록한다.
+  - 최초 1회 앱 코드 전체를 포맷한다. `TheEconByte/TB`는 포맷이 끝난 상태에서 새 이력으로 시작했으므로 blame에서 건너뛸 포맷 commit이 없다.
   - hook은 명령 문자열 패턴으로 판단하므로 우회 가능한 방어선이다. 인간 리뷰를 대체하지 않는다.
   - hook이 Git Bash 또는 bash에서 `$CLAUDE_PROJECT_DIR`로 실행되므로 Windows 팀원은 Git for Windows가 필요하다.
 - migration·호환성: DB·API 변경 없음.
@@ -56,6 +56,6 @@
 ## Validation
 
 - `npm --prefix app run verify:fast`가 포맷 검사를 포함해 통과한다.
-- CI `App checks`가 PR에서 `git diff --check`와 `format:check`를 실행한다.
+- CI 필수 check `check`(workflow `App checks`)가 PR에서 `git diff --check`와 `format:check`를 실행한다.
 - Claude Code 새 세션에서 세션 시작 상태가 문맥에 들어오고, `git reset --hard` 같은 명령이 hook에 의해 거부된다.
 - 팀원 전원이 이 ADR을 확인한 뒤 Status를 Accepted로 바꾼다.

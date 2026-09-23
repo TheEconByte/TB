@@ -4,13 +4,7 @@
 
 ## 현재 상태
 
-- 재무 계산, 인증, 계획 저장, revision 충돌, 불변 결과 저장
-- 서울시 상권분석서비스의 상위 업종 매출·점포·고객 구성 분석
-- 소진공 세부 업종 경쟁 점포 조회
-- 사업 조건 입력과 계획 저장
-- 사람 검수 카탈로그 기반 자금 후보와 확정 조건 대출 가정
-
-세부 업종 매출·배달, 검수되지 않은 임대료·프랜차이즈 비교, 자동 대출 승인·예측 기능은 제공하지 않는다. 현재 기능·데이터 릴리스·미제공 범위는 [프로젝트 컨텍스트](docs/PROJECT_CONTEXT.md)를 단일 기준으로 삼는다.
+현재 제공하는 기능·제공하지 않는 기능·운영 데이터 릴리스는 [PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) §2~§4가 원본이다.
 
 ## 먼저 읽을 문서
 
@@ -25,20 +19,11 @@ Claude Code는 `CLAUDE.md`를 통해 1·2번을 자동으로 읽고, `.claude/se
 
 ## 구조
 
-```text
-app/                    Next.js App Router 단일 애플리케이션
-app/src/features/       finance, plans, market, business-directory, funding
-app/prisma/             schema와 순서가 있는 migration
-app/catalog/funding/    사람이 검수하는 버전 고정 자금 카탈로그
-app/scripts/            검증·부트스트랩·운영 데이터 적재
-app/e2e/                데스크톱·모바일 핵심 사용자 흐름
-infra/                  PostgreSQL 17 개발 구성
-docs/                   현재 컨텍스트·제품·아키텍처·운영·검증 기록
-```
+단일 Next.js 앱(`app/`)과 PostgreSQL(`infra/`)로 구성된다. 디렉터리별 책임은 [PROJECT_CONTEXT.md §7](docs/PROJECT_CONTEXT.md#7-코드-지도), 도메인·테스트 지도는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 따른다.
 
 ## 빠른 시작
 
-Node.js 24 LTS(`.nvmrc`), npm 11, Docker Desktop이 필요하다. 저장소 루트에서 실행한다.
+Node.js 24 LTS(`.nvmrc`), npm 11, Docker Desktop이 필요하다. Windows에서는 Claude Code hook 실행에 Git for Windows(Git Bash)가 필요하다. 저장소 루트에서 실행한다.
 
 ```sh
 npm --prefix app ci
@@ -50,7 +35,7 @@ npm --prefix app run dev
 - 공개 상권 분석: <http://localhost:3000/markets>
 - 자금 후보: <http://localhost:3000/funding>
 
-`bootstrap`은 기존 환경파일을 덮어쓰지 않는다. 루트 `node_modules`는 앱 의존성 경로가 아니며 의존성은 `app/package-lock.json`으로 관리한다.
+`bootstrap`은 기존 환경파일을 덮어쓰지 않고 운영 데이터도 적재하지 않는다. 상권·점포 데이터와 원본 대조 테스트에 필요한 준비는 [DEVELOPMENT.md의 로컬 데이터 준비](docs/DEVELOPMENT.md#로컬-데이터-준비)를 따른다. 의존성은 `app/package-lock.json`으로 관리한다.
 
 ## 검증과 협업
 

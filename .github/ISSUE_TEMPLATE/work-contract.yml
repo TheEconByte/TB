@@ -44,15 +44,15 @@ body:
     id: single-writer
     attributes:
       label: single-writer 영역 수정
-      description: AGENTS.md의 single-writer 영역을 수정한다면 표시한다. 같은 영역을 수정하는 열린 작업이 없어야 한다.
+      description: AGENTS.md §3 표의 영역을 수정한다면 표시한다. 경로는 그 표가 원본이다. 같은 영역을 수정하는 열린 작업이 없어야 한다.
       options:
-        - label: Prisma schema·migrations
-        - label: package.json·package-lock.json
-        - label: 공통 API 타입·plans/schema.ts
-        - label: 인증·세션·요청 보안 경계
-        - label: 운영 적재기·manifest·자금 카탈로그
-        - label: 컨텍스트 문서(AGENTS.md, PROJECT_CONTEXT.md, TEAM_AI_WORKFLOW.md, TASKS.md)
-        - label: CI·GitHub 템플릿·.claude 설정
+        - label: DB schema
+        - label: 의존성
+        - label: 공통 계약
+        - label: 인증·보안 경계
+        - label: 운영 데이터
+        - label: 규칙·컨텍스트
+        - label: 하네스
   - type: textarea
     id: contracts
     attributes:

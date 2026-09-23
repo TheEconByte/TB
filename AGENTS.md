@@ -6,7 +6,7 @@
 |---|---|
 | 현재 기능·데이터 릴리스·변경 금지 계약 | [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) |
 | 작업 계약·worktree·리뷰·병합 절차 | [docs/TEAM_AI_WORKFLOW.md](docs/TEAM_AI_WORKFLOW.md) |
-| 도메인별 API·적재·계산 정책 | [docs/domains/](docs/DEVELOPMENT.md#도메인별-구현-계약) |
+| 도메인별 API·적재·계산 정책 | [docs/domains/README.md](docs/domains/README.md) |
 | 전체 문서 지도와 우선순위 | [docs/README.md](docs/README.md) |
 
 ## 1. 시작 전에 반드시 할 일
@@ -27,7 +27,7 @@
 
 ## 3. single-writer 영역
 
-아래 경로는 동시에 한 작업만 수정한다. 다른 작업이 필요하면 해당 owner에게 작은 선행 PR을 요청하고, 타입 복사나 임시 우회로 병렬성을 만들지 않는다.
+아래 경로는 동시에 한 작업만 수정한다. 영역의 owner는 그 영역을 수정 중인 열린 Issue의 assignee다. 다른 작업이 필요하면 해당 owner에게 작은 선행 PR을 요청하고, 타입 복사나 임시 우회로 병렬성을 만들지 않는다. 이 표를 바꾸면 [작업 계약 Issue 템플릿](.github/ISSUE_TEMPLATE/work-contract.yml)의 체크박스도 같은 이름으로 고친다.
 
 | 영역 | 경로 | 추가 조건 |
 |---|---|---|
@@ -66,9 +66,23 @@
 
 ## 7. branch·commit·PR 형식
 
-- branch: `<type>/<Issue 번호>-<짧은-영문-slug>`. type은 `feat`, `fix`, `docs`, `chore`, `refactor`, `test` 중 하나다. 예: `feat/12-result-compare`.
-- commit: 영어 Conventional Commits. `<type>(<scope>): <명령형 요약>`. scope는 `finance`, `plans`, `market`, `business-directory`, `business-profile`, `funding`, `security`, `harness`, `docs` 중 하나다. 예: `feat(plans): compare two saved results`.
-- PR: 본문 첫 줄 `Closes #<Issue 번호>`, [PR template](.github/PULL_REQUEST_TEMPLATE.md)의 검증 증거를 채운다. 하나의 PR은 하나의 Issue만 닫는다.
+main은 squash 병합만 허용한다. **PR 제목이 main에 남는 commit 메시지가 되므로 PR 제목은 반드시 아래 commit 형식을 따른다.** branch 안의 중간 commit도 같은 형식을 권장한다.
+
+- commit·PR 제목: 영어 Conventional Commits. `<type>(<scope>): <명령형 요약>`. 예: `feat(plans): compare two saved results`.
+- type:
+
+| type | 용도 |
+|---|---|
+| `feat` / `fix` | 사용자 기능 추가 / 결함 수정 |
+| `refactor` / `test` | 동작 변화 없는 구조 변경 / 테스트만 추가·수정 |
+| `docs` | 문서만 변경 |
+| `style` | 포맷만 변경 |
+| `ci` / `build` | CI workflow / 의존성·빌드 설정 |
+| `chore` | 그 밖의 하네스·저장소 관리 |
+
+- scope: 도메인 `finance`, `plans`, `market`, `business-directory`, `business-profile`, `funding`, `security` 또는 공통 `e2e`, `db`(schema·migration), `deps`, `harness`. 여러 영역의 문서만 고치면 scope를 생략한다(`docs: ...`).
+- branch: `<type>/<Issue 번호>-<짧은-영문-slug>`. type은 위 목록과 같다. 예: `feat/12-result-compare`.
+- PR 본문: 첫 줄 `Closes #<Issue 번호>`, [PR template](.github/PULL_REQUEST_TEMPLATE.md)의 검증 증거를 채운다. 하나의 PR은 하나의 Issue만 닫는다.
 - 언어: 문서·주석·화면 문구는 한국어, 식별자·commit 메시지는 영어.
 
 ## 8. 검증
@@ -94,7 +108,8 @@ npm --prefix app run verify
 | 하네스(.claude·CI·스크립트) | 해당 hook·스크립트 실제 실행 | `verify:fast` |
 | 배포 후보 | 해당 없음 | `npm --prefix app run verify` 필수 |
 
-- DB suite가 건너뛴 결과를 완료로 보고하지 않는다. 이전 commit에서 통과한 검사를 현재 변경의 증거로 재사용하지 않는다.
+- DB suite가 건너뛴 결과를 완료로 보고하지 않는다. 하네스는 건너뛴 테스트가 있어도 "통과"를 출력하므로 Vitest 요약의 `skipped` 수를 직접 확인한다. `data/raw/` 원본이 없으면 원본 대조 테스트 6개가 건너뛰어진다([DEVELOPMENT.md](docs/DEVELOPMENT.md#로컬-데이터-준비)).
+- 이전 commit에서 통과한 검사를 현재 변경의 증거로 재사용하지 않는다.
 - 실행한 명령과 결과, 실행하지 못한 검사와 이유를 구분한다.
 - 완료 표시 전에 `git diff --check`와 최종 `git status --short`를 확인한다.
 
@@ -113,7 +128,7 @@ npm --prefix app run verify
 | 작업 진행 상태 | GitHub Issue. 기능 PR은 `docs/TASKS.md`를 고치지 않는다 |
 | 되돌리기 어려운 결정 | `docs/decisions/NNNN-*.md` |
 
-역사 문서(`docs/11~13_*.md`, `REPOSITORY_REORGANIZATION.md`)는 현재 구현 지침으로 사용하지 않는다. 문서와 코드가 다르면 조용히 한쪽을 따르지 말고 불일치를 보고한다.
+`docs/history/`의 역사 문서는 현재 구현 지침으로 사용하지 않는다. 문서와 코드가 다르면 조용히 한쪽을 따르지 말고 불일치를 보고한다.
 
 ## 10. 작업 종료 보고
 

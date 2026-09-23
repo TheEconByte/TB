@@ -2,9 +2,9 @@
 
 작성일: 2026-09-09
 
-> 역사·설계 근거: 이 문서는 2026-09-09 초기 MVP 설계와 계산 근거를 보존한다. 이후 DB 모델·API·데이터 릴리스가 확장되어 현재 구현 지침으로 사용하지 않는다. 현재 사실은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), 작업 상태는 [TASKS.md](TASKS.md)를 따른다.
+> 역사·설계 근거: 이 문서는 2026-09-09 초기 MVP 설계와 계산 근거를 보존한다. 이후 DB 모델·API·데이터 릴리스가 확장되어 현재 구현 지침으로 사용하지 않는다. 현재 사실은 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md), 작업 상태는 [TASKS.md](../TASKS.md)를 따른다.
 
-현재 범위와 우선순위는 [PRODUCT.md](PRODUCT.md), 코드 위치는 [ARCHITECTURE.md](ARCHITECTURE.md), 실행 방법은 [DEVELOPMENT.md](DEVELOPMENT.md)를 따른다. 이 문서의 코드 폴더와 테이블 수 예시는 당시 제안이며 현재 schema의 사실로 인용하지 않는다.
+현재 범위와 우선순위는 [PRODUCT.md](../PRODUCT.md), 코드 위치는 [ARCHITECTURE.md](../ARCHITECTURE.md), 실행 방법은 [DEVELOPMENT.md](../DEVELOPMENT.md)를 따른다. 이 문서의 코드 폴더와 테이블 수 예시는 당시 제안이며 현재 schema의 사실로 인용하지 않는다.
 
 ## 1. 설계 전제와 결론
 

@@ -53,7 +53,7 @@ GitHub는 작은 단일 목적 PR이 검토하기 쉽고 안전하다고 설명�
 
 ```sh
 git fetch origin
-git worktree add ../TrendBench-12 -b feat/12-result-compare origin/main
+git worktree add ../TB-12 -b feat/12-result-compare origin/main
 ```
 
 - branch 이름은 [AGENTS.md §7](../AGENTS.md#7-branchcommitpr-형식)을 따른다.
@@ -118,23 +118,24 @@ PR 본문 또는 Issue 댓글에 남긴다.
 - 충돌은 해당 변경을 이해하는 작성자가 해결한다. `ours`/`theirs` 전체 선택이나 생성 코드 재생성으로 덮지 않는다.
 - 병합 순서는 `schema/공통 계약 → 서버 → UI → 후속 문서`처럼 의존성 방향을 따른다. 하나의 원자적 변경이면 한 PR에 함께 둔다.
 - 대형 작업은 작은 stacked PR로 나눌 수 있지만 각 PR은 독립 검증 가능해야 한다.
-- 마일스톤의 마지막 Issue가 닫히면 문서 owner가 [TASKS.md](TASKS.md)와 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)를 한 PR로 갱신한다.
+- PR 작성자는 자기 PR을 승인할 수 없다. 다른 팀원 1명의 승인이 필요하다.
+- squash 병합 시 PR 제목이 main의 commit 메시지가 된다. 병합 전에 제목이 [AGENTS.md §7](../AGENTS.md#7-branchcommitpr-형식) 형식인지 확인한다.
+- 마일스톤의 마지막 Issue가 닫히면 [TASKS.md](TASKS.md)와 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)를 갱신하는 작업 계약 Issue를 따로 만들어 한 PR로 반영한다.
 
-## 7. 권장 GitHub 저장소 설정
+## 7. GitHub 저장소 설정
 
-관리자는 기본 branch에 다음 ruleset을 설정한다.
+`TheEconByte/TB`(public)의 현재 설정이다. 설정을 바꾸면 이 절을 같은 PR에서 고친다.
 
-- PR 없이 직접 push 금지
-- 최소 1명 인간 승인
-- 새 push 후 기존 승인 해제
-- conversation resolution 필수
-- 최신 commit의 CI 필수: `App checks` (공백·포맷·lint·typecheck·unit test·build)
-- DB·E2E 변경은 로컬 `verify` 증거 또는 별도 CI 게이트 요구
-- force push와 branch 삭제 제한
-- PR 수가 많아지면 merge queue 도입
-- 실제 담당자가 정해진 뒤에만 CODEOWNERS 추가. 가짜 사용자명은 넣지 않음
+| 항목 | 현재 값 |
+|---|---|
+| main ruleset `main protection` | PR 필수, 승인 1명, 새 push 시 기존 승인 해제, conversation resolution 필수, force push·삭제 금지, bypass 없음(admin 포함) |
+| 필수 status check | `check` (workflow `App checks`의 job 이름). 최신 main 기준으로 통과해야 병합 가능 |
+| 병합 방식 | squash만 허용. commit 제목은 PR 제목, 병합 후 branch 자동 삭제 |
+| 접근 권한 | 조직 team `trendbench-dev`에 write |
+| CODEOWNERS | 없음. 실제 담당자가 정해진 뒤에만 추가하고 가짜 사용자명은 넣지 않는다 |
 
-현재 workflow가 모든 DB·E2E 검증을 수행한다고 가정하지 않는다. 로컬 `verify` 결과를 PR에 명시한다.
+- CI `check`는 PR diff 공백·포맷·lint·typecheck·unit test·build만 실행한다. DB·E2E는 원격 CI에 없으므로 DB·E2E 변경 PR은 로컬 `verify` 결과를 PR에 명시한다.
+- PR 수가 많아지면 merge queue 도입을 검토한다.
 
 ## 8. AI 도구 설정
 
@@ -151,6 +152,7 @@ PR 본문 또는 Issue 댓글에 남긴다.
 - 다른 AI 도구를 추가하면 해당 도구의 진입 파일은 `AGENTS.md`를 가리키는 포인터만 둔다(`GEMINI.md`, `.github/copilot-instructions.md`가 예시다).
 - subagent가 repository instructions를 자동 상속한다고 가정하지 않는다. 파일을 수정하는 subagent에는 Issue 번호와 소유 경계를 명시적으로 전달한다.
 - AI가 생성한 요약보다 현재 branch의 코드·테스트·문서를 우선한다.
+- 가드 hook은 명령 문자열 전체를 검사한다. heredoc이나 인자 안에 금지 명령 문구가 들어 있으면 실제로 실행하지 않아도 차단된다(예: Issue 본문에 적힌 금지 명령 예시). 이런 본문은 파일 쓰기 도구로 파일을 만든 뒤 `--body-file`처럼 파일 경로로 넘긴다.
 
 ## 9. 근거 자료
 

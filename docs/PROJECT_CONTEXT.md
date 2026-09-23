@@ -1,6 +1,6 @@
 # TrendBench 프로젝트 컨텍스트
 
-이 문서는 현재 구현·운영 데이터·변경 금지 계약의 유일한 원본이다. Claude Code는 `CLAUDE.md`를 통해 세션 시작 시 이 문서를 자동으로 읽는다. 규칙은 [AGENTS.md](../AGENTS.md), 제품 의도는 [PRODUCT.md](PRODUCT.md), 마일스톤은 [TASKS.md](TASKS.md), 작업 절차는 [TEAM_AI_WORKFLOW.md](TEAM_AI_WORKFLOW.md), 실행은 [DEVELOPMENT.md](DEVELOPMENT.md), 도메인 정책은 [domains/](DEVELOPMENT.md#도메인별-구현-계약)를 따른다. 문서와 코드가 다르면 임의로 하나를 선택하지 말고 불일치를 작업 범위에 포함하거나 담당자에게 알린다. 갱신 시점은 Git 이력으로 확인한다.
+이 문서는 현재 구현·운영 데이터·변경 금지 계약의 유일한 원본이다. Claude Code는 `CLAUDE.md`를 통해 세션 시작 시 이 문서를 자동으로 읽는다. 규칙은 [AGENTS.md](../AGENTS.md), 제품 의도는 [PRODUCT.md](PRODUCT.md), 마일스톤은 [TASKS.md](TASKS.md), 작업 절차는 [TEAM_AI_WORKFLOW.md](TEAM_AI_WORKFLOW.md), 실행은 [DEVELOPMENT.md](DEVELOPMENT.md), 도메인 정책은 [domains/README.md](domains/README.md)를 따른다. 문서와 코드가 다르면 임의로 하나를 선택하지 말고 불일치를 작업 범위에 포함하거나 담당자에게 알린다. 갱신 시점은 Git 이력으로 확인한다.
 
 ## 1. 제품 한 문장
 

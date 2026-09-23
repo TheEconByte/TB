@@ -37,7 +37,7 @@
 ## 현재 범위
 
 - 서울 한식(`CS100001`)과 커피·음료(`CS100010`) 상위 업종
-- 서울시 상권분석서비스 2024Q1~2025Q4 관측 자료
+- 서울시 상권분석서비스 상위 업종 관측 자료 (기준기간은 [PROJECT_CONTEXT.md §4](PROJECT_CONTEXT.md#4-현재-데이터-상태))
 - 소진공 서울 음식점 세부 업종 경쟁 점포
 - 사용자 입력 기반 재무·상환 시뮬레이션
 - 사람이 검수하는 정책자금 카탈로그와 규칙 기반 후보
@@ -56,10 +56,6 @@
 
 ## 출시 전 해결할 제품 결정
 
-- 결과 비교 방식과 미저장 변경 경고
-- 매출 시간 단위와 점포당 분모의 공식 확인
-- 운영 정책자금 원문 검수 책임과 갱신 주기
-- 이메일 전달·비밀번호 복구
-- 개인정보 보관·삭제, 백업·복구, 운영 모니터링
+남은 결정과 작업은 [TASKS.md](TASKS.md)의 마일스톤과 GitHub Issue에서 관리한다. 제품 범위를 바꾸는 결정은 [ADR](decisions/README.md)로 남긴다.
 
-초기 설계 과정은 [12_Simplified_MVP_Technical_Plan.md](12_Simplified_MVP_Technical_Plan.md), 당시 데이터 검증은 [13_Data_API_Feasibility_Verification.md](13_Data_API_Feasibility_Verification.md)에 남아 있지만 현재 범위보다 우선하지 않는다.
+초기 설계 과정은 [history/12_Simplified_MVP_Technical_Plan.md](history/12_Simplified_MVP_Technical_Plan.md), 당시 데이터 검증은 [history/13_Data_API_Feasibility_Verification.md](history/13_Data_API_Feasibility_Verification.md)에 남아 있지만 현재 범위보다 우선하지 않는다.

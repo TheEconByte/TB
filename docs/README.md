@@ -22,20 +22,20 @@ Claude Code는 `CLAUDE.md`를 통해 1·2번을 세션 시작 시 자동으로 �
 | 어느 마일스톤이 끝났고 다음은 무엇인가 | [TASKS.md](TASKS.md) | 마일스톤 요약. 개별 작업 상태는 GitHub Issue |
 | 코드는 어디에 있는가 | [ARCHITECTURE.md](ARCHITECTURE.md) | 도메인·API·테스트 지도, 변경 위치, 검증 계층 |
 | 어떻게 실행하는가 | [DEVELOPMENT.md](DEVELOPMENT.md) | 환경, 명령, 포맷, DB, CI, 한 PC의 여러 worktree |
-| 도메인 정책은 무엇인가 | [domains/](DEVELOPMENT.md#도메인별-구현-계약) | 도메인별 API·적재·계산 정책과 테스트 범위 |
+| 도메인 정책은 무엇인가 | [domains/README.md](domains/README.md) | 도메인별 API·적재·계산 정책과 테스트 범위 |
 | 되돌리기 어려운 결정을 어디에 남기는가 | [decisions/README.md](decisions/README.md) | ADR 대상, 형식, 변경 이력 |
 | 공공 원본을 어떻게 재현 검증하는가 | [verification/README.md](verification/README.md) | 원본 준비와 검증 스크립트 |
 
 ## 역사·근거 문서
 
-아래 문서는 결정 근거와 당시 검증을 보존하지만 현재 구현 지침이 아니다.
+`history/` 폴더의 문서는 결정 근거와 당시 검증을 보존하지만 현재 구현 지침이 아니다.
 
 | 문서 | 용도 |
 |---|---|
-| [11_Project_Direction_Analysis.md](11_Project_Direction_Analysis.md) | 2026-09-09 방향 전환 기록 |
-| [12_Simplified_MVP_Technical_Plan.md](12_Simplified_MVP_Technical_Plan.md) | 초기 MVP 설계와 계산 근거 |
-| [13_Data_API_Feasibility_Verification.md](13_Data_API_Feasibility_Verification.md) | 당시 공공데이터·지원 공고 검증 증거 |
-| [REPOSITORY_REORGANIZATION.md](REPOSITORY_REORGANIZATION.md) | 2026-09-18 저장소 개편 기록 |
+| [11_Project_Direction_Analysis.md](history/11_Project_Direction_Analysis.md) | 2026-09-09 방향 전환 기록 |
+| [12_Simplified_MVP_Technical_Plan.md](history/12_Simplified_MVP_Technical_Plan.md) | 초기 MVP 설계와 계산 근거 |
+| [13_Data_API_Feasibility_Verification.md](history/13_Data_API_Feasibility_Verification.md) | 당시 공공데이터·지원 공고 검증 증거 |
+| [REPOSITORY_REORGANIZATION.md](history/REPOSITORY_REORGANIZATION.md) | 2026-09-18 저장소 개편 기록 |
 
 역사 문서의 테이블 수, 완료 상태, 데이터 기준일이 현재 문서와 다르면 현재 원본 문서를 따른다. 단, 계산식이나 데이터 의미를 바꾸려면 역사 문서의 근거도 검토하고 새 ADR을 남긴다.
 

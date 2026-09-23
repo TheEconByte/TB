@@ -54,7 +54,7 @@ npm --prefix app run start
 
 Prisma 스키마나 마이그레이션을 바꾼 뒤에는 실행 중인 개발 서버를 재시작한다. 재시작하지 않으면 이전 스키마로 생성된 Prisma 클라이언트가 남아 새 컬럼을 쓰는 요청이 500으로 실패한다.
 
-`bootstrap`은 세 로컬 환경파일이 모두 없을 때만 임의 값을 생성하며 일부만 존재하면 값을 추측하거나 덮어쓰지 않고 실패한다. Compose 기동, 전용 테스트 DB 생성, 운영·테스트 DB migration, Prisma Client와 Playwright Chromium 준비를 멱등하게 수행한다. `-- --skip-browser`로 브라우저 설치만 생략할 수 있다.
+`bootstrap`은 세 로컬 환경파일이 모두 없을 때만 임의 값을 생성하며 일부만 존재하면 값을 추측하거나 덮어쓰지 않고 실패한다. Compose 기동, 전용 테스트 DB 생성, 운영·테스트 DB migration, Prisma Client와 Playwright Chromium 준비를 멱등하게 수행한다. `-- --skip-browser`로 브라우저 설치만 생략할 수 있다. 운영 데이터는 적재하지 않으므로 [로컬 데이터 준비](#로컬-데이터-준비)를 이어서 따른다.
 
 `test`·`verify:fast`는 DB 비의존 피드백용이다. `test:db`·`verify:db`는 운영 DB와 다른 `TEST_DATABASE_URL`을 강제한다. 최종 `verify`는 Docker Desktop을 직접 시작하거나 재시작하지 않고 migration 상태, 카탈로그, 포맷, lint, typecheck, 전체 Vitest, Playwright를 순서대로 검증한다.
 
@@ -105,6 +105,18 @@ npm --prefix app run db:status
 
 Better Auth 1.7.5는 이메일·비밀번호와 DB 세션을 담당한다. `BETTER_AUTH_SECRET`은 32자 이상의 고엔트로피 값으로 설정하고 저장소에 커밋하지 않는다. 실제 이메일 발송, 비밀번호 복구, 소셜 로그인은 제공하지 않는다.
 
+## 로컬 데이터 준비
+
+`bootstrap`은 schema만 만들고 운영 데이터는 적재하지 않는다. 새 PC의 운영 DB는 비어 있어서 `/markets`의 상권 조회는 `503 RELEASE_UNAVAILABLE`을 반환하고, 세부 업종 목록은 빈 목록과 `nullReason`을 반환한다. 같은 PC에서 기존 Compose 볼륨(`trendbench-mvp`)을 쓰는 clone은 이미 적재된 데이터를 공유한다. 현재 ACTIVE 릴리스는 [PROJECT_CONTEXT.md §4](PROJECT_CONTEXT.md#4-현재-데이터-상태)에서 확인한다.
+
+| 데이터 | 준비 | 적재 |
+|---|---|---|
+| 서울시 상권 원본 | [verification/README.md](verification/README.md)의 5개 ZIP을 저장소 루트 `data/raw/`(Git 제외)에 둔다. 제공자가 파일을 교체했으면 manifest checksum이 맞지 않으므로, 기존 보유자에게 같은 파일을 받는다 | `npm --prefix app run market:load` |
+| 소진공 점포 | 공공데이터포털 인증키를 `app/.env.local`의 `SEMAS_SERVICE_KEY`에 넣는다. 키는 사람이 안전한 채널로 전달하거나 각자 발급한다 | `npm --prefix app run business:load` |
+| 자금 카탈로그 | 현재 검수자가 `UNASSIGNED`라 `funding:load`가 적재를 거부한다. `/funding`의 `503 CATALOG_UNAVAILABLE`은 정상적인 fail-closed 상태다 | 검수자 지정 후 `npm --prefix app run funding:load` |
+
+테스트는 운영 데이터가 없어도 전용 테스트 DB에 합성 릴리스를 만들어 실행한다. 다만 `data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어지고, 하네스는 그래도 "통과"를 출력한다. 전체 검증 결과를 보고할 때는 Vitest 요약 줄(`Tests ... passed`)에 `skipped`가 없는지 확인한다.
+
 ## CI
 
 현재 `.github/workflows/check.yml`은 `.nvmrc`의 Node에서 PR diff의 공백 오류(`git diff --check`), `npm ci`, 포맷 검사, lint, typecheck, DB 비의존 unit test, production build만 실행한다. PostgreSQL service, migration, DB suite, Playwright, artifact 보존은 아직 원격 CI에 연결되지 않았다. 따라서 GitHub의 초록색 check만으로 DB·브라우저 검증까지 통과했다고 말할 수 없다.
@@ -113,17 +125,7 @@ DB·E2E 변경 PR은 작성자가 로컬 `npm --prefix app run verify` 결과를
 
 ## 도메인별 구현 계약
 
-API·적재·계산 정책과 도메인 테스트 범위는 도메인별 문서가 단일 원본이다. 서로 다른 도메인 작업이 같은 파일을 고치지 않도록 이 문서에는 복사하지 않는다.
-
-| 도메인 | 문서 |
-|---|---|
-| 재무 계산 | [domains/finance.md](domains/finance.md) |
-| 계획·불변 결과·계획 API | [domains/plans.md](domains/plans.md) |
-| 서울시 상권 적재·공개 API | [domains/market.md](domains/market.md) |
-| 소진공 세부 업종 점포 | [domains/business-directory.md](domains/business-directory.md) |
-| 사업 조건 저장 | [domains/business-profile.md](domains/business-profile.md) |
-| 자금 카탈로그·후보·대출 가정 적용 | [domains/funding.md](domains/funding.md) |
-| 웹 요청 보안 경계 | [domains/security.md](domains/security.md) |
+API·적재·계산 정책과 도메인 테스트 범위는 [domains/README.md](domains/README.md)의 도메인 문서가 원본이다.
 
 ## 데이터 검증
 
