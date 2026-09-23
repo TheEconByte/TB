@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
+import { BUILDING_TYPE_CRITERIA, BUILDING_TYPE_LABELS, BUILDING_TYPES } from '@/features/rent-benchmark/types';
 import type { BusinessProfileInput } from './schema';
 
 export type BusinessProfileForm = {
@@ -259,7 +260,7 @@ export default function BusinessProfileWizard({
           <>
             <WizardHeading
               title="매장이 어느 층에 있는지 알려주세요."
-              note="층 정보는 계획 조건이며 특정 점포 임대료를 자동 추정하지 않습니다."
+              note="층에 맞는 부동산원 층별 임대료를 참고로 보여 드립니다. 재무계획에는 자동으로 넣지 않습니다."
             />
             <div className="choice-grid three">
               {(
@@ -286,24 +287,18 @@ export default function BusinessProfileWizard({
           <>
             <WizardHeading
               title="매장이 어떤 건물에 있는지 알려주세요."
-              note="임대료 벤치마크 원본이 검수되기 전까지 금액을 표시하거나 재무계획에 적용하지 않습니다."
+              note="한국부동산원 임대동향조사의 상가 구분입니다. 고른 유형의 조사 임대료를 참고로 보여 드립니다."
             />
             <div className="choice-grid three">
-              {(
-                [
-                  ['SMALL_RETAIL', '소규모 상가'],
-                  ['MEDIUM_LARGE_RETAIL', '중대형 상가'],
-                  ['COLLECTIVE_RETAIL', '집합 상가'],
-                ] as const
-              ).map(([value, label]) => (
+              {BUILDING_TYPES.map((value) => (
                 <button
                   type="button"
                   key={value}
                   className={form.buildingType === value ? 'choice-card selected' : 'choice-card'}
                   onClick={() => onChange({ ...form, buildingType: value })}
                 >
-                  <strong>{label}</strong>
-                  <span>임대료 벤치마크 자료 미확보</span>
+                  <strong>{BUILDING_TYPE_LABELS[value]}</strong>
+                  <span>{BUILDING_TYPE_CRITERIA[value]}</span>
                 </button>
               ))}
             </div>

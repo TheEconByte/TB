@@ -32,6 +32,7 @@ import BusinessProfileWizard, {
   businessProfilePayload,
   type BusinessProfileForm,
 } from '@/features/business-profile/BusinessProfileWizard';
+import RentBenchmarkPanel from '@/features/rent-benchmark/RentBenchmarkPanel';
 
 type PlanSummary = { id: string; title: string; revision: number; updatedAt: string; _count: { results: number } };
 type ResultSummary = { id: string; inputRevision: number; calculationVersion: string; calculatedAt: string };
@@ -535,6 +536,10 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             <p className="funding-position">저장 결과에 반영된 대출 가정: {describeLoanAssumption(resultAssumption)}</p>
           )}
           <BusinessProfileWizard form={businessForm} onChange={setBusinessForm} />
+          <RentBenchmarkPanel
+            profile={businessForm}
+            savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null}
+          />
           <FinancePlanner
             key={plan?.id ?? 'new'}
             initialTitle={plan?.title}
