@@ -15,7 +15,7 @@
 - 원문 확인과 카탈로그 편집은 운영자가 수행한다. 웹 요청 처리 중에는 공고 수집이나 카탈로그 적재를 하지 않는다.
 - Zod 스키마(`app/src/features/funding/schema.ts`)가 productKey·version 형식, 필수 필드, 날짜 형식, 금액의 원 단위 정수 문자열, supportType·사업단계·접수 상태·상환방식 열거, 공식 기관 HTTPS 호스트, checksum 형식을 검사한다.
 - 상환 계산에 쓰는 확정 조건은 자유 서술이 아니라 구조화된 필드로 기록한다: `interestRatePercent`(확정 고정 연 금리 %), `repaymentTermMonths`(전체 상환개월), `repaymentGraceMonths`(원금 거치개월). `interestCondition`·`repaymentCondition`은 근거 문장으로만 남기며 숫자로 해석하지 않는다.
-- 규칙 검사(`app/src/features/funding/validation.ts`)가 productKey+version 중복, 접수기간과 관측 접수 상태의 모순(종료된 공고를 OPEN으로 기록 등), 지원 유형과 금리·상환 조건의 모순, 원문 미확보 상태의 checksum, 검수 기한 경과, 상환 계산 사유 누락·불필요, 조건별 공식 근거 누락, 확정 조건의 내부 모순을 검사한다. 검수 기한 경과와 검수자 미지정(UNASSIGNED), 공식 원문이 아닌 요약 근거는 주의로 기록한다. 단, `funding:load`는 카탈로그나 상품의 검수자가 UNASSIGNED이면 운영 적재를 거부한다.
+- 규칙 검사(`app/src/features/funding/validation.ts`)가 productKey+version 중복, 접수기간과 관측 접수 상태의 모순(종료된 공고를 OPEN으로 기록 등), 지원 유형과 금리·상환 조건의 모순, 원문 미확보 상태의 checksum, 검수 기한 경과, 상환 계산 사유 누락·불필요, 조건별 공식 근거 누락, 확정 조건의 내부 모순을 검사한다. 검수 기한 경과와 검수자 미지정(UNASSIGNED), 공식 원문이 아닌 요약 근거는 주의로 기록한다. 검수 기능이 생기기 전까지 `funding:load`는 검수자가 UNASSIGNED여도 적재한다. 그런 상품은 판정에서 현재 후보가 되지 않고 추가 확인으로 분류된다.
 - 릴리스에는 출처 목록(`sourceDocuments`), 이 카탈로그가 담은 상품 버전 목록(`productVersions`), 기준일(`basisDate`), 상품 검수일 중 가장 늦은 날짜(`reviewedAt`), `schemaVersion`, 카탈로그 checksum, 검증 요약을 함께 보존한다.
 - 카탈로그 checksum은 파일 바이트의 SHA-256이다. `funding_catalog_releases.catalogChecksum`이 UNIQUE라서 같은 내용을 다시 적재해도 릴리스가 늘지 않고 `ALREADY_ACTIVE`로 끝난다. 같은 catalogKey+catalogVersion에 다른 내용이 오면 거부한다.
 - 상품 버전은 `productKey + version`이 UNIQUE이며 불변이다. 이미 적재된 버전과 내용이 다르면 `PRODUCT_VERSION_IMMUTABLE`로 실패하고 기존 행을 덮어쓰지 않는다. 새 내용은 version을 올려 추가한다. 릴리스와 상품 버전은 `funding_catalog_products` 연결 테이블로 묶어 동일한 불변 버전을 여러 릴리스가 재사용할 수 있다.

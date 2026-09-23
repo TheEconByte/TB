@@ -38,7 +38,7 @@ npm --prefix app run dev
 |---|---|---|
 | 서울시 상권 | [verification/README.md](verification/README.md)의 ZIP 5개를 `data/raw/`(Git 제외)에 둔다. checksum이 맞아야 하므로 기존 보유자에게 같은 파일을 받는다 | `npm --prefix app run market:load` |
 | 소진공 점포 | 공공데이터포털 인증키를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
-| 자금 카탈로그 | 카탈로그와 상품에 실제 검수자가 지정되어야 적재된다 | `npm --prefix app run funding:load` |
+| 자금 카탈로그 | 준비 없음. 검수자가 UNASSIGNED여도 적재되며, 그런 상품은 현재 후보가 아니라 추가 확인으로 분류된다 | `npm --prefix app run funding:load` |
 
 `data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어진다.
 

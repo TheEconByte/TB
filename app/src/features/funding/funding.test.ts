@@ -115,23 +115,27 @@ function catalogFrom(validation: FundingCatalogValidation): FundingCatalog {
   return validation.catalog;
 }
 
-function reviewedCatalogFile(): string {
+function testCatalogFile(catalogKey: string, productPrefix: string, reviewer: string | null): string {
   const source = JSON.parse(readFileSync(REAL_CATALOG_PATH, 'utf8')) as {
     catalogKey: string;
     catalogVersion: string;
     reviewer: string;
-    products: Array<Record<string, unknown> & { productKey: string }>;
+    products: Array<Record<string, unknown> & { productKey: string; reviewer: string }>;
   };
   return writeCatalogFile({
     ...source,
-    catalogKey: 'test-reviewed-catalog',
-    reviewer: 'test-reviewer',
+    catalogKey,
+    reviewer: reviewer ?? source.reviewer,
     products: source.products.map((entry) => ({
       ...entry,
-      productKey: `test-${entry.productKey}`,
-      reviewer: 'test-reviewer',
+      productKey: `${productPrefix}${entry.productKey}`,
+      reviewer: reviewer ?? entry.reviewer,
     })),
   });
+}
+
+function reviewedCatalogFile(): string {
+  return testCatalogFile('test-reviewed-catalog', 'test-', 'test-reviewer');
 }
 
 function firstProduct(validation: FundingCatalogValidation, productKey = 'test-loan') {
@@ -388,11 +392,9 @@ describe('the reviewed 2026-09-20 catalog', () => {
     }
   });
 
-  it('allows draft validation but refuses operational loading while reviewers are unassigned', () => {
+  it('accepts the catalog for loading while reviewers are unassigned', () => {
     expect(validate(REAL_CATALOG).ok).toBe(true);
-    expect(() => readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE, { requireAssignedReviewer: true })).toThrow(
-      /검수자가 지정되지 않았습니다/,
-    );
+    expect(readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE).catalog.reviewer).toBe('UNASSIGNED');
   });
 
   it('keeps every loan uncalculated while the rate and repayment method are unknown', () => {
@@ -829,5 +831,18 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
       firstMemberships.map((entry) => entry.productVersionId),
     );
     expect(await db().fundingProductVersion.count({ where: { productKey: { startsWith: 'test-' } } })).toBe(5);
+  });
+
+  it('activates a catalog whose reviewers are still UNASSIGNED', async () => {
+    const report = await loadFundingCatalog({
+      catalogPath: testCatalogFile('test-unassigned-catalog', 'test-unassigned-', null),
+      prisma: db(),
+      asOfDate: REVIEW_DATE,
+      log: () => {},
+    });
+    expect(report.outcome).toBe('ACTIVATED');
+    const stored = await db().fundingCatalogRelease.findUnique({ where: { id: report.releaseId } });
+    expect(stored?.status).toBe('ACTIVE');
+    expect(stored?.reviewer).toBe('UNASSIGNED');
   });
 });

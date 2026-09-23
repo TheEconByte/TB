@@ -5,7 +5,6 @@ import { canonicalJson } from './canonical.ts';
 import { fromDate, toDate } from './dates.ts';
 import { assessProductRepayment } from './eligibility.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
-import { REVIEWER_UNASSIGNED } from './types.ts';
 import {
   FundingCatalogError,
   requireValidFundingCatalog,
@@ -48,11 +47,7 @@ export type ParsedFundingCatalogFile = {
 
 // 카탈로그 checksum은 파일 바이트의 SHA-256이다. 같은 파일을 다시 적재하면
 // 같은 값이 나오므로 중복 적재를 만들지 않는다.
-export function readFundingCatalogFile(
-  catalogPath: string,
-  asOfDate: string,
-  options: { requireAssignedReviewer?: boolean } = {},
-): ParsedFundingCatalogFile {
+export function readFundingCatalogFile(catalogPath: string, asOfDate: string): ParsedFundingCatalogFile {
   let bytes: Buffer;
   try {
     bytes = readFileSync(catalogPath);
@@ -72,16 +67,6 @@ export function readFundingCatalogFile(
   const catalog = validation.catalog;
   if (catalog === null) {
     throw new FundingCatalogError('CATALOG_VALIDATION_FAILED', '카탈로그 검증 결과가 비어 있습니다.');
-  }
-  if (
-    options.requireAssignedReviewer &&
-    (catalog.reviewer === REVIEWER_UNASSIGNED ||
-      catalog.products.some((product) => product.reviewer === REVIEWER_UNASSIGNED))
-  ) {
-    throw new FundingCatalogError(
-      'REVIEWER_UNASSIGNED',
-      '카탈로그 또는 상품의 검수자가 지정되지 않았습니다. 운영 적재 전에 모든 reviewer를 실제 검수자로 지정하세요.',
-    );
   }
   return {
     catalog,
@@ -129,10 +114,10 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       '판정 기준일(asOfDate)이 필요합니다. 명령은 서버의 한국 시간 날짜를 넘깁니다.',
     );
   }
+  // 검수 기능은 아직 없다. 검수자가 UNASSIGNED여도 적재하고, 그런 상품은 판정에서 현재 후보가 되지 않는다.
   const { catalog, catalogChecksum, reviewOverdue, warnings, checks } = readFundingCatalogFile(
     options.catalogPath,
     options.asOfDate,
-    { requireAssignedReviewer: true },
   );
   const products = catalog.products.map(productVersionKey);
   const releaseReviewedAt = latestReviewDate(catalog);

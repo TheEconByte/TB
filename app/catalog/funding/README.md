@@ -13,7 +13,7 @@ npm --prefix app run funding:load
 ```
 
 - `funding:validate`: JSON 스키마, productKey+version 중복, 공식 URL, 날짜·접수기간 모순, 지원 유형과 금융 조건 모순, checksum, 검수 기한, 상환 계산 사유 누락을 검사하고 결과만 출력한다(DB 사용 없음).
-- `funding:load`: 같은 검사를 통과하고 카탈로그와 모든 상품에 실제 검수자가 지정된 경우만 `funding_catalog_releases`(PENDING → ACTIVE), `funding_product_versions`, `funding_catalog_products`에 적재한다.
+- `funding:load`: 같은 검사를 통과한 카탈로그만 `funding_catalog_releases`(PENDING → ACTIVE), `funding_product_versions`, `funding_catalog_products`에 적재한다. 검수 기능이 생기기 전까지는 검수자가 UNASSIGNED여도 적재한다.
 - 검증을 우회하는 명령행 옵션은 없다. 검사에 실패한 카탈로그는 적재되지 않고 기존 ACTIVE 카탈로그도 바뀌지 않는다.
 
 ## 갱신 절차
@@ -44,4 +44,4 @@ npm --prefix app run funding:load
 - 예비 창업자가 아니라 사업자등록 이후에만 검토할 수 있는 상품 3건(서울시 중소기업육성자금 창업기업자금·포용금융자금·긴급자영업자금)을 별도 상태로 분리했다.
 - 2026-09-09에 확인했던 강북창업지원센터 입주 모집은 다시 확인하지 않아 검수 기한 경과 상태로 남겼고, 현재 후보에서 제외된다.
 - 서울여성 창업아이디어 공모전 등 2026-09-09 검토 항목은 이번 검수에서 다시 확인하지 않아 카탈로그에 넣지 않았다.
-- 검수자(`reviewer`)는 아직 지정되지 않아 `UNASSIGNED`이며, `funding:validate`는 초안 구조만 검사하고 경고한다. `funding:load`는 실제 검수자가 지정될 때까지 운영 적재를 거부한다.
+- 검수자(`reviewer`)는 아직 지정되지 않아 `UNASSIGNED`이며, `funding:validate`는 경고로 표시하고 `funding:load`는 그대로 적재한다. 이 상품들은 현재 후보가 아니라 추가 확인으로 분류된다.
