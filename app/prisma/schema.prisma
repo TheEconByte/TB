@@ -378,3 +378,58 @@ model FundingCatalogProduct {
   @@index([productVersionId])
   @@map("funding_catalog_products")
 }
+
+enum RentBenchmarkReleaseStatus {
+  PENDING
+  ACTIVE
+  SUPERSEDED
+  FAILED
+}
+
+// 한국부동산원 상업용부동산 임대동향조사(R-ONE Open API)의 서울 행을 운영자가 적재한
+// 불변 스냅샷이다. 검증을 모두 통과한 릴리스만 ACTIVE가 된다.
+model RentBenchmarkRelease {
+  id                String                     @id @default(cuid())
+  releaseKey        String                     @unique
+  status            RentBenchmarkReleaseStatus @default(PENDING)
+  schemaVersion     String
+  sourceUrl         String
+  basisPeriod       String
+  basisPeriodLabel  String
+  retrievedAt       DateTime
+  sourceTables      Json                       @db.JsonB
+  validationSummary Json                       @db.JsonB
+  observationCount  Int                        @default(0)
+  activatedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  observations      RentBenchmarkObservation[]
+
+  @@index([status, activatedAt])
+  @@map("rent_benchmark_releases")
+}
+
+// 조사 지역(서울 > 권역 > 조사 상권)·상가 유형·지표·층·분기별 관측값. 원본 단위와 값을
+// 그대로 보존하고, 원본이 비운 값은 NULL로 둔다. 지역 ID는 표마다 달라 경로로 잇는다.
+model RentBenchmarkObservation {
+  id            String               @id @default(cuid())
+  releaseId     String
+  buildingType  String
+  metric        String
+  quarter       String
+  regionPath    String
+  regionName    String
+  regionLevel   Int
+  floor         String
+  value         Decimal?             @db.Decimal(24, 12)
+  unit          String
+  sourceTableId String
+  createdAt     DateTime             @default(now())
+  release       RentBenchmarkRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, buildingType, metric, quarter, regionPath, floor])
+  @@index([releaseId, buildingType, regionPath])
+  @@map("rent_benchmark_observations")
+}

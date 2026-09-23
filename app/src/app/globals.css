@@ -1276,6 +1276,11 @@ footer {
 .choice-card span {
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  padding: 0 10px;
 }
 .choice-card .floor-icon {
   color: var(--green);
@@ -1465,5 +1470,56 @@ footer {
   }
   .metric-row {
     grid-template-columns: 60px minmax(0, 1fr) auto;
+  }
+}
+
+/* 임대료 참고 패널 */
+.rent-lead {
+  margin-top: 8px;
+}
+.rent-select-row {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 18px;
+}
+.rent-summary {
+  margin-top: 18px;
+}
+.rent-summary small {
+  color: #d6e2dc;
+  font-size: 12px;
+}
+.rent-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 22px;
+}
+.rent-detail-grid h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.metric-row.selected {
+  font-weight: 700;
+}
+.metric-row.selected .metric-track span {
+  background: var(--accent);
+}
+.rent-source {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rent-source summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+.rent-source ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+@media (max-width: 850px) {
+  .rent-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
