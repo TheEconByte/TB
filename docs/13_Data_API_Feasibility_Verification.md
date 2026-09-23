@@ -120,12 +120,12 @@ CSV의 기간 열은 분기인데 금액 열은 `당월_매출_금액`이다. �
 
 - [검사 스크립트](verification/verify_market.py): pandas 기반 읽기·결합 검사. 운영 적재기가 아니다.
 - [검사 결과](verification/market-verification.json): 행 수, 중복·누락, 결합 범위, 실제 표본, 원본 SHA-256, 다운로드 파라미터.
-- 원본 파일 보관 위치: `C:\Users\jacob\.codex\visualizations\2026\09\09\01a08539-f398-7ae1-ac56-4e9d421078e3\verification`.
+- 원본 파일 보관 위치: 저장소 루트의 `data/raw/`(Git 제외). 준비 방법은 [검증 도구 안내](verification/README.md)를 따른다.
 
 재실행 예시:
 
 ```powershell
-python docs/verification/verify_market.py --source-dir 'C:\Users\jacob\.codex\visualizations\2026\09\09\01a08539-f398-7ae1-ac56-4e9d421078e3\verification'
+python docs/verification/verify_market.py --source-dir data/raw
 ```
 
 Python과 pandas가 필요하다. 검사는 원본 ZIP을 수정하지 않고 지정 폴더의 결과 JSON을 갱신한다. 재다운로드 때 파일 내용·목록이 달라질 수 있으므로 checksum과 제공 기준도 다시 확인한다.

@@ -7,8 +7,7 @@
       "Read(**/infra/.env)",
       "Edit(**/.env.local)",
       "Edit(**/.env.test.local)",
-      "Edit(**/infra/.env)",
-      "Edit(**/prisma/migrations/*/migration.sql)"
+      "Edit(**/infra/.env)"
     ]
   },
   "hooks": {
