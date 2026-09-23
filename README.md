@@ -28,5 +28,6 @@ npm --prefix app run dev
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 시스템 구조, 도메인·코드 지도 |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 실행·DB·데이터 준비·CI |
 | [decisions/](docs/decisions/README.md) | 되돌리기 어려운 결정(ADR) |
+| [SPRINT.md](docs/SPRINT.md) | 데모 스프린트(~9/28) 작업 패키지·인터페이스·일정. 데모 후 삭제 |
 
 작업 진행 상태는 GitHub Issue와 Milestone에서 관리한다.
