@@ -14,4 +14,3 @@
 - API 오류·누락 필드·중복 상가업소번호·지원 업종 0건은 활성화를 막는다. 새 스냅샷 검증이 끝날 때까지 기존 ACTIVE 스냅샷을 유지한다.
 - `/api/business-categories`는 활성 스냅샷의 한식·커피 세부 업종을 반환한다. 활성 릴리스가 없으면 200과 빈 목록, `nullReason`을 반환한다.
 - `/api/businesses/summary?districtCode=...&detailedIndustryCode=...`는 자치구·세부 업종 점포 수와 최대 50개 점포를 반환한다. 이 값은 매출이 아니며 서울시 추정매출과 합치지 않는다.
-- `/api/franchises`는 검수 스냅샷이 생기기 전까지 503 `DATASET_UNAVAILABLE`다. 샘플 숫자나 0으로 성공 응답을 만들지 않는다.

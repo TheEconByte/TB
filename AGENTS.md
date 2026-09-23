@@ -14,7 +14,7 @@
 
 - 앱은 `app/` 하나다: Next.js App Router, TypeScript, PostgreSQL 17, Prisma, Better Auth, Zod.
 - 별도 서버·Redis·큐·지도·POS 연동·자동 공고 해석 AI 같은 스택 추가는 [ADR](docs/decisions/README.md)을 먼저 쓴다.
-- 웹 요청 중에 외부 데이터를 가져오지 않는다. 공식 데이터는 운영자 명령(`market:load`, `business:load`, `rent:load`, `funding:load`)으로 적재한다.
+- 웹 요청 중에 외부 데이터를 가져오지 않는다. 공식 데이터는 운영자 명령(`market:load`, `business:load`, `rent:load`, `franchise:load`, `funding:load`)으로 적재한다.
 - 가짜 API, 샘플 운영 데이터, 성공을 흉내 내는 미구현 함수를 만들지 않는다. 기존 계산기·스키마·enum을 재사용한다.
 
 ## 3. 데이터·계산 계약
@@ -46,7 +46,7 @@
 - main은 squash 병합만 한다. PR 제목이 main의 commit 메시지가 된다.
 - 제목은 영어 Conventional Commits: `<type>(<scope>): <명령형 요약>`. 예: `feat(plans): compare two saved results`
   - type: `feat` `fix` `refactor` `test` `docs` `style` `ci` `build` `chore`
-  - scope: `finance` `plans` `market` `business-directory` `business-profile` `rent-benchmark` `funding` `security` `e2e` `db` `deps` `harness`. 여러 영역의 문서만 고치면 생략한다.
+  - scope: `finance` `plans` `market` `business-directory` `business-profile` `rent-benchmark` `franchise` `funding` `security` `e2e` `db` `deps` `harness`. 여러 영역의 문서만 고치면 생략한다.
 - branch: `<type>/<번호>-<영문-slug>`. 예: `feat/12-result-compare`
 - PR 본문은 템플릿(변경 내용·검증·위험)을 채운다. CI `check`가 통과하면 병합한다.
 - 문서·주석·화면 문구는 한국어, 식별자·commit 메시지는 영어로 쓴다.

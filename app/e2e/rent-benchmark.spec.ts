@@ -102,7 +102,7 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await expect(panel.getByText('성동구와 겹치는 조사 상권 2곳이 위에 있습니다.')).toBeVisible();
   await expect(panel.getByText('1,983,471원')).toBeVisible();
   await expect(panel.getByText('1층 ㎡당 임대료 × 33.1㎡')).toBeVisible();
-  await expect(panel.locator('.rent-summary > div', { hasText: '대표 ㎡당 월 임대료' })).toContainText('60,000원');
+  await expect(panel.locator('.reference-summary > div', { hasText: '대표 ㎡당 월 임대료' })).toContainText('60,000원');
   await expect(panel.getByText('8.0%')).toBeVisible();
 
   // 자치구 밖 지역으로 바꾸면 그 지역 값으로 다시 계산한다. 원본이 비운 층은 0이 아니라 자료 없음이다.

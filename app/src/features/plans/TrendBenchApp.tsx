@@ -32,6 +32,7 @@ import BusinessProfileWizard, {
   businessProfilePayload,
   type BusinessProfileForm,
 } from '@/features/business-profile/BusinessProfileWizard';
+import FranchisePanel from '@/features/franchise/FranchisePanel';
 import RentBenchmarkPanel from '@/features/rent-benchmark/RentBenchmarkPanel';
 
 type PlanSummary = { id: string; title: string; revision: number; updatedAt: string; _count: { results: number } };
@@ -539,6 +540,10 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           <RentBenchmarkPanel
             profile={businessForm}
             savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null}
+          />
+          <FranchisePanel
+            industryCode={businessForm.marketIndustryCode}
+            savedMonthlyRevenue={plan?.inputJson.monthlyRevenue ?? null}
           />
           <FinancePlanner
             key={plan?.id ?? 'new'}
