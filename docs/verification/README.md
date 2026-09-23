@@ -1,6 +1,6 @@
 # 공공파일 검증 재현
 
-`verify_market.py`는 pandas로 원본 파일을 읽어 키·행 수·결합을 검사하는 별도 도구다. 웹앱의 데이터 적재 코드가 아니다.
+`verify_market.py`는 pandas로 원본 파일을 읽어 키·행 수·결합을 검사하는 별도 도구다. 웹앱의 데이터 적재 코드가 아니다. 운영 적재는 Open API로 한다([market.md](../domains/market.md#적재)). 이 도구와 `market:load -- --source-dir`은 2026-09-09에 내려받은 파일을 재현할 때 쓴다.
 
 ## 원본 준비
 

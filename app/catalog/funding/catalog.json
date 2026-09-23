@@ -1,7 +1,7 @@
 {
   "catalogKey": "trendbench-funding-catalog",
   "schemaVersion": "funding-catalog-v1.0.0",
-  "catalogVersion": "2026-09-20.1",
+  "catalogVersion": "2026-09-23.1",
   "basisDate": "2026-09-20",
   "reviewer": "UNASSIGNED",
   "notes": [
@@ -9,13 +9,13 @@
     "원문 PDF·첨부 파일을 내려받아 보관하지 않았으므로 모든 상품의 sourceDocumentRetrieved는 false, sourceChecksum은 null입니다. 대용량 원본은 Git에 추가하지 않습니다.",
     "공고문 원문에서 확정 숫자로 확인되지 않은 금리·기간·한도는 0으로 채우지 않고 null 또는 UNKNOWN으로 보존했습니다.",
     "검수자가 지정되지 않아(UNASSIGNED) 상태이며, 운영 공개 전에 실제 검수자와 다음 검토일을 지정해야 합니다.",
-    "이 카탈로그는 사용자별 매칭 API와 화면을 구현하기 전 단계입니다. 후보 판정 함수와 상태 구분만 제공합니다.",
+    "2026-09-23: 2026-09-20.1 적재 뒤 조건별 공식 근거(evidence)가 추가되어 catalogVersion을 2026-09-23.1, 상품 버전을 1.0.1로 올렸습니다. 검수 내용과 검수일은 바뀌지 않았습니다.",
     "2026-09-09에 확인했던 서울여성 창업아이디어 공모전 등은 2026-09-20에 다시 확인하지 않아 카탈로그에 넣지 않았습니다. 접수 상태가 OPEN으로 확인된 상품도 이번 검수 범위에는 없습니다."
   ],
   "products": [
     {
       "productKey": "pre-startup-package-2026-2nd",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "name": "2026년 창업지원사업 「예비창업패키지」 예비창업자 모집 수정공고(2차)",
       "organization": "중소벤처기업부 · 창업진흥원",
       "supportType": "GRANT",
@@ -109,7 +109,7 @@
     },
     {
       "productKey": "seoul-fund-2026-startup-company",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "name": "2026년 서울시 중소기업육성자금 창업기업자금 융자지원",
       "organization": "서울특별시 · 서울신용보증재단",
       "supportType": "LOAN",
@@ -224,7 +224,7 @@
     },
     {
       "productKey": "seoul-fund-2026-inclusive-finance",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "name": "2026년 서울시 중소기업육성자금 포용금융자금 융자지원",
       "organization": "서울특별시 · 서울신용보증재단",
       "supportType": "LOAN",
@@ -327,7 +327,7 @@
     },
     {
       "productKey": "seoul-fund-2026-emergency-self-employed",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "name": "2026년 서울시 중소기업육성자금 긴급자영업자금 융자지원",
       "organization": "서울특별시 · 서울신용보증재단",
       "supportType": "LOAN",
@@ -430,7 +430,7 @@
     },
     {
       "productKey": "gangbuk-startup-center-2026-h2-residency",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "name": "2026년 강북창업지원센터 하반기 입주기업 모집",
       "organization": "서울특별시 · 강북창업지원센터",
       "supportType": "SPACE",

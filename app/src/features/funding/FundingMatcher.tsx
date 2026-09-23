@@ -122,7 +122,7 @@ export default function FundingMatcher() {
       <section className="hero funding-hero">
         <p className="eyebrow">자금 후보 조회</p>
         <h1>
-          검수된 공고만,
+          공식 공고만,
           <br />
           상태와 이유까지.
         </h1>
@@ -254,7 +254,7 @@ export default function FundingMatcher() {
         </>
       )}
 
-      <footer>TrendBench · 검수된 자금 공고 카탈로그 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
+      <footer>TrendBench · 공식 공고 기반 자금 카탈로그 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
 }

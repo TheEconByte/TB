@@ -115,13 +115,18 @@ export const MARKET_RELEASE_EXPECTATIONS = {
   storeCountIdentityMismatches: 0,
 };
 
-// Release identity is the source bytes plus the schema and definition versions,
-// so reloading identical files is a no-op and a changed file is a new release.
-export function releaseKeyFor(files: readonly { file: string; sha256: string }[]): string {
+// Release identity is the source content plus the schema and definition versions,
+// so reloading identical content is a no-op and a changed source is a new release.
+// Open API loads pass their own basis period; file loads use the recorded one.
+export function releaseKeyFor(
+  files: readonly { file: string; sha256: string }[],
+  basisStart = MARKET_BASIS_START_QUARTER,
+  basisEnd = MARKET_BASIS_END_QUARTER,
+): string {
   const fingerprint = contentHash([
     { file: 'schemaVersion', sha256: MARKET_SCHEMA_VERSION },
     { file: 'definitionVersion', sha256: MARKET_DEFINITION_VERSION },
     { file: 'releaseContent', sha256: contentHash(files) },
   ]);
-  return `seoul-market-${basisPeriodCode(MARKET_BASIS_START_QUARTER, MARKET_BASIS_END_QUARTER).toLowerCase()}-${fingerprint.slice(0, 12)}`;
+  return `seoul-market-${basisPeriodCode(basisStart, basisEnd).toLowerCase()}-${fingerprint.slice(0, 12)}`;
 }

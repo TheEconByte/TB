@@ -5,9 +5,11 @@
       "Read(**/.env.local)",
       "Read(**/.env.test.local)",
       "Read(**/infra/.env)",
+      "Read(**/app/.env)",
       "Edit(**/.env.local)",
       "Edit(**/.env.test.local)",
-      "Edit(**/infra/.env)"
+      "Edit(**/infra/.env)",
+      "Edit(**/app/.env)"
     ]
   },
   "hooks": {

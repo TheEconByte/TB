@@ -1,4 +1,4 @@
-// SessionStart hook. AGENTS.md "시작 전에 반드시 할 일" 1~2단계의 사실을 세션 문맥에 넣는다.
+// SessionStart hook. AGENTS.md §1 "작업 시작"에 필요한 git 상태를 세션 문맥에 넣는다.
 import { execFileSync } from 'node:child_process';
 
 function git(args) {
@@ -24,6 +24,6 @@ process.stdout.write(
     status,
     '',
     '위 변경은 사용자·다른 작업자의 소유다. 덮어쓰기·stash·reset·checkout으로 정리하지 않는다.',
-    '작업 계약(GitHub Issue)이 없으면 조사와 제안까지만 한다. 기준: AGENTS.md → docs/PROJECT_CONTEXT.md.',
+    '파일 수정은 GitHub Issue나 사람이 지정한 범위 안에서만 한다. 규칙: AGENTS.md.',
   ].join('\n') + '\n',
 );

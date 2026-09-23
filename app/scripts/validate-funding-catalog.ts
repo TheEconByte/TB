@@ -129,7 +129,7 @@ function main() {
     );
   } else {
     console.log(
-      `구조 검증 통과: 상품 ${catalog.products.length}건입니다. 검수자가 지정되지 않아 운영 적재는 차단됩니다(주의 ${validation.warnings.length}건).`,
+      `통과: 상품 ${catalog.products.length}건을 적재할 수 있습니다. 검수자가 지정되지 않은 상품은 현재 후보로 판정되지 않습니다(주의 ${validation.warnings.length}건).`,
     );
   }
 }

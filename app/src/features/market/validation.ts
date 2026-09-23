@@ -40,7 +40,9 @@ export type MarketIssueCode =
   | 'DUPLICATE_AREA'
   | 'UNEXPECTED_ROW_LENGTH'
   | 'MISSING_SUPPORTED_INDUSTRY'
-  | 'AMBIGUOUS_AREA_CODE';
+  | 'AMBIGUOUS_AREA_CODE'
+  | 'SOURCE_API_ERROR'
+  | 'INCOMPLETE_SOURCE';
 
 export type MarketIssue = { code: MarketIssueCode; source: string; detail: string; row?: number };
 

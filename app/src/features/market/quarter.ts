@@ -29,6 +29,27 @@ export function basisPeriodLabel(start: string, end: string): string {
   return `${from.year}년 ${from.quarter}분기~${to.year}년 ${to.quarter}분기`;
 }
 
+export function previousQuarter(input: string): string {
+  const parsed = parseQuarter(input);
+  if (!parsed) throw new Error(`분기 형식이 아닙니다: ${input}`);
+  return parsed.quarter === 1 ? `${parsed.year - 1}4` : `${parsed.year}${parsed.quarter - 1}`;
+}
+
+// Inclusive list from start to end, oldest first. Empty when start is after end.
+export function quartersBetween(start: string, end: string): string[] {
+  const quarters: string[] = [];
+  for (let current = end; compareQuarters(current, start) >= 0; current = previousQuarter(current)) {
+    quarters.unshift(current);
+  }
+  return quarters;
+}
+
+// Quarter that contains the given instant in Korea time.
+export function quarterAt(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}${Math.floor(kst.getUTCMonth() / 3) + 1}`;
+}
+
 export function basisPeriodCode(start: string, end: string): string {
   const from = parseQuarter(start);
   const to = parseQuarter(end);

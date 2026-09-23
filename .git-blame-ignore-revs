@@ -1,3 +1,0 @@
-# git blame에서 건너뛸 포맷 전용 commit. 사용: git config blame.ignoreRevsFile .git-blame-ignore-revs
-# style(harness): format app code with prettier
-647b95918919939db857d33a229ee2d2813cf0fb
