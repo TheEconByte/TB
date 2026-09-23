@@ -6,7 +6,7 @@
 
 - `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI, 계획에 저장한 자금 조건과 그 조건 판정 조립(`funding-matches.ts`), API 경계 테스트.
 
-## F2 API 정책
+## API
 
 - `/api/auth/*`: Better Auth handler.
 - `/api/plans`: 내 계획 생성·목록.

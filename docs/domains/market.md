@@ -12,7 +12,7 @@
 - 릴리스 키는 정의 버전과 원본 checksum으로 만들어지므로 같은 원본을 적재하면 어느 PC에서나 같은 키가 된다.
 - 결합 키는 표시명이 아니라 `quarter + areaType + areaCode + industryCode`다.
 
-## F3 적재 정책
+## 적재
 
 - 실행: `npm --prefix app run market:load [-- --source-dir <경로>]`. 기본 원본 경로는 `<저장소 루트>/data/raw`다.
 - 원본은 운영자가 준비한다. 웹 요청 처리 중에는 원본 수집이나 DB 적재를 하지 않는다.
@@ -27,7 +27,7 @@
 - 업종 메타데이터는 릴리스별로 저장한다. PENDING·FAILED 릴리스의 업종 원본 명칭이 현재 ACTIVE 릴리스 응답을 바꾸지 않는다.
 - 적재 명령은 Node 24의 TypeScript 실행을 그대로 쓴다. 생성된 Prisma client가 확장자 없는 상대 import를 만들지 않도록 `app/prisma/schema.prisma`의 generator에 `moduleFormat = "esm"`, `importFileExtension = "ts"`를 둔다.
 
-## F3 공개 API 정책
+## 공개 API
 
 - `/api/industries`: 로그인 없이 지원 업종과 현재 활성 릴리스를 반환한다. 활성 릴리스가 없어도 200이며 `activeRelease`가 null이다.
 - `/api/markets/areas?districtCode=...`: 자치구 목록은 항상 반환하고, `districtCode`가 있으면 그 자치구의 상권을 반환한다. 없는 자치구 코드는 400 `INVALID_DISTRICT_CODE`다.
@@ -37,6 +37,6 @@
 - 자료가 없는 조합은 0이 아니라 `dataStatus: NOT_PROVIDED`와 빈 `quarters`로, 매출만 없는 분기는 `salesStatus: NOT_PROVIDED`와 `salesAmount: null`로 응답한다.
 - 응답에는 지표 정의(원본 열·단위·해석 제한)와 제한 문구, 릴리스 출처·기준기간·입수일·파일별 SHA-256을 함께 담는다.
 
-## F3 테스트 범위
+## 테스트
 
-F3 테스트는 원본 파싱·헤더 매핑·checksum·거부 규칙을 항상 검증하고, `data/raw/`의 실제 파일이 있으면 기록된 행 수·결합·표본까지 대조한다. 합성 릴리스를 PostgreSQL에 적재하는 변경 테스트는 일반 `DATABASE_URL`을 절대 사용하지 않으며, `TEST_DATABASE_URL` 환경변수 또는 `app/.env.test.local`의 전용 테스트 DB가 있을 때만 실행한다. 테스트는 합성 릴리스만 만들고 끝나면 삭제하며, 실행 전에 ACTIVE였던 테스트 DB 릴리스 상태를 복원한다.
+테스트는 원본 파싱·헤더 매핑·checksum·거부 규칙을 항상 검증하고, `data/raw/`의 실제 파일이 있으면 기록된 행 수·결합·표본까지 대조한다. 합성 릴리스를 PostgreSQL에 적재하는 변경 테스트는 일반 `DATABASE_URL`을 절대 사용하지 않으며, `TEST_DATABASE_URL` 환경변수 또는 `app/.env.test.local`의 전용 테스트 DB가 있을 때만 실행한다. 테스트는 합성 릴리스만 만들고 끝나면 삭제하며, 실행 전에 ACTIVE였던 테스트 DB 릴리스 상태를 복원한다.

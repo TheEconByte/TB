@@ -75,5 +75,3 @@
 - 폴더·도메인 경계 → `docs/ARCHITECTURE.md`
 - 실행·환경·DB·CI → `docs/DEVELOPMENT.md`
 - 되돌리기 어려운 결정 → `docs/decisions/`
-
-`docs/history/`는 과거 기록이며 현재 지침이 아니다.

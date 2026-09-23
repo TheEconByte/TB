@@ -14,7 +14,7 @@
 
 - [데이터셋 FAQ](https://data.seoul.go.kr/dataList/OA-15572/F/1/datasetView.do)는 "분기 매출"이라고 쓴다.
 - [서울시 설명자료](https://culture.seoul.go.kr/culture/cmmn/file/fileDown.do?atchFileId=af365d87d23c4c5b8411d3ba236292f6&bbsId=&fileSn=2&menuNo=200051) 8쪽은 이 값을 분기 월평균으로 설명하고 계산식까지 제시한다. 다만 다른 상권 사례이고, 2026년 7월 제공 기준 변경 이전 자료다.
-- 점포 원본 611,664행 전부에서 `점포_수 + 프랜차이즈_점포_수 = 유사_업종_점포_수`가 성립한다. 공식 설명도 전체 점포를 일반 점포와 프랜차이즈의 합으로 안내한다([검증 기록](../history/13_Data_API_Feasibility_Verification.md)).
+- 점포 원본 611,664행 전부에서 `점포_수 + 프랜차이즈_점포_수 = 유사_업종_점포_수`가 성립한다. 2026-09-10에 2024~2025년 원본 전체를 확인했다. 공식 설명도 전체 점포를 일반 점포와 프랜차이즈의 합으로 안내한다.
 
 ## Decision
 

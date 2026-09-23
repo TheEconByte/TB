@@ -32,7 +32,7 @@ npm --prefix app run dev
 
 ## 로컬 데이터 준비
 
-새 DB는 비어 있다. 그래서 `/markets`는 `503 RELEASE_UNAVAILABLE`, `/funding`은 `503 CATALOG_UNAVAILABLE`을 반환한다.
+새 DB는 비어 있다. 적재 전에는 상권 조회가 `503 RELEASE_UNAVAILABLE`, 자금 후보 조회가 `503 CATALOG_UNAVAILABLE`로 응답한다.
 
 | 데이터 | 준비 | 적재 |
 |---|---|---|
