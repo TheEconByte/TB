@@ -253,6 +253,109 @@ const STORES_COLUMNS_2025: Readonly<Record<string, CanonicalColumn>> = {
   clsbiz_stor_co: 'closedStoreCount',
 };
 
+// Field names of the Seoul Open API services (서울 열린데이터광장). The sales
+// service mirrors the sales file column by column; the store service uses the
+// 2025 file's English names in upper case. Checked against the live API on 2026-09-23.
+export const SALES_API_FIELDS: Readonly<Record<string, CanonicalColumn>> = {
+  STDR_YYQU_CD: 'quarter',
+  TRDAR_SE_CD: 'areaType',
+  TRDAR_SE_CD_NM: 'areaTypeName',
+  TRDAR_CD: 'areaCode',
+  TRDAR_CD_NM: 'areaName',
+  SVC_INDUTY_CD: 'industryCode',
+  SVC_INDUTY_CD_NM: 'industryName',
+  THSMON_SELNG_AMT: 'salesAmount',
+  THSMON_SELNG_CO: 'salesCount',
+  MDWK_SELNG_AMT: 'weekdayAmount',
+  WKEND_SELNG_AMT: 'weekendAmount',
+  MON_SELNG_AMT: 'mondayAmount',
+  TUES_SELNG_AMT: 'tuesdayAmount',
+  WED_SELNG_AMT: 'wednesdayAmount',
+  THUR_SELNG_AMT: 'thursdayAmount',
+  FRI_SELNG_AMT: 'fridayAmount',
+  SAT_SELNG_AMT: 'saturdayAmount',
+  SUN_SELNG_AMT: 'sundayAmount',
+  TMZON_00_06_SELNG_AMT: 'time0006Amount',
+  TMZON_06_11_SELNG_AMT: 'time0611Amount',
+  TMZON_11_14_SELNG_AMT: 'time1114Amount',
+  TMZON_14_17_SELNG_AMT: 'time1417Amount',
+  TMZON_17_21_SELNG_AMT: 'time1721Amount',
+  TMZON_21_24_SELNG_AMT: 'time2124Amount',
+  ML_SELNG_AMT: 'maleAmount',
+  FML_SELNG_AMT: 'femaleAmount',
+  AGRDE_10_SELNG_AMT: 'age10Amount',
+  AGRDE_20_SELNG_AMT: 'age20Amount',
+  AGRDE_30_SELNG_AMT: 'age30Amount',
+  AGRDE_40_SELNG_AMT: 'age40Amount',
+  AGRDE_50_SELNG_AMT: 'age50Amount',
+  AGRDE_60_ABOVE_SELNG_AMT: 'age60Amount',
+  MDWK_SELNG_CO: 'weekdayCount',
+  WKEND_SELNG_CO: 'weekendCount',
+  MON_SELNG_CO: 'mondayCount',
+  TUES_SELNG_CO: 'tuesdayCount',
+  WED_SELNG_CO: 'wednesdayCount',
+  THUR_SELNG_CO: 'thursdayCount',
+  FRI_SELNG_CO: 'fridayCount',
+  SAT_SELNG_CO: 'saturdayCount',
+  SUN_SELNG_CO: 'sundayCount',
+  TMZON_00_06_SELNG_CO: 'time0006Count',
+  TMZON_06_11_SELNG_CO: 'time0611Count',
+  TMZON_11_14_SELNG_CO: 'time1114Count',
+  TMZON_14_17_SELNG_CO: 'time1417Count',
+  TMZON_17_21_SELNG_CO: 'time1721Count',
+  TMZON_21_24_SELNG_CO: 'time2124Count',
+  ML_SELNG_CO: 'maleCount',
+  FML_SELNG_CO: 'femaleCount',
+  AGRDE_10_SELNG_CO: 'age10Count',
+  AGRDE_20_SELNG_CO: 'age20Count',
+  AGRDE_30_SELNG_CO: 'age30Count',
+  AGRDE_40_SELNG_CO: 'age40Count',
+  AGRDE_50_SELNG_CO: 'age50Count',
+  AGRDE_60_ABOVE_SELNG_CO: 'age60Count',
+};
+
+export const STORES_API_FIELDS: Readonly<Record<string, CanonicalColumn | null>> = {
+  STDR_YYQU_CD: 'quarter',
+  TRDAR_SE_CD: 'areaType',
+  TRDAR_SE_CD_NM: 'areaTypeName',
+  TRDAR_CD: 'areaCode',
+  TRDAR_CD_NM: 'areaName',
+  SVC_INDUTY_CD: 'industryCode',
+  SVC_INDUTY_CD_NM: 'industryName',
+  SIMILR_INDUTY_STOR_CO: 'similarIndustryStoreCount',
+  STOR_CO: 'storeCount',
+  FRC_STOR_CO: 'franchiseStoreCount',
+  OPBIZ_RT: null,
+  OPBIZ_STOR_CO: 'openedStoreCount',
+  CLSBIZ_RT: null,
+  CLSBIZ_STOR_CO: 'closedStoreCount',
+};
+
+// Area service fields that the area record uses; the service also returns the
+// centroid, administrative dong and area size, which are kept only in the hash.
+export const AREA_API_FIELDS = {
+  areaType: 'TRDAR_SE_CD',
+  areaTypeName: 'TRDAR_SE_CD_NM',
+  areaCode: 'TRDAR_CD',
+  sourceName: 'TRDAR_CD_NM',
+  districtCode: 'SIGNGU_CD',
+  districtName: 'SIGNGU_CD_NM',
+} as const;
+
+export const AREA_API_FIELD_NAMES: readonly string[] = [
+  'TRDAR_SE_CD',
+  'TRDAR_SE_CD_NM',
+  'TRDAR_CD',
+  'TRDAR_CD_NM',
+  'XCNTS_VALUE',
+  'YDNTS_VALUE',
+  'SIGNGU_CD',
+  'SIGNGU_CD_NM',
+  'ADSTRD_CD',
+  'ADSTRD_CD_NM',
+  'RELM_AR',
+];
+
 const KEY_COLUMNS: readonly CanonicalColumn[] = ['quarter', 'areaType', 'areaCode', 'industryCode'];
 
 export const SALES_SCHEMA_2024: SourceSchema = {

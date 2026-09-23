@@ -15,7 +15,7 @@ Next.js App Router + TypeScript (app/)
 PostgreSQL 17 (single application database)
 
 Operator commands
-  ├─ market:load       verified local public files
+  ├─ market:load       Seoul Open API (or verified files)
   ├─ business:load     SEMAS API snapshot
   └─ funding:load      human-reviewed catalog
 ```

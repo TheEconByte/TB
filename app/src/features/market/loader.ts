@@ -5,16 +5,30 @@ import { sha256Hex } from './checksum.ts';
 import { decodeCp949, iterateCsvRows, normalizeHeaderRow } from './csv.ts';
 import { parseDbf } from './dbf.ts';
 import {
+  AREA_API_FIELDS,
   resolveColumnIndex,
+  SALES_API_FIELDS,
   SALES_SCHEMA_2024,
   SALES_SCHEMA_2025,
+  STORES_API_FIELDS,
   STORES_SCHEMA_2024,
   STORES_SCHEMA_2025,
   type CanonicalColumn,
   type ColumnIndex,
   type SourceSchema,
 } from './headers.ts';
-import { quarterLabel } from './quarter.ts';
+import { basisPeriodLabel, parseQuarter, quarterLabel, quartersBetween } from './quarter.ts';
+import {
+  apiCell,
+  canonicalRowsHash,
+  createSeoulApiClient,
+  fieldDifferences,
+  findLatestQuarter,
+  SEOUL_MARKET_SERVICES,
+  type FetchLike,
+  type SeoulApiRow,
+  type SeoulApiService,
+} from './seoul-api.ts';
 import {
   MARKET_BASIS_END_QUARTER,
   MARKET_BASIS_START_QUARTER,
@@ -88,9 +102,29 @@ export type MarketQuarterlyRecord = {
 
 export type MarketCheck = { name: string; expected: string; actual: string; passed: boolean };
 
+// Release fields that depend on how the source was obtained (verified files or the Open API).
+export type MarketReleaseMeta = {
+  basisStart: string;
+  basisEnd: string;
+  basisPeriodLabel: string;
+  retrievedAt: Date;
+  sourceUrl: string;
+};
+
+// Per service and quarter record of an Open API load, kept in the validation summary.
+export type SourceQuarterRecord = {
+  role: SourceFileRole;
+  service: string;
+  quarter: string | null;
+  rows: number;
+  sha256: string;
+};
+
 export type ParsedMarketSources = {
   releaseKey: string;
   releaseLabel: string;
+  release: MarketReleaseMeta;
+  sourceQuarters: SourceQuarterRecord[];
   files: SourceFileRecord[];
   checksumVerified: boolean;
   areas: MarketAreaRecord[];
@@ -303,54 +337,64 @@ function parseAreas(
   }
   issues.throwIfFailed();
 
+  const candidates = table.rows.map((row) => ({
+    areaType: row[AREA_DBF_FIELDS.areaType] ?? '',
+    areaCode: row[AREA_DBF_FIELDS.areaCode] ?? '',
+    sourceName: row[AREA_DBF_FIELDS.sourceName] ?? '',
+    areaTypeName: row[AREA_DBF_FIELDS.areaTypeName] ?? '',
+    districtCode: row[AREA_DBF_FIELDS.districtCode] ?? '',
+    districtName: row[AREA_DBF_FIELDS.districtName] ?? '',
+  }));
+  const areas = collectAreas(candidates, definition.file, issues);
+  record.rowCount = table.rows.length;
+  return { areas, record };
+}
+
+type AreaCandidate = Record<Exclude<keyof MarketAreaRecord, 'observedName'>, string>;
+
+// 영역 원본(파일 DBF 또는 API)의 행을 같은 규칙으로 검증해 상권 목록으로 만든다.
+function collectAreas(
+  candidates: readonly AreaCandidate[],
+  source: string,
+  issues: IssueCollector,
+): MarketAreaRecord[] {
   const areas: MarketAreaRecord[] = [];
   const seen = new Set<string>();
-  table.rows.forEach((row, index) => {
+  candidates.forEach((candidate, index) => {
     const line = index + 1;
-    const areaType = (row[AREA_DBF_FIELDS.areaType] ?? '').trim();
-    const areaCode = (row[AREA_DBF_FIELDS.areaCode] ?? '').trim();
-    const sourceName = (row[AREA_DBF_FIELDS.sourceName] ?? '').trim();
-    const areaTypeName = (row[AREA_DBF_FIELDS.areaTypeName] ?? '').trim();
-    const districtCode = (row[AREA_DBF_FIELDS.districtCode] ?? '').trim();
-    const districtName = (row[AREA_DBF_FIELDS.districtName] ?? '').trim();
+    const areaType = candidate.areaType.trim();
+    const areaCode = candidate.areaCode.trim();
+    const sourceName = candidate.sourceName.trim();
+    const areaTypeName = candidate.areaTypeName.trim();
+    const districtCode = candidate.districtCode.trim();
+    const districtName = candidate.districtName.trim();
     let valid = true;
     if (!AREA_TYPE_SET.has(areaType)) {
-      issues.add('INVALID_AREA_TYPE', definition.file, `상권 구분 코드 '${areaType}'`, line);
+      issues.add('INVALID_AREA_TYPE', source, `상권 구분 코드 '${areaType}'`, line);
       valid = false;
     }
     if (!isAreaCode(areaCode)) {
-      issues.add('INVALID_AREA_CODE', definition.file, `상권 코드 '${areaCode}'`, line);
+      issues.add('INVALID_AREA_CODE', source, `상권 코드 '${areaCode}'`, line);
       valid = false;
     }
     if (!isDistrictCode(districtCode)) {
-      issues.add(
-        'MISSING_KEY',
-        definition.file,
-        `자치구 코드 '${districtCode}' 형식이 올바르지 않습니다. (${areaCode})`,
-        line,
-      );
+      issues.add('MISSING_KEY', source, `자치구 코드 '${districtCode}' 형식이 올바르지 않습니다. (${areaCode})`, line);
       valid = false;
     }
     if (sourceName.length === 0 || areaTypeName.length === 0 || districtName.length === 0) {
-      issues.add(
-        'MISSING_KEY',
-        definition.file,
-        `상권 명칭·구분 명칭·자치구 명칭이 비어 있습니다. (${areaCode})`,
-        line,
-      );
+      issues.add('MISSING_KEY', source, `상권 명칭·구분 명칭·자치구 명칭이 비어 있습니다. (${areaCode})`, line);
       valid = false;
     }
     const key = areaKey(areaType, areaCode);
     if (seen.has(key)) {
-      issues.add('DUPLICATE_AREA', definition.file, `상권 구분/코드 ${key}`, line);
+      issues.add('DUPLICATE_AREA', source, `상권 구분/코드 ${key}`, line);
       valid = false;
     }
     seen.add(key);
     if (!valid) return;
     areas.push({ areaType, areaCode, sourceName, observedName: null, areaTypeName, districtCode, districtName });
   });
-  record.rowCount = table.rows.length;
-  return { areas, record };
+  return areas;
 }
 
 function parseTabularSource(
@@ -485,22 +529,17 @@ function readSalesObservation(
   };
 }
 
-export function readMarketSources(
-  options: Readonly<{ sourceDir: string; acceptChangedSource?: boolean; log?: (message: string) => void }>,
-): ParsedMarketSources {
-  const issues = createIssueCollector();
-  const log = options.log ?? (() => {});
-  const acceptChangedSource = options.acceptChangedSource ?? false;
-  const byRole = (role: SourceFileRole) => MARKET_SOURCE_FILES.filter((definition) => definition.role === role);
-  const files: SourceFileRecord[] = [];
+type RowGetter = (column: CanonicalColumn) => string;
 
-  log('영역 속성(DBF)을 읽습니다.');
-  const areaDefinition = byRole('areas')[0];
-  const areaResult = parseAreas(options.sourceDir, areaDefinition, issues, acceptChangedSource);
-  files.push(areaResult.record);
-  issues.throwIfFailed();
+type BuiltMarket = {
+  areas: MarketAreaRecord[];
+  industries: MarketIndustryRecord[];
+  quarterly: MarketQuarterlyRecord[];
+  stats: ParsedMarketSources['stats'];
+};
 
-  const areas = areaResult.areas;
+// 매출·점포 행을 결합 키로 모아 분기 지표를 만든다. 원본 형식(파일·API)과 분리해 두 경로가 같은 검증을 쓴다.
+function createMarketBuilder(areas: MarketAreaRecord[], areaSource: string, issues: IssueCollector) {
   const areaByKey = new Map<string, MarketAreaRecord>();
   const areaTypesByCode = new Map<string, string[]>();
   for (const area of areas) {
@@ -513,7 +552,7 @@ export function readMarketSources(
     if (types.length > 1) {
       issues.warn(
         'AMBIGUOUS_AREA_CODE',
-        areaDefinition.file,
+        areaSource,
         `상권 코드 ${code}가 상권 구분 ${types.join(', ')}에 함께 있습니다.`,
       );
     }
@@ -547,7 +586,7 @@ export function readMarketSources(
       if (!newest || (year ?? 0) >= newest.year) industryNewest.set(code, { name, year: year ?? 0 });
     }
   };
-  const validatedKey = (get: (column: CanonicalColumn) => string, file: string, line: number): JoinKey | null => {
+  const validatedKey = (get: RowGetter, file: string, line: number): JoinKey | null => {
     const parts: JoinKey = {
       quarter: get('quarter').trim(),
       areaType: get('areaType').trim(),
@@ -579,196 +618,217 @@ export function readMarketSources(
     return parts;
   };
 
+  function addSales(get: RowGetter, file: string, line: number, year: number | null) {
+    salesRows += 1;
+    const parts = validatedKey(get, file, line);
+    if (!parts) return;
+    const key = joinKey(parts);
+    const observation = readSalesObservation(get, file, line, issues);
+    if (!observation) return;
+    if (salesKeys.has(key)) {
+      duplicateKeys += 1;
+      issues.add('DUPLICATE_KEY', file, `결합 키 ${key}`, line);
+      return;
+    }
+    salesKeys.add(key);
+    quarters.add(parts.quarter);
+    rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
+    rememberIndustry(parts.industryCode, get('industryName').trim(), year);
+    if (supportedIndustry(parts.industryCode)) salesObservations.set(key, observation);
+  }
+
+  function addStores(get: RowGetter, file: string, line: number, year: number | null) {
+    storeRows += 1;
+    const parts = validatedKey(get, file, line);
+    if (!parts) return;
+    const counts = readStoreCounts(get, file, line, issues);
+    if (!counts) return;
+    if (counts.storeCount + counts.franchiseStoreCount !== counts.similarIndustryStoreCount) {
+      storeCountIdentityMismatches += 1;
+      issues.add(
+        'STORE_COUNT_IDENTITY',
+        file,
+        `점포_수 ${counts.storeCount} + 프랜차이즈 ${counts.franchiseStoreCount} ≠ 유사_업종 ${counts.similarIndustryStoreCount}`,
+        line,
+      );
+    }
+    const key = joinKey(parts);
+    if (storeKeys.has(key)) {
+      duplicateKeys += 1;
+      issues.add('DUPLICATE_KEY', file, `결합 키 ${key}`, line);
+      return;
+    }
+    storeKeys.add(key);
+    quarters.add(parts.quarter);
+    rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
+    rememberIndustry(parts.industryCode, get('industryName').trim(), year);
+    if (supportedIndustry(parts.industryCode)) storeCounts.set(key, counts);
+  }
+
+  function finish(basisStart: string, basisEnd: string): BuiltMarket {
+    let salesRowsMissingStores = 0;
+    for (const key of salesKeys) {
+      if (!storeKeys.has(key)) {
+        salesRowsMissingStores += 1;
+        issues.add('JOIN_MISSING_STORES', 'join', `매출 결합 키 ${key}에 점포 자료가 없습니다.`);
+      }
+    }
+    const storeOnlyKeys = storeKeys.size - (salesKeys.size - salesRowsMissingStores);
+
+    let areaNameMismatches = 0;
+    for (const area of areas) {
+      const observed = observedAreaNames.get(areaKey(area.areaType, area.areaCode));
+      if (!observed || observed.size === 0) continue;
+      const distinct = [...observed];
+      const differing = distinct.filter((name) => name !== area.sourceName);
+      if (differing.length === 0) continue;
+      area.observedName = differing[0];
+      areaNameMismatches += 1;
+      issues.warn(
+        'AREA_NAME_MISMATCH',
+        'areas',
+        `상권 ${area.areaType}/${area.areaCode}: 영역 자료 '${area.sourceName}' vs 매출·점포 자료 '${distinct.join(' | ')}'`,
+      );
+    }
+
+    const industries: MarketIndustryRecord[] = [];
+    for (const [code, names] of industryNames) {
+      if (names.size > 1) {
+        issues.warn(
+          'INDUSTRY_NAME_CONFLICT',
+          'industry',
+          `업종 코드 ${code}의 원본 명칭이 여러 개입니다: ${[...names.keys()].join(', ')}`,
+        );
+      }
+      const newest = industryNewest.get(code);
+      const sourceName = newest?.name ?? [...names.keys()][0] ?? code;
+      const supported = supportedIndustry(code);
+      industries.push({
+        code,
+        sourceName,
+        displayName: supported ? supported.displayName : sourceName,
+        displayNameSource: supported ? 'PRODUCT_DOCUMENT' : 'SOURCE_FILE',
+        sourceCategoryVersion: INDUSTRY_CATEGORY_VERSION,
+        isSupported: supported !== null,
+      });
+    }
+    industries.sort((left, right) => left.code.localeCompare(right.code));
+
+    const quarterly: MarketQuarterlyRecord[] = [];
+    for (const [key, observation] of salesObservations) {
+      const parts = splitJoinKey(key);
+      const counts = storeCounts.get(key);
+      quarterly.push({
+        ...parts,
+        salesAmount: observation.salesAmount,
+        salesCount: observation.salesCount,
+        salesBreakdownJson: observation.salesBreakdownJson,
+        storeCount: counts?.storeCount ?? null,
+        similarIndustryStoreCount: counts?.similarIndustryStoreCount ?? null,
+        franchiseStoreCount: counts?.franchiseStoreCount ?? null,
+        openedStoreCount: counts?.openedStoreCount ?? null,
+        closedStoreCount: counts?.closedStoreCount ?? null,
+      });
+    }
+    let storeOnlyQuarterlyRows = 0;
+    for (const [key, counts] of storeCounts) {
+      if (salesObservations.has(key)) continue;
+      storeOnlyQuarterlyRows += 1;
+      quarterly.push({
+        ...splitJoinKey(key),
+        salesAmount: null,
+        salesCount: null,
+        salesBreakdownJson: null,
+        storeCount: counts.storeCount,
+        similarIndustryStoreCount: counts.similarIndustryStoreCount,
+        franchiseStoreCount: counts.franchiseStoreCount,
+        openedStoreCount: counts.openedStoreCount,
+        closedStoreCount: counts.closedStoreCount,
+      });
+    }
+    quarterly.sort((left, right) => {
+      const leftKey = joinKey(left);
+      const rightKey = joinKey(right);
+      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+    });
+
+    for (const industry of SUPPORTED_INDUSTRIES) {
+      const count = quarterly.filter((row) => row.industryCode === industry.code).length;
+      if (count === 0) {
+        issues.add('MISSING_SUPPORTED_INDUSTRY', 'industry', `지원 업종 ${industry.code}의 분기 자료가 없습니다.`);
+      }
+    }
+
+    const quarterList = [...quarters].sort();
+    if (quarterList.length > 0 && (quarterList[0] !== basisStart || quarterList[quarterList.length - 1] !== basisEnd)) {
+      issues.warn(
+        'INVALID_QUARTER',
+        'join',
+        `원본 분기 범위 ${quarterList[0]}~${quarterList[quarterList.length - 1]}가 릴리스 기준기간 ${basisStart}~${basisEnd}와 다릅니다.`,
+      );
+    }
+
+    return {
+      areas,
+      industries,
+      quarterly,
+      stats: {
+        salesRows,
+        storeRows,
+        areaRows: areas.length,
+        salesRowsMissingStores,
+        storeOnlyKeys,
+        duplicateKeys,
+        storeCountIdentityMismatches,
+        areaNameMismatches,
+        salesRowsForSupportedIndustries: salesObservations.size,
+        storeOnlyQuarterlyRows,
+        quarters: quarterList,
+      },
+    };
+  }
+
+  return { addSales, addStores, finish };
+}
+
+// 2026-09-09에 내려받아 checksum을 기록한 ZIP 원본을 읽는다(`market:load -- --source-dir`).
+export function readMarketSources(
+  options: Readonly<{ sourceDir: string; acceptChangedSource?: boolean; log?: (message: string) => void }>,
+): ParsedMarketSources {
+  const issues = createIssueCollector();
+  const log = options.log ?? (() => {});
+  const acceptChangedSource = options.acceptChangedSource ?? false;
+  const byRole = (role: SourceFileRole) => MARKET_SOURCE_FILES.filter((definition) => definition.role === role);
+  const files: SourceFileRecord[] = [];
+
+  log('영역 속성(DBF)을 읽습니다.');
+  const areaDefinition = byRole('areas')[0];
+  const areaResult = parseAreas(options.sourceDir, areaDefinition, issues, acceptChangedSource);
+  files.push(areaResult.record);
+  issues.throwIfFailed();
+  const builder = createMarketBuilder(areaResult.areas, areaDefinition.file, issues);
+
   for (const definition of byRole('sales')) {
     log(`추정매출 ${definition.year}년 파일을 읽습니다.`);
     const schema = definition.year === 2024 ? SALES_SCHEMA_2024 : SALES_SCHEMA_2025;
-    const record = parseTabularSource(
-      options.sourceDir,
-      definition,
-      schema,
-      issues,
-      acceptChangedSource,
-      (get, line) => {
-        salesRows += 1;
-        const parts = validatedKey(get, definition.file, line);
-        if (!parts) return;
-        const key = joinKey(parts);
-        const observation = readSalesObservation(get, definition.file, line, issues);
-        if (!observation) return;
-        if (salesKeys.has(key)) {
-          duplicateKeys += 1;
-          issues.add('DUPLICATE_KEY', definition.file, `결합 키 ${key}`, line);
-          return;
-        }
-        salesKeys.add(key);
-        quarters.add(parts.quarter);
-        rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
-        rememberIndustry(parts.industryCode, get('industryName').trim(), definition.year);
-        if (supportedIndustry(parts.industryCode)) salesObservations.set(key, observation);
-      },
+    files.push(
+      parseTabularSource(options.sourceDir, definition, schema, issues, acceptChangedSource, (get, line) =>
+        builder.addSales(get, definition.file, line, definition.year),
+      ),
     );
-    files.push(record);
   }
-
   for (const definition of byRole('stores')) {
     log(`점포 ${definition.year}년 파일을 읽습니다.`);
     const schema = definition.year === 2024 ? STORES_SCHEMA_2024 : STORES_SCHEMA_2025;
-    const record = parseTabularSource(
-      options.sourceDir,
-      definition,
-      schema,
-      issues,
-      acceptChangedSource,
-      (get, line) => {
-        storeRows += 1;
-        const parts = validatedKey(get, definition.file, line);
-        if (!parts) return;
-        const counts = readStoreCounts(get, definition.file, line, issues);
-        if (!counts) return;
-        if (counts.storeCount + counts.franchiseStoreCount !== counts.similarIndustryStoreCount) {
-          storeCountIdentityMismatches += 1;
-          issues.add(
-            'STORE_COUNT_IDENTITY',
-            definition.file,
-            `점포_수 ${counts.storeCount} + 프랜차이즈 ${counts.franchiseStoreCount} ≠ 유사_업종 ${counts.similarIndustryStoreCount}`,
-            line,
-          );
-        }
-        const key = joinKey(parts);
-        if (storeKeys.has(key)) {
-          duplicateKeys += 1;
-          issues.add('DUPLICATE_KEY', definition.file, `결합 키 ${key}`, line);
-          return;
-        }
-        storeKeys.add(key);
-        quarters.add(parts.quarter);
-        rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
-        rememberIndustry(parts.industryCode, get('industryName').trim(), definition.year);
-        if (supportedIndustry(parts.industryCode)) storeCounts.set(key, counts);
-      },
-    );
-    files.push(record);
-  }
-
-  let salesRowsMissingStores = 0;
-  for (const key of salesKeys) {
-    if (!storeKeys.has(key)) {
-      salesRowsMissingStores += 1;
-      issues.add('JOIN_MISSING_STORES', 'join', `매출 결합 키 ${key}에 점포 자료가 없습니다.`);
-    }
-  }
-  const storeOnlyKeys = storeKeys.size - (salesKeys.size - salesRowsMissingStores);
-
-  let areaNameMismatches = 0;
-  for (const area of areas) {
-    const observed = observedAreaNames.get(areaKey(area.areaType, area.areaCode));
-    if (!observed || observed.size === 0) continue;
-    const distinct = [...observed];
-    const differing = distinct.filter((name) => name !== area.sourceName);
-    if (differing.length === 0) continue;
-    area.observedName = differing[0];
-    areaNameMismatches += 1;
-    issues.warn(
-      'AREA_NAME_MISMATCH',
-      'areas',
-      `상권 ${area.areaType}/${area.areaCode}: 영역 파일 '${area.sourceName}' vs 매출·점포 파일 '${distinct.join(' | ')}'`,
+    files.push(
+      parseTabularSource(options.sourceDir, definition, schema, issues, acceptChangedSource, (get, line) =>
+        builder.addStores(get, definition.file, line, definition.year),
+      ),
     );
   }
 
-  const industries: MarketIndustryRecord[] = [];
-  for (const [code, names] of industryNames) {
-    if (names.size > 1) {
-      issues.warn(
-        'INDUSTRY_NAME_CONFLICT',
-        'industry',
-        `업종 코드 ${code}의 원본 명칭이 여러 개입니다: ${[...names.keys()].join(', ')}`,
-      );
-    }
-    const newest = industryNewest.get(code);
-    const sourceName = newest?.name ?? [...names.keys()][0] ?? code;
-    const supported = supportedIndustry(code);
-    industries.push({
-      code,
-      sourceName,
-      displayName: supported ? supported.displayName : sourceName,
-      displayNameSource: supported ? 'PRODUCT_DOCUMENT' : 'SOURCE_FILE',
-      sourceCategoryVersion: INDUSTRY_CATEGORY_VERSION,
-      isSupported: supported !== null,
-    });
-  }
-  industries.sort((left, right) => left.code.localeCompare(right.code));
-
-  const quarterly: MarketQuarterlyRecord[] = [];
-  for (const [key, observation] of salesObservations) {
-    const parts = splitJoinKey(key);
-    const counts = storeCounts.get(key);
-    quarterly.push({
-      ...parts,
-      salesAmount: observation.salesAmount,
-      salesCount: observation.salesCount,
-      salesBreakdownJson: observation.salesBreakdownJson,
-      storeCount: counts?.storeCount ?? null,
-      similarIndustryStoreCount: counts?.similarIndustryStoreCount ?? null,
-      franchiseStoreCount: counts?.franchiseStoreCount ?? null,
-      openedStoreCount: counts?.openedStoreCount ?? null,
-      closedStoreCount: counts?.closedStoreCount ?? null,
-    });
-  }
-  let storeOnlyQuarterlyRows = 0;
-  for (const [key, counts] of storeCounts) {
-    if (salesObservations.has(key)) continue;
-    storeOnlyQuarterlyRows += 1;
-    quarterly.push({
-      ...splitJoinKey(key),
-      salesAmount: null,
-      salesCount: null,
-      salesBreakdownJson: null,
-      storeCount: counts.storeCount,
-      similarIndustryStoreCount: counts.similarIndustryStoreCount,
-      franchiseStoreCount: counts.franchiseStoreCount,
-      openedStoreCount: counts.openedStoreCount,
-      closedStoreCount: counts.closedStoreCount,
-    });
-  }
-  quarterly.sort((left, right) => {
-    const leftKey = joinKey(left);
-    const rightKey = joinKey(right);
-    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
-  });
-
-  for (const industry of SUPPORTED_INDUSTRIES) {
-    const count = quarterly.filter((row) => row.industryCode === industry.code).length;
-    if (count === 0) {
-      issues.add('MISSING_SUPPORTED_INDUSTRY', 'industry', `지원 업종 ${industry.code}의 분기 자료가 없습니다.`);
-    }
-  }
-
-  const quarterList = [...quarters].sort();
-  if (
-    quarterList.length > 0 &&
-    (quarterList[0] !== MARKET_BASIS_START_QUARTER || quarterList[quarterList.length - 1] !== MARKET_BASIS_END_QUARTER)
-  ) {
-    issues.warn(
-      'INVALID_QUARTER',
-      'join',
-      `원본 분기 범위 ${quarterList[0]}~${quarterList[quarterList.length - 1]}가 릴리스 기준기간 ${MARKET_BASIS_START_QUARTER}~${MARKET_BASIS_END_QUARTER}와 다릅니다.`,
-    );
-  }
-
-  const stats = {
-    salesRows,
-    storeRows,
-    areaRows: areas.length,
-    salesRowsMissingStores,
-    storeOnlyKeys,
-    duplicateKeys,
-    storeCountIdentityMismatches,
-    areaNameMismatches,
-    salesRowsForSupportedIndustries: salesObservations.size,
-    storeOnlyQuarterlyRows,
-    quarters: quarterList,
-  };
-
+  const built = builder.finish(MARKET_BASIS_START_QUARTER, MARKET_BASIS_END_QUARTER);
+  const stats = built.stats;
   const checks: MarketCheck[] = [
     check('매출 행', MARKET_RELEASE_EXPECTATIONS.salesRows, stats.salesRows),
     check('점포 행', MARKET_RELEASE_EXPECTATIONS.storesRows, stats.storeRows),
@@ -795,11 +855,215 @@ export function readMarketSources(
   return {
     releaseKey: releaseKeyFor(files.map((file) => ({ file: file.file, sha256: file.sha256 }))),
     releaseLabel: MARKET_RELEASE_LABEL,
+    release: {
+      basisStart: MARKET_BASIS_START_QUARTER,
+      basisEnd: MARKET_BASIS_END_QUARTER,
+      basisPeriodLabel: basisPeriodLabel(MARKET_BASIS_START_QUARTER, MARKET_BASIS_END_QUARTER),
+      retrievedAt: new Date(`${MARKET_RETRIEVED_AT}T00:00:00.000Z`),
+      sourceUrl: MARKET_SOURCE_URL,
+    },
+    sourceQuarters: [],
     files,
     checksumVerified: files.every((file) => file.checksumVerified),
-    areas,
-    industries,
-    quarterly,
+    areas: built.areas,
+    industries: built.industries,
+    quarterly: built.quarterly,
+    stats,
+    checks,
+    warnings: issues.warnings,
+  };
+}
+
+// API로 받을 때 시작 분기를 따로 주지 않으면 지금 파일 적재본과 같은 2024년 1분기부터 받는다.
+export const MARKET_API_DEFAULT_START_QUARTER = '20241';
+
+export type MarketApiReadOptions = {
+  apiKey: string;
+  fromQuarter?: string;
+  toQuarter?: string;
+  fetchImpl?: FetchLike;
+  now?: Date;
+  pageSize?: number;
+  concurrency?: number;
+  retryDelayMs?: number;
+  log?: (message: string) => void;
+};
+
+function columnFields(fields: Readonly<Record<string, CanonicalColumn | null>>): Map<CanonicalColumn, string> {
+  const byColumn = new Map<CanonicalColumn, string>();
+  for (const [field, column] of Object.entries(fields)) if (column) byColumn.set(column, field);
+  return byColumn;
+}
+
+function apiGetter(row: SeoulApiRow, byColumn: Map<CanonicalColumn, string>): RowGetter {
+  return (column) => {
+    const field = byColumn.get(column);
+    return field === undefined ? '' : apiCell(row[field]);
+  };
+}
+
+// 응답 행의 필드 구성이 기록과 다르면 서비스·분기마다 한 번만 오류로 남긴다.
+function checkApiFields(service: SeoulApiService, rows: readonly SeoulApiRow[], label: string, issues: IssueCollector) {
+  let mismatched = 0;
+  let example = '';
+  for (const row of rows) {
+    const { missing, unexpected } = fieldDifferences(row, service.fields);
+    if (missing.length === 0 && unexpected.length === 0) continue;
+    mismatched += 1;
+    if (!example) example = `누락 [${missing.slice(0, 5).join(', ')}], 예상 밖 [${unexpected.slice(0, 5).join(', ')}]`;
+  }
+  if (mismatched > 0) {
+    issues.add('UNEXPECTED_HEADER', label, `응답 ${mismatched}행의 필드 구성이 기록과 다릅니다: ${example}`);
+  }
+}
+
+// 서울 열린데이터광장 Open API에서 영역과 분기별 매출·점포를 받아 같은 검증을 거친다.
+export async function readMarketApiSources(options: MarketApiReadOptions): Promise<ParsedMarketSources> {
+  const log = options.log ?? (() => {});
+  const issues = createIssueCollector();
+  const client = createSeoulApiClient({
+    apiKey: options.apiKey,
+    fetchImpl: options.fetchImpl,
+    pageSize: options.pageSize,
+    concurrency: options.concurrency,
+    retryDelayMs: options.retryDelayMs,
+  });
+  const now = options.now ?? new Date();
+  const start = options.fromQuarter ?? MARKET_API_DEFAULT_START_QUARTER;
+  if (!parseQuarter(start))
+    throw new MarketSourceError('INVALID_QUARTER', `시작 분기는 YYYYQ 형식이어야 합니다: ${start}`);
+  const end = options.toQuarter ?? (await findLatestQuarter(client, now));
+  if (!parseQuarter(end)) throw new MarketSourceError('INVALID_QUARTER', `끝 분기는 YYYYQ 형식이어야 합니다: ${end}`);
+  const quarters = quartersBetween(start, end);
+  if (quarters.length === 0) {
+    throw new MarketSourceError('INVALID_QUARTER', `시작 분기 ${start}가 끝 분기 ${end}보다 늦습니다.`);
+  }
+  log(`서울 열린데이터광장 Open API에서 ${basisPeriodLabel(start, end)}(${quarters.length}개 분기)를 받습니다.`);
+
+  const sourceQuarters: SourceQuarterRecord[] = [];
+  const bytesByRole: Record<SourceFileRole, number> = { areas: 0, sales: 0, stores: 0 };
+
+  const areaService = SEOUL_MARKET_SERVICES.areas;
+  log('영역을 받습니다.');
+  const areaResult = await client.fetchAll(areaService.service);
+  checkApiFields(areaService, areaResult.rows, areaService.service, issues);
+  issues.throwIfFailed();
+  bytesByRole.areas += areaResult.bytes;
+  sourceQuarters.push({
+    role: 'areas',
+    service: areaService.service,
+    quarter: null,
+    rows: areaResult.rows.length,
+    sha256: canonicalRowsHash(areaResult.rows, areaService.fields),
+  });
+  const areas = collectAreas(
+    areaResult.rows.map((row) => ({
+      areaType: apiCell(row[AREA_API_FIELDS.areaType]),
+      areaCode: apiCell(row[AREA_API_FIELDS.areaCode]),
+      sourceName: apiCell(row[AREA_API_FIELDS.sourceName]),
+      areaTypeName: apiCell(row[AREA_API_FIELDS.areaTypeName]),
+      districtCode: apiCell(row[AREA_API_FIELDS.districtCode]),
+      districtName: apiCell(row[AREA_API_FIELDS.districtName]),
+    })),
+    areaService.service,
+    issues,
+  );
+  issues.throwIfFailed();
+  const builder = createMarketBuilder(areas, areaService.service, issues);
+
+  const tabular = [
+    { service: SEOUL_MARKET_SERVICES.sales, byColumn: columnFields(SALES_API_FIELDS), add: builder.addSales },
+    { service: SEOUL_MARKET_SERVICES.stores, byColumn: columnFields(STORES_API_FIELDS), add: builder.addStores },
+  ];
+  for (const quarter of quarters) {
+    const year = parseQuarter(quarter)?.year ?? null;
+    for (const { service, byColumn, add } of tabular) {
+      const result = await client.fetchAll(service.service, quarter);
+      const label = `${service.service}:${quarter}`;
+      log(`${service.datasetName} ${quarterLabel(quarter)} ${result.total}행을 받았습니다.`);
+      if (result.total === 0) issues.add('INCOMPLETE_SOURCE', label, `${quarterLabel(quarter)} 자료가 없습니다.`);
+      checkApiFields(service, result.rows, label, issues);
+      let otherQuarter = 0;
+      result.rows.forEach((row, index) => {
+        if (apiCell(row.STDR_YYQU_CD) !== quarter) otherQuarter += 1;
+        add(apiGetter(row, byColumn), label, index + 1, year);
+      });
+      if (otherQuarter > 0) {
+        issues.add('INVALID_QUARTER', label, `요청한 분기가 아닌 행 ${otherQuarter}건이 응답에 있습니다.`);
+      }
+      bytesByRole[service.role] += result.bytes;
+      sourceQuarters.push({
+        role: service.role,
+        service: service.service,
+        quarter,
+        rows: result.rows.length,
+        sha256: canonicalRowsHash(result.rows, service.fields),
+      });
+    }
+  }
+
+  const built = builder.finish(start, end);
+  const stats = built.stats;
+  const receivedAll = stats.quarters.length === quarters.length && stats.quarters.every((q, i) => q === quarters[i]);
+  const checks: MarketCheck[] = [
+    { name: '받은 분기', expected: quarters.join(','), actual: stats.quarters.join(','), passed: receivedAll },
+    check('점포 자료가 없는 매출 행', 0, stats.salesRowsMissingStores),
+    check('결합 키 중복', 0, stats.duplicateKeys),
+    check('점포 수 항등식 위반', 0, stats.storeCountIdentityMismatches),
+  ];
+  for (const entry of checks) {
+    if (!entry.passed) {
+      issues.add('ROW_COUNT_MISMATCH', 'checks', `${entry.name}: 예상 ${entry.expected}, 실제 ${entry.actual}`);
+    }
+  }
+  issues.throwIfFailed();
+
+  // 화면에는 서비스별 출처 3개만 보여 주고, 분기별 행 수와 해시는 검증 요약(sourceQuarters)에 남긴다.
+  const basisCode = `${start}-${end}`;
+  const files: SourceFileRecord[] = (['areas', 'sales', 'stores'] as const).map((role) => {
+    const service = SEOUL_MARKET_SERVICES[role];
+    const records = sourceQuarters.filter((record) => record.role === role);
+    return {
+      file: `api:${service.service}`,
+      role,
+      datasetId: service.datasetId,
+      datasetName: service.datasetName,
+      url: service.url,
+      basisPeriod: basisCode,
+      bytes: bytesByRole[role],
+      sha256: sha256Hex(
+        records
+          .map((record) => `${record.quarter ?? '-'}:${record.sha256}`)
+          .sort()
+          .join('\n'),
+      ),
+      rowCount: records.reduce((sum, record) => sum + record.rows, 0),
+      // API에는 기록된 원본 파일이 없다. 모든 분기를 전체 건수만큼 받고 내용 해시를 남겼다는 뜻이다.
+      checksumVerified: true,
+    };
+  });
+
+  const periodLabel = basisPeriodLabel(start, end);
+  return {
+    releaseKey: releaseKeyFor(
+      files.map((file) => ({ file: file.file, sha256: file.sha256 })),
+      start,
+      end,
+    ),
+    releaseLabel: `서울시 상권분석서비스 ${periodLabel}`,
+    release: {
+      basisStart: start,
+      basisEnd: end,
+      basisPeriodLabel: periodLabel,
+      retrievedAt: now,
+      sourceUrl: SEOUL_MARKET_SERVICES.sales.url,
+    },
+    sourceQuarters,
+    files,
+    checksumVerified: true,
+    areas: built.areas,
+    industries: built.industries,
+    quarterly: built.quarterly,
     stats,
     checks,
     warnings: issues.warnings,
@@ -947,7 +1211,6 @@ async function markReleaseFailed(
 
 export async function loadMarketRelease(options: MarketLoadOptions): Promise<MarketLoadReport> {
   const log = options.log ?? (() => {});
-  const prisma = options.prisma;
   if (options.allowUnverifiedSourceForTests && process.env.NODE_ENV !== 'test') {
     throw new MarketSourceError(
       'UNVERIFIED_SOURCE_FORBIDDEN',
@@ -959,7 +1222,24 @@ export async function loadMarketRelease(options: MarketLoadOptions): Promise<Mar
     acceptChangedSource: options.allowUnverifiedSourceForTests === true,
     log,
   });
+  return persistMarketRelease(options.prisma, parsed, log, options.hooks);
+}
 
+export type MarketApiLoadOptions = MarketApiReadOptions & { prisma: PrismaClient; hooks?: MarketLoadHooks };
+
+// `market:load`의 기본 경로. 서울 열린데이터광장 Open API에서 받아 파일과 같은 검증·활성화 절차를 거친다.
+export async function loadMarketReleaseFromApi(options: MarketApiLoadOptions): Promise<MarketLoadReport> {
+  const log = options.log ?? (() => {});
+  const parsed = await readMarketApiSources(options);
+  return persistMarketRelease(options.prisma, parsed, log, options.hooks);
+}
+
+async function persistMarketRelease(
+  prisma: PrismaClient,
+  parsed: ParsedMarketSources,
+  log: (message: string) => void,
+  hooks: MarketLoadHooks | undefined,
+): Promise<MarketLoadReport> {
   const existing = await prisma.marketRelease.findUnique({ where: { releaseKey: parsed.releaseKey } });
   if (existing && existing.status === 'ACTIVE') {
     await upsertIndustries(prisma, existing.id, parsed.industries);
@@ -995,12 +1275,17 @@ export async function loadMarketRelease(options: MarketLoadOptions): Promise<Mar
       status: 'PENDING',
       schemaVersion: MARKET_SCHEMA_VERSION,
       definitionVersion: MARKET_DEFINITION_VERSION,
-      sourceUrl: MARKET_SOURCE_URL,
-      basisPeriod: `${MARKET_BASIS_START_QUARTER}-${MARKET_BASIS_END_QUARTER}`,
-      basisPeriodLabel: MARKET_RELEASE_LABEL.replace('서울시 상권분석서비스 ', ''),
-      retrievedAt: new Date(`${MARKET_RETRIEVED_AT}T00:00:00.000Z`),
+      sourceUrl: parsed.release.sourceUrl,
+      basisPeriod: `${parsed.release.basisStart}-${parsed.release.basisEnd}`,
+      basisPeriodLabel: parsed.release.basisPeriodLabel,
+      retrievedAt: parsed.release.retrievedAt,
       files: parsed.files,
-      validationSummary: { checks: parsed.checks, warnings: parsed.warnings, stats: parsed.stats },
+      validationSummary: {
+        checks: parsed.checks,
+        warnings: parsed.warnings,
+        stats: parsed.stats,
+        sourceQuarters: parsed.sourceQuarters,
+      },
       areaCount: parsed.areas.length,
       quarterlyRowCount: parsed.quarterly.length,
     },
@@ -1012,7 +1297,7 @@ export async function loadMarketRelease(options: MarketLoadOptions): Promise<Mar
     await insertAreas(prisma, release.id, parsed.areas, log);
     await insertQuarterly(prisma, release.id, parsed.quarterly, log);
     await verifyPersistedRelease(prisma, release.id, parsed);
-    if (options.hooks?.beforeActivate) await options.hooks.beforeActivate();
+    if (hooks?.beforeActivate) await hooks.beforeActivate();
     await prisma.$transaction(async (transaction) => {
       await transaction.marketRelease.updateMany({
         where: { status: 'ACTIVE', id: { not: release.id } },

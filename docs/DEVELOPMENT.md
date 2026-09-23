@@ -25,7 +25,7 @@ npm --prefix app run dev
 | 파일 | 값 |
 |---|---|
 | `infra/.env` | `POSTGRES_PASSWORD`, `POSTGRES_PORT` |
-| `app/.env.local` | `DATABASE_URL`, `BETTER_AUTH_SECRET`(32자 이상), `BETTER_AUTH_URL`, 점포 적재 시 `SEMAS_SERVICE_KEY` |
+| `app/.env.local` | `DATABASE_URL`, `BETTER_AUTH_SECRET`(32자 이상), `BETTER_AUTH_URL`, 상권 적재 시 `SEOUL_OPEN_API_KEY`, 점포 적재 시 `SEMAS_SERVICE_KEY` |
 | `app/.env.test.local` | `TEST_DATABASE_URL`(DB명 `trendbench_mvp_test`) |
 
 직접 만들 때는 세 파일을 모두 만든다. 비밀번호는 같은 값을 쓰고 URL의 특수문자는 인코딩한다. 예시는 `infra/.env.example`과 `app/.env.example`에 있다. Prisma CLI와 적재 명령도 `app/.env.local`을 읽는다.
@@ -36,11 +36,11 @@ npm --prefix app run dev
 
 | 데이터 | 준비 | 적재 |
 |---|---|---|
-| 서울시 상권 | [verification/README.md](verification/README.md)의 ZIP 5개를 `data/raw/`(Git 제외)에 둔다. checksum이 맞아야 하므로 기존 보유자에게 같은 파일을 받는다 | `npm --prefix app run market:load` |
+| 서울시 상권 | 서울 열린데이터광장 인증키를 `SEOUL_OPEN_API_KEY`에 넣는다. 약 2분 걸린다 | `npm --prefix app run market:load` |
 | 소진공 점포 | 공공데이터포털 인증키를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
 | 자금 카탈로그 | 준비 없음. 검수자가 UNASSIGNED여도 적재되며, 그런 상품은 현재 후보가 아니라 추가 확인으로 분류된다 | `npm --prefix app run funding:load` |
 
-`data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어진다.
+2026-09-09 검증본 ZIP으로 적재하려면 [verification/README.md](verification/README.md)의 파일 5개를 `data/raw/`(Git 제외)에 두고 `npm --prefix app run market:load -- --source-dir ../data/raw`를 실행한다. `data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어진다.
 
 ## 명령
 
