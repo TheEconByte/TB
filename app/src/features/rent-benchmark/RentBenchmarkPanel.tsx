@@ -156,11 +156,11 @@ function RentBenchmarkBody({
 
   return (
     <>
-      <p className="picker-note rent-lead">
+      <p className="picker-note reference-lead">
         {payload.source.statName}의 {payload.buildingType.label} {payload.source.latestQuarterLabel} 조사값입니다. 지역
         평균이며, 재무계획의 월 임대료에 자동으로 넣지 않습니다.
       </p>
-      <div className="select-row rent-select-row">
+      <div className="select-row reference-select-row">
         <label className="field">
           <span>조사 지역</span>
           <select value={region.path} onChange={(event) => onSelect(event.target.value)}>
@@ -202,7 +202,7 @@ function RentBenchmarkBody({
         </label>
       </div>
 
-      <div className="summary-grid rent-summary">
+      <div className="summary-grid reference-summary">
         <div>
           <span>월 임대료 참고값</span>
           <strong>{monthly ? formatWon(monthly) : '계산 불가'}</strong>
@@ -236,7 +236,7 @@ function RentBenchmarkBody({
         </p>
       )}
 
-      <div className="rent-detail-grid">
+      <div className="reference-detail-grid">
         <div>
           <h3>층별 ㎡당 월 임대료</h3>
           {region.latest.floors.length === 0 ? (
@@ -288,7 +288,7 @@ function RentBenchmarkBody({
         </div>
       </div>
 
-      <details className="rent-source">
+      <details className="reference-source">
         <summary>기준과 출처</summary>
         <ul>
           {[...payload.definitions, ...payload.limitations].map((line) => (

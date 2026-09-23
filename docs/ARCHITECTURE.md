@@ -9,7 +9,7 @@ Browser
   ↓
 Next.js App Router + TypeScript (app/)
   ├─ pages and Route Handlers
-  ├─ finance / plans / market / business-directory / business-profile / rent-benchmark / funding
+  ├─ finance / plans / market / business-directory / business-profile / rent-benchmark / franchise / funding
   └─ Prisma + Better Auth + Zod
   ↓
 PostgreSQL 17 (single application database)
@@ -18,6 +18,7 @@ Operator commands
   ├─ market:load       Seoul Open API (or verified files)
   ├─ business:load     SEMAS API snapshot
   ├─ rent:load         REB R-ONE rent survey
+  ├─ franchise:load    FTC franchise disclosure stats
   └─ funding:load      human-reviewed catalog
 ```
 
@@ -34,6 +35,7 @@ Operator commands
 | 서울시 상권 | `app/src/features/market` | `/markets`, industries·areas·summary·report API | `market.test.ts` | [market.md](domains/market.md) |
 | 소진공 점포 | `app/src/features/business-directory` | business-categories·businesses/summary API | `business-directory.test.ts` | [business-directory.md](domains/business-directory.md) |
 | 임대료 참고 | `app/src/features/rent-benchmark` | rent-benchmarks API, `/`의 임대료 참고 패널 | `rent-benchmark.test.ts`, `rent-benchmark.spec.ts` | [rent-benchmark.md](domains/rent-benchmark.md) |
+| 프랜차이즈 참고 | `app/src/features/franchise` | franchises API, `/`의 프랜차이즈 참고 패널 | `franchise.test.ts`, `franchise.spec.ts` | [franchise.md](domains/franchise.md) |
 | 사업 조건 | `app/src/features/business-profile` | 계획 business-profile API, 입력 플로우 | `business-profile.test.ts` | [business-profile.md](domains/business-profile.md) |
 | 자금 카탈로그·후보 | `app/src/features/funding`, `app/catalog/funding` | `/funding`, candidates API | `funding.test.ts`, `candidates.test.ts` | [funding.md](domains/funding.md) |
 | 인증·요청 보안 | `app/src/lib/auth.ts`, `session.ts`, `request-security.ts`, `rate-limit.ts` | `/api/auth/*`, 업무 API 공통 경계 | `request-security.test.ts`, 계획 API 테스트 | [security.md](domains/security.md) |

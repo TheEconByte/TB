@@ -27,6 +27,7 @@
     "market:load": "node --env-file-if-exists=.env.local scripts/load-market.ts",
     "business:load": "node --env-file-if-exists=.env.local scripts/load-business-directory.ts",
     "rent:load": "node --env-file-if-exists=.env.local scripts/load-rent-benchmarks.ts",
+    "franchise:load": "node --env-file-if-exists=.env.local scripts/load-franchises.ts",
     "funding:validate": "node --env-file-if-exists=.env.local scripts/validate-funding-catalog.ts",
     "funding:load": "node --env-file-if-exists=.env.local scripts/load-funding-catalog.ts"
   },

@@ -1473,28 +1473,28 @@ footer {
   }
 }
 
-/* 임대료 참고 패널 */
-.rent-lead {
+/* 임대료·프랜차이즈 참고 패널 */
+.reference-lead {
   margin-top: 8px;
 }
-.rent-select-row {
+.reference-select-row {
   grid-template-columns: minmax(0, 1fr);
   margin-top: 18px;
 }
-.rent-summary {
+.reference-summary {
   margin-top: 18px;
 }
-.rent-summary small {
+.reference-summary small {
   color: #d6e2dc;
   font-size: 12px;
 }
-.rent-detail-grid {
+.reference-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   margin-top: 22px;
 }
-.rent-detail-grid h3 {
+.reference-detail-grid h3 {
   margin: 0 0 12px;
   font-size: 15px;
 }
@@ -1504,22 +1504,49 @@ footer {
 .metric-row.selected .metric-track span {
   background: var(--accent);
 }
-.rent-source {
+.reference-source {
   margin-top: 20px;
   font-size: 13px;
   color: var(--muted);
 }
-.rent-source summary {
+.reference-source summary {
   cursor: pointer;
   font-weight: 700;
   color: var(--ink);
 }
-.rent-source ul {
+.reference-source ul {
   margin: 10px 0 0;
   padding-left: 18px;
 }
 @media (max-width: 850px) {
-  .rent-detail-grid {
+  .reference-detail-grid {
     grid-template-columns: 1fr;
   }
+}
+.franchise-list {
+  margin-top: 18px;
+  max-height: 360px;
+}
+.franchise-list caption {
+  caption-side: top;
+  text-align: left;
+  margin: 0 0 8px;
+}
+.franchise-list tr.selected td {
+  background: var(--sage);
+  font-weight: 700;
+}
+.franchise-detail {
+  margin-top: 22px;
+}
+.franchise-detail > h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.franchise-detail > h3 span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
 }
