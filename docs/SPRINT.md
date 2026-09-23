@@ -23,6 +23,7 @@
   - 다른 PR이 병합되면 바로 rebase한다.
 - **migration:** 스프린트 동안 WP5 하나만 만든다.
 - **PR:** 작게 만들어 하루 2번 이상 main에 합친다. CI `check`가 통과하면 바로 병합한다.
+- **main 보호 규칙:** 스프린트 동안 ruleset `main protection`을 비활성화했다. 승인 없이 병합할 수 있다. 데모가 끝나면 다시 켠다([CONTRIBUTING.md](../CONTRIBUTING.md#github-설정)의 설정으로).
 - **문서:** 각 WP가 자기 도메인 문서와 [PRODUCT.md](PRODUCT.md)의 현재 기능 한 줄을 함께 고친다.
 - **데모 노트북:** 데이터가 이미 적재된 작성자 PC다.
 
