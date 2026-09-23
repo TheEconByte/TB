@@ -345,7 +345,7 @@ describe('the reviewed 2026-09-20 catalog', () => {
     const parsed = catalogFrom(validation);
     expect(parsed.products).toHaveLength(5);
     expect(parsed.basisDate).toBe(REVIEW_DATE);
-    expect(validation.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.0']);
+    expect(validation.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.1']);
 
     const byStatus = parsed.products.map((entry) => entry.observedApplicationStatus);
     expect(byStatus.filter((status) => status === 'CLOSED')).toHaveLength(1);
@@ -624,7 +624,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   let client: PrismaClient | null = null;
   let startedAt = new Date(0);
   let previousActiveId: string | null = null;
-  const REAL_VERSION = '2026-09-20.1';
+  const REAL_VERSION = '2026-09-23.1';
   const REVIEWED_CATALOG_PATH = reviewedCatalogFile();
 
   const db = (): PrismaClient => {
@@ -684,7 +684,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
     });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.productCount).toBe(5);
-    expect(report.reviewOverdue).toEqual(['test-gangbuk-startup-center-2026-h2-residency@1.0.0']);
+    expect(report.reviewOverdue).toEqual(['test-gangbuk-startup-center-2026-h2-residency@1.0.1']);
     expect(report.catalogChecksum).toHaveLength(64);
 
     const stored = await db().fundingCatalogRelease.findUnique({ where: { catalogChecksum: report.catalogChecksum } });
@@ -797,8 +797,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
 
   it('validates a catalog file before it can be loaded', () => {
     const parsed = readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE);
-    expect(parsed.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.0']);
-    expect(parsed.catalog.products.map(productVersionKey)).toContain('seoul-fund-2026-inclusive-finance@1.0.0');
+    expect(parsed.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.1']);
+    expect(parsed.catalog.products.map(productVersionKey)).toContain('seoul-fund-2026-inclusive-finance@1.0.1');
   });
 
   it('links reused immutable product versions to a later catalog release', async () => {
