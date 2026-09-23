@@ -795,6 +795,12 @@ footer {
   font-size: 11px;
   text-anchor: middle;
 }
+/* 왼쪽 끝에 두는 라벨이라 가운데 정렬하면 앞부분이 잘린다. */
+.chart-max-label {
+  fill: var(--muted);
+  font-size: 11px;
+  text-anchor: start;
+}
 .chart-value-label {
   fill: var(--ink);
   font-size: 10px;

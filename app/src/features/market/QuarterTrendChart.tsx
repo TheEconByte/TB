@@ -9,7 +9,8 @@ const numberFormat = new Intl.NumberFormat('ko-KR');
 export default function QuarterTrendChart({ points }: { readonly points: readonly ChartPoint[] }) {
   const width = Math.max(320, points.length * 72 + 24);
   const height = 210;
-  const padding = { top: 18, right: 14, bottom: 46, left: 14 };
+  // 위쪽 여백은 최대값 라벨 줄이다. 가장 높은 막대의 값 라벨과 겹치지 않게 막대 영역 위에 둔다.
+  const padding = { top: 32, right: 14, bottom: 46, left: 14 };
   const plotHeight = height - padding.top - padding.bottom;
   const observed = points.map((point) => point.amount).filter((amount): amount is number => amount !== null);
   const maximum = observed.length > 0 ? Math.max(...observed) : 0;
@@ -37,7 +38,7 @@ export default function QuarterTrendChart({ points }: { readonly points: readonl
           stroke="var(--line)"
         />
         {maximum > 0 && (
-          <text x={padding.left} y={padding.top - 4} className="chart-axis-label">
+          <text x={padding.left} y={14} className="chart-max-label">
             최대 {numberFormat.format(maximum)}원
           </text>
         )}
