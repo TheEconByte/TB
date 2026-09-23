@@ -42,5 +42,5 @@ AI 리뷰만으로 승인하지 않는다. AI가 지적한 내용도 코드에�
 
 - `CLAUDE.md`가 `AGENTS.md`를 자동으로 읽는다.
 - `.claude/settings.json`은 환경파일 읽기를 막는 권한 규칙과 두 hook을 둔다. 세션 시작 hook은 branch·HEAD·작업 트리 상태를 알려 주고, 가드 hook은 일부 파괴적 명령을 막는다. hook은 Node로 작성되어 Windows에서는 Git for Windows가 필요하다.
-- 가드 hook은 명령 문자열 전체를 검사한다. Issue·PR 본문에 금지 명령 예시가 있으면 파일로 만든 뒤 `--body-file`로 넘긴다.
+- 가드 hook은 명령 문자열 전체를 검사한다. Issue·PR 본문에 금지 명령 예시가 있으면 파일로 만든 뒤 `--body-file`로 넘긴다. hook 규칙을 바꾸면 `app/scripts/guard-commands.test.ts`에 막을 명령과 허용할 명령을 추가한다.
 - 개인 설정은 `.claude/settings.local.json`(Git 제외)에 두고, 팀 공통 hook을 개인 설정으로 끄지 않는다.

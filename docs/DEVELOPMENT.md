@@ -60,14 +60,15 @@ Prisma 스키마나 마이그레이션을 바꾼 뒤에는 실행 중인 개발 
 
 ## PostgreSQL
 
-PowerShell:
+로컬 환경파일은 `bootstrap`이 만든다. 직접 만들 때는 아래 세 파일을 모두 만든다. 하나라도 빠지면 `bootstrap`이 실패하고, `TEST_DATABASE_URL`이 `app/.env.test.local`에 없으면 `verify:db`가 실패한다.
 
-```powershell
-Copy-Item infra/.env.example infra/.env
-Copy-Item app/.env.example app/.env.local
-```
+| 파일 | 값 | 예시 |
+|---|---|---|
+| `infra/.env` | `POSTGRES_PASSWORD`, `POSTGRES_PORT` | `infra/.env.example` |
+| `app/.env.local` | `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, 점포 적재 시 `SEMAS_SERVICE_KEY` | `app/.env.example` |
+| `app/.env.test.local` | `TEST_DATABASE_URL` (DB명 `trendbench_mvp_test`) | `app/.env.example`의 주석 |
 
-이미 파일이 있다면 덮어쓰지 말고 필요한 항목만 수정한다. `infra/.env`의 로컬 비밀번호를 설정하고 `app/.env.local`의 DATABASE_URL에도 같은 값을 사용한다. URL의 비밀번호 특수문자는 URL 인코딩한다.
+이미 있는 파일은 덮어쓰지 않는다. 세 파일의 비밀번호는 같은 값을 쓰고 URL의 특수문자는 인코딩한다.
 
 ```sh
 docker compose --env-file infra/.env -f infra/compose.yaml config --quiet
@@ -118,7 +119,7 @@ Better Auth 1.7.5는 이메일·비밀번호와 DB 세션을 담당한다. `BETT
 
 ## CI
 
-현재 `.github/workflows/check.yml`은 `.nvmrc`의 Node에서 PR diff의 공백 오류(`git diff --check`), `npm ci`, 포맷 검사, lint, typecheck, DB 비의존 unit test, production build만 실행한다. PostgreSQL service, migration, DB suite, Playwright, artifact 보존은 아직 원격 CI에 연결되지 않았다. 따라서 GitHub의 초록색 check만으로 DB·브라우저 검증까지 통과했다고 말할 수 없다.
+현재 `.github/workflows/check.yml`은 PR과 main push에서 한 번씩, `.nvmrc`의 Node로 PR diff의 공백 오류(`git diff --check`), `npm ci`, 포맷 검사, lint, typecheck, DB 비의존 unit test, production build만 실행한다. PostgreSQL service, migration, DB suite, Playwright, artifact 보존은 아직 원격 CI에 연결되지 않았다. 따라서 GitHub의 초록색 check만으로 DB·브라우저 검증까지 통과했다고 말할 수 없다.
 
 DB·E2E 변경 PR은 작성자가 로컬 `npm --prefix app run verify` 결과를 PR에 기록한다. CI 변경은 자체 검증 없이 문서만 먼저 “구현됨”으로 바꾸지 않는다.
 

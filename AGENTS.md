@@ -37,7 +37,7 @@
 
 - 적용된 migration은 수정하지 않고 새 migration을 추가한다. schema를 바꾸면 `db:generate`, 앱 DB와 테스트 DB migration, `verify:db`까지 같은 작업에서 한다.
 - 테스트 DB(`TEST_DATABASE_URL`)를 앱 DB와 같게 설정하지 않는다. DB를 바꾸는 테스트는 테스트 DB에서만 실행한다.
-- `.env.local`, `.env.test.local`, `infra/.env`의 값을 읽거나 출력하지 않는다. API 키·환경변수 값·로컬 원본을 commit·로그·PR에 남기지 않는다.
+- `app/.env.local`, `app/.env.test.local`, `app/.env`, `infra/.env`의 값을 읽거나 출력하지 않는다. API 키·환경변수 값·로컬 원본을 commit·로그·PR에 남기지 않는다.
 - 다음은 사람이 직접 판단해 실행한다: `prisma migrate reset`, `docker compose down -v`, 운영 원본·사용자 파일 삭제, force push, `git reset --hard`, `git clean -f`, `git stash`, `git checkout -- <path>`·`git restore <path>`로 변경 버리기.
 - Claude Code의 hook이 위 명령 일부와 환경파일 읽기를 실행 전에 막는다. 전부 막지는 못하므로 hook을 통과했다고 안전한 명령은 아니다.
 - commit·push·PR 생성은 사람이 요청했을 때만 한다.
