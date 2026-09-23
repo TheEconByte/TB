@@ -19,4 +19,4 @@
 4. 승인된 ADR의 후속 코드·migration·문서 PR을 연결한다.
 5. 결정을 바꿀 때 과거 ADR을 수정해 역사를 지우지 않고 새 ADR에서 `Supersedes`로 연결한다.
 
-[0000-template.md](0000-template.md)를 복사해 사용한다. 현재 제품 사실은 ADR이 아니라 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)에 유지한다.
+[0000-template.md](0000-template.md)를 복사해 사용한다. 현재 제품 사실은 ADR이 아니라 [PRODUCT.md](../PRODUCT.md)와 도메인 문서에 유지한다.

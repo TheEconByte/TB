@@ -1,4 +1,4 @@
-# ADR 0001: 단일 원본 문서와 기계적 강제 기반의 팀 AI 하네스
+# ADR 0001: 규칙 파일 하나와 도구 강제 중심의 팀 AI 하네스
 
 - Status: Proposed
 - Date: 2026-09-23
@@ -8,54 +8,41 @@
 
 ## Context
 
-팀원 각자가 Claude Code 세션으로 동시에 작업한다. 기존 문서는 변경 금지 계약·협업 규칙·single-writer 목록·운영 릴리스 값을 4~7개 문서에 복사해 두었고, 복사본 사이에 이미 항목 수와 범위가 달랐다. 또한 모든 기능 PR이 `PROJECT_CONTEXT.md`, `TASKS.md`, `DEVELOPMENT.md`를 고치도록 되어 있어 문서 자체가 병합 충돌 지점이었다.
+3명이 각자 Claude Code 세션으로 동시에 작업한다. 동시에 PR을 여는 AI 에이전트 사이의 충돌은 흔하다. [GitHub의 에이전트 PR 연구](https://arxiv.org/abs/2607.04697)에서 교차 에이전트 쌍의 텍스트 충돌률은 41.7%였다.
 
-문서로 막을 수 없는 충돌 원인도 있었다. `next dev`와 `next build`가 서로 다르게 다시 쓰는 `next-env.d.ts`, OS별 줄바꿈, 포매터 부재, 고정되지 않은 npm 버전, 같은 PC의 worktree가 공유하는 테스트 DB와 E2E 포트가 그것이다. 금지 명령과 작업 시작 절차는 문장으로만 존재했다.
+첫 하네스 초안은 규칙·현재 사실·절차·마일스톤을 12개 문서, 1,000줄 넘게 나눠 적었다. 여기에 single-writer 영역 7개, 필드 10개짜리 작업 계약 Issue, 문서 동기화 표를 두었다. 작성 5일 만에 사실과 다른 곳이 7군데 나왔다. 현재 사실 문서는 마일스톤이 끝날 때만 갱신하도록 되어 있었는데, 모든 세션이 이 문서를 자동으로 읽었다. 그래서 오래된 문맥을 계속 읽게 되는 구조였다.
+
+문장으로는 막을 수 없는 충돌 원인도 있었다. `next dev`와 `next build`가 서로 다르게 다시 쓰는 `next-env.d.ts`, OS별 줄바꿈, 포매터 부재, 고정되지 않은 npm 버전, 같은 PC의 worktree가 공유하는 테스트 DB와 E2E 포트가 그것이다.
 
 ## Decision
 
-1. **한 종류의 사실·규칙은 한 문서에만 쓴다.**
-   - 규칙: `AGENTS.md`
-   - 현재 사실과 변경 금지 계약: `docs/PROJECT_CONTEXT.md`
-   - 사람의 절차: `docs/TEAM_AI_WORKFLOW.md`
-   - 도메인 정책: `docs/domains/<도메인>.md`
-   - 다른 문서는 링크만 한다.
-2. **작업 상태의 원본은 GitHub Issue다.** 작업 ID는 Issue 번호다. `TASKS.md`는 마일스톤 요약이며 기능 PR에서 고치지 않는다.
-3. **Claude Code를 팀 표준 도구로 한다.**
-   - `CLAUDE.md`는 `@AGENTS.md`와 `@docs/PROJECT_CONTEXT.md`를 import한다.
-   - `.claude/settings.json`의 hook은 세션 시작 상태를 넣어 준다.
-   - 같은 hook이 금지 명령과 환경파일 접근을 실행 전에 거부한다.
-4. **포맷·줄바꿈·버전을 도구가 결정한다.**
-   - Prettier(`format:check`를 verify와 CI에 포함)
-   - `.editorconfig`, `.gitattributes`의 `eol=lf`
-   - `.nvmrc`, `packageManager`
-   - `next-env.d.ts`는 추적하지 않는다.
+1. **규칙은 `AGENTS.md` 하나에 둔다.** `CLAUDE.md`는 이 파일만 import한다. 협업 절차는 한 페이지짜리 `CONTRIBUTING.md`에 둔다. 제품 범위와 현재 기능은 `docs/PRODUCT.md`, 도메인 정책과 적재 기준 데이터는 `docs/domains/<도메인>.md`에 둔다. 문서는 코드와 같은 PR에서 고친다.
+2. **작업 상태는 GitHub Issue와 Milestone에서만 관리한다.** 저장소에 상태 문서를 두지 않는다.
+3. **충돌과 사고는 문장보다 도구로 막는다.**
+   - GitHub: main 보호, 승인 1명, CI `check`, squash 병합
+   - 포맷·버전: Prettier, `.editorconfig`, `.gitattributes`의 `eol=lf`, `.nvmrc`, `packageManager`. `next-env.d.ts`는 추적하지 않는다.
+   - Claude Code: 환경파일 읽기 차단 권한, 세션 시작 상태 hook, 일부 파괴적 명령 차단 hook
+4. **Claude Code를 팀 표준 AI 도구로 한다.** 다른 도구를 쓰게 되면 `AGENTS.md`를 가리키는 포인터 파일만 둔다.
 
 ## Alternatives considered
 
-- **문서 복사 유지와 주기적 대조:** 대조 책임자가 없으면 복사본이 계속 어긋난다. 기각한다.
-- **작업 상태를 TASKS.md에 유지:** 모든 PR이 같은 파일을 고쳐 충돌한다. 기각한다.
-- **도구별 규칙 파일(GEMINI.md, copilot-instructions.md)을 각각 유지:** 현재 팀은 Claude Code만 쓴다. 다른 도구를 추가하면 포인터만 둔다.
-- **Prettier 도입 보류:** 코드가 적은 지금이 전체 포맷 비용이 가장 작다. 보류하면 에이전트마다 스타일이 달라 충돌이 누적된다.
+- **첫 초안 유지:** 규칙·사실·절차를 문서별로 나누고 single-writer 영역·작업 계약·문서 동기화 표로 관리하는 방식이다. 3명 규모에 비해 유지 비용이 크고, 이미 문서가 사실과 어긋났다. 기각한다.
+- **문서 없이 구두 합의:** AI 에이전트는 구두 합의를 모른다. 기각한다.
+- **도구별 규칙 파일 유지(GEMINI.md, copilot-instructions.md):** 현재 Claude Code만 쓴다. 기각한다.
 
 ## Consequences
 
-- 장점:
-  - 에이전트가 읽는 규칙이 하나로 모인다.
-  - 서로 다른 도메인 작업은 서로 다른 문서를 고친다.
-  - 파괴적 명령이 사람 확인 없이 실행되지 않는다.
+- 장점: 에이전트와 사람이 읽을 규칙이 한 파일에 모인다. 매 세션 자동으로 읽는 문맥이 짧고 최신이다.
 - 비용·위험:
-  - 최초 1회 앱 코드 전체를 포맷한다. `TheEconByte/TB`는 포맷이 끝난 상태에서 새 이력으로 시작했으므로 blame에서 건너뛸 포맷 commit이 없다.
-  - hook은 명령 문자열 패턴으로 판단하므로 우회 가능한 방어선이다. 인간 리뷰를 대체하지 않는다.
+  - hook은 명령 문자열 패턴으로 판단하므로 우회할 수 있다. 인간 리뷰를 대체하지 않는다.
   - hook이 Git Bash 또는 bash에서 `$CLAUDE_PROJECT_DIR`로 실행되므로 Windows 팀원은 Git for Windows가 필요하다.
+  - 공유 파일 목록을 줄였으므로 인증·공통 계약 파일의 동시 수정은 리뷰에서 잡아야 한다.
 - migration·호환성: DB·API 변경 없음.
-- 운영·보안·데이터 영향:
-  - 환경파일 읽기를 권한 규칙과 hook으로 막는다.
-  - 자금 카탈로그와 적용된 migration은 포맷 대상에서 제외해 checksum과 적용 이력을 보존한다.
+- 운영·보안·데이터 영향: 자금 카탈로그와 적용된 migration은 포맷 대상에서 제외해 checksum과 적용 이력을 보존한다.
 
 ## Validation
 
 - `npm --prefix app run verify:fast`가 포맷 검사를 포함해 통과한다.
-- CI 필수 check `check`(workflow `App checks`)가 PR에서 `git diff --check`와 `format:check`를 실행한다.
+- CI 필수 check `check`가 PR에서 `git diff --check`와 `format:check`를 실행한다.
 - Claude Code 새 세션에서 세션 시작 상태가 문맥에 들어오고, `git reset --hard` 같은 명령이 hook에 의해 거부된다.
-- 팀원 전원이 이 ADR을 확인한 뒤 Status를 Accepted로 바꾼다.
+- 팀원 3명이 확인한 뒤 Status를 Accepted로 바꾼다.

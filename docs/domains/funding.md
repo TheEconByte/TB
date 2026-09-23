@@ -1,8 +1,8 @@
 # 자금 카탈로그·후보 도메인
 
-이 문서는 자금 카탈로그·후보의 구현 계약(API·적재·계산 정책과 테스트 범위)의 단일 원본이다. 이 도메인을 바꾸는 PR은 코드·테스트와 함께 이 파일을 고친다. 제품 전체의 불변 계약은 [PROJECT_CONTEXT.md §6](../PROJECT_CONTEXT.md#6-변경하면-안-되는-계약), 코드 지도는 [ARCHITECTURE.md](../ARCHITECTURE.md)를 따른다.
+이 도메인을 바꾸는 PR은 코드·테스트와 함께 이 문서를 고친다. 제품 전체의 데이터·계산 계약은 [AGENTS.md §3](../../AGENTS.md#3-데이터계산-계약)을 따른다.
 
-카탈로그 편집·검수 절차는 [app/catalog/funding/README.md](../../app/catalog/funding/README.md)를 따른다.
+카탈로그 편집·검수 절차는 [app/catalog/funding/README.md](../../app/catalog/funding/README.md)를 따른다. 현재 카탈로그 5건은 검수자 `UNASSIGNED`와 1차 원문 부족 때문에 `funding:load`가 적재를 거부한다(fail-closed). 이를 강제로 현재 후보나 상환 계산 가능 상품으로 바꾸지 않는다.
 
 ## 코드 위치
 

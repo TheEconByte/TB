@@ -1,6 +1,6 @@
 # 실제 데이터·API 구현 가능성 검증
 
-> 역사·검증 근거: 이 문서는 2026-09-09~10에 수행한 원본 검증을 보존한다. 이후 서울시 확장 릴리스와 소진공 운영 스냅샷이 적재되었다. 현재 ACTIVE 릴리스와 구현 가능 범위는 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)를 따른다.
+> 역사·검증 근거: 이 문서는 2026-09-09~10에 수행한 원본 검증을 보존한다. 이후 서울시 확장 릴리스와 소진공 운영 스냅샷이 적재되었다. 현재 기준 데이터는 [market.md](../domains/market.md#기준-데이터)와 [business-directory.md](../domains/business-directory.md), 구현 범위는 [PRODUCT.md](../PRODUCT.md)를 따른다.
 
 원본 입수·공고 확인: 2026-09-09. 연도별 열 매핑 재검증 및 문서 작성: 2026-09-10.
 

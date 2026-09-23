@@ -6,7 +6,7 @@
 - DB 작업 시 Docker Compose v2 또는 로컬 PostgreSQL 17.
 - Python은 공공파일 검증에만 필요하며 웹앱 실행 조건이 아니다.
 
-모든 명령의 기본 위치는 저장소 루트다. 규칙은 [AGENTS.md](../AGENTS.md), 현재 기능·데이터 계약은 [프로젝트 컨텍스트](PROJECT_CONTEXT.md), 코드 위치는 [아키텍처 지도](ARCHITECTURE.md), 작업 절차는 [팀 AI 개발 공동 지침](TEAM_AI_WORKFLOW.md)을 따른다.
+모든 명령의 기본 위치는 저장소 루트다. 규칙은 [AGENTS.md](../AGENTS.md), 협업 절차는 [CONTRIBUTING.md](../CONTRIBUTING.md), 코드·도메인 문서 위치는 [ARCHITECTURE.md](ARCHITECTURE.md)를 따른다.
 
 ## 포맷·줄바꿈
 
@@ -20,7 +20,7 @@
 - `.env.local`, `infra/.env`, 원본 데이터, API 키는 worktree 사이에서 자동 복사하지 않는다. 필요한 값은 사람이 안전하게 준비한다.
 - 모든 worktree가 같은 PostgreSQL 컨테이너(`127.0.0.1:5433`)와 같은 테스트 DB(`trendbench_mvp_test`)를 쓴다. `verify:db`·`verify`·`verify:e2e`는 테스트 DB의 ACTIVE 릴리스를 바꾸고 Playwright는 포트 3100을 쓰므로, 같은 PC에서 두 worktree가 동시에 실행하지 않는다. `verify:fast`는 동시에 실행해도 된다.
 - 개발 서버를 동시에 띄우면 두 번째부터 `npm --prefix app run dev -- --port <번호>`로 포트를 나눈다.
-- schema migration과 운영 적재 명령은 해당 작업 계약의 owner 한 명만 실행한다.
+- schema migration과 운영 적재 명령은 해당 Issue 담당자 한 명만 실행한다.
 
 ## 앱
 
@@ -77,7 +77,6 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 
 - 새 프로젝트명: `trendbench-mvp`, DB명: `trendbench_mvp`.
 - 로컬 접속: `127.0.0.1:5433`, 사용자 `trendbench`.
-- 기존 POS용 5432 포트와 데이터 볼륨을 재사용하지 않는다.
 - 컨테이너 정지: `docker compose --env-file infra/.env -f infra/compose.yaml stop`.
 - `down -v`는 데이터를 삭제하므로 일상 종료 명령으로 쓰지 않는다.
 
@@ -107,7 +106,7 @@ Better Auth 1.7.5는 이메일·비밀번호와 DB 세션을 담당한다. `BETT
 
 ## 로컬 데이터 준비
 
-`bootstrap`은 schema만 만들고 운영 데이터는 적재하지 않는다. 새 PC의 운영 DB는 비어 있어서 `/markets`의 상권 조회는 `503 RELEASE_UNAVAILABLE`을 반환하고, 세부 업종 목록은 빈 목록과 `nullReason`을 반환한다. 같은 PC에서 기존 Compose 볼륨(`trendbench-mvp`)을 쓰는 clone은 이미 적재된 데이터를 공유한다. 현재 ACTIVE 릴리스는 [PROJECT_CONTEXT.md §4](PROJECT_CONTEXT.md#4-현재-데이터-상태)에서 확인한다.
+`bootstrap`은 schema만 만들고 운영 데이터는 적재하지 않는다. 새 PC의 운영 DB는 비어 있어서 `/markets`의 상권 조회는 `503 RELEASE_UNAVAILABLE`을 반환하고, 세부 업종 목록은 빈 목록과 `nullReason`을 반환한다. 같은 PC에서 기존 Compose 볼륨(`trendbench-mvp`)을 쓰는 clone은 이미 적재된 데이터를 공유한다. 기준 릴리스와 건수는 [market.md](domains/market.md#기준-데이터)와 [business-directory.md](domains/business-directory.md)에 있다.
 
 | 데이터 | 준비 | 적재 |
 |---|---|---|
@@ -121,11 +120,7 @@ Better Auth 1.7.5는 이메일·비밀번호와 DB 세션을 담당한다. `BETT
 
 현재 `.github/workflows/check.yml`은 `.nvmrc`의 Node에서 PR diff의 공백 오류(`git diff --check`), `npm ci`, 포맷 검사, lint, typecheck, DB 비의존 unit test, production build만 실행한다. PostgreSQL service, migration, DB suite, Playwright, artifact 보존은 아직 원격 CI에 연결되지 않았다. 따라서 GitHub의 초록색 check만으로 DB·브라우저 검증까지 통과했다고 말할 수 없다.
 
-DB·E2E 변경 PR은 작성자가 로컬 `npm --prefix app run verify` 결과를 PR에 기록한다. 원격 CI를 확장하기 전에는 이 제한을 branch ruleset과 PR template에서 명시한다. CI 변경은 자체 검증 없이 문서만 먼저 “구현됨”으로 바꾸지 않는다.
-
-## 도메인별 구현 계약
-
-API·적재·계산 정책과 도메인 테스트 범위는 [domains/README.md](domains/README.md)의 도메인 문서가 원본이다.
+DB·E2E 변경 PR은 작성자가 로컬 `npm --prefix app run verify` 결과를 PR에 기록한다. CI 변경은 자체 검증 없이 문서만 먼저 “구현됨”으로 바꾸지 않는다.
 
 ## 데이터 검증
 
