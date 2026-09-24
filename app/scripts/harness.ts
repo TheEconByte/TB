@@ -65,6 +65,16 @@ export function runNpm(label: string, script: string, env: NodeJS.ProcessEnv = p
   runStep(label, process.execPath, [npmCli(), 'run', script], env);
 }
 
+// CI는 PR base commit을 DIFF_BASE로 넘긴다. 로컬은 origin/main과의 merge-base부터 작업 트리까지 검사한다.
+export function runDiffCheck(): void {
+  let base = process.env.DIFF_BASE;
+  if (!base) {
+    const mergeBase = runCaptured('git', ['merge-base', 'HEAD', 'origin/main']);
+    base = mergeBase.status === 0 ? mergeBase.stdout.trim() : 'HEAD';
+  }
+  runStep(`diff 공백 검사 (${base.slice(0, 12)}부터)`, 'git', ['diff', '--check', base]);
+}
+
 export function applicationDatabaseUrl(): string | undefined {
   return process.env.DATABASE_URL ?? readEnvValue(resolve(APP_DIR, '.env.local'), 'DATABASE_URL');
 }

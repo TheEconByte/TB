@@ -49,7 +49,7 @@ npm --prefix app run dev
 
 | 명령 | 용도 |
 |---|---|
-| `verify:fast` | 카탈로그·포맷·lint·typecheck·DB 비의존 테스트 |
+| `verify:fast` | diff 공백·카탈로그·포맷·lint·typecheck·DB 비의존 테스트·production build. CI와 같은 검사 |
 | `verify:db` | 테스트 DB를 쓰는 전체 Vitest |
 | `verify:e2e` | production build로 Playwright(desktop·mobile) |
 | `verify` | migration 상태부터 DB 테스트·E2E까지 전체 |
@@ -78,4 +78,6 @@ npm --prefix app run dev
 
 ## CI
 
-PR과 main push마다 `.github/workflows/check.yml`이 실행된다. 검사 항목은 diff 공백·포맷·lint·typecheck·unit test·build다. DB 테스트와 E2E는 원격 CI에 없으므로 로컬 `verify`로 확인한다.
+PR과 main push마다 `.github/workflows/check.yml`의 `check` job이 `verify:fast`를 실행한다. 로컬에서 `verify:fast`가 통과하면 CI도 통과한다. diff 공백 검사는 CI에서 PR base부터, 로컬에서 `origin/main`과의 merge-base부터 작업 트리까지 본다. DB 테스트와 E2E는 원격 CI에 없으므로 로컬 `verify`로 확인한다.
+
+main은 GitHub ruleset `main protection`이 보호한다: squash 병합만, 필수 check `check` 통과, 병합 전 최신 main 반영, force push·삭제 금지. 기반 작업 동안 필수 승인은 0명이고, 협업을 시작할 때 올린다(#10). `check` job 이름을 바꾸면 ruleset의 필수 check도 함께 바꾼다.

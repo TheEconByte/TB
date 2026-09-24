@@ -18,12 +18,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - name: Whitespace errors in PR diff
-        if: github.event_name == 'pull_request'
-        run: git diff --check "${{ github.event.pull_request.base.sha }}" HEAD
       - run: npm ci
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
+      # 로컬 verify:fast와 같은 검사다. 검사 목록은 app/scripts/verify-fast.ts 한 곳에서 관리한다.
+      - run: npm run verify:fast
+        env:
+          DIFF_BASE: ${{ github.event.pull_request.base.sha }}
