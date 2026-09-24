@@ -13,16 +13,12 @@ Next.js App Router + TypeScript (app/)
   └─ Prisma + Better Auth + Zod
   ↓
 PostgreSQL 17 (single application database)
-
-Operator commands
-  ├─ market:load       Seoul Open API (or verified files)
-  ├─ business:load     SEMAS API snapshot
-  ├─ rent:load         REB R-ONE rent survey
-  ├─ franchise:load    FTC franchise disclosure stats
-  └─ funding:load      operator-maintained catalog file
+  ↑
+Operator load commands (*:load)
+  └─ public Open APIs and the funding catalog file → PENDING → ACTIVE releases
 ```
 
-외부 수집은 웹 요청 중이 아니라 운영자 명령으로만 수행한다.
+적재 명령과 출처 목록은 [DEVELOPMENT.md](DEVELOPMENT.md#로컬-데이터-준비)에 있다.
 
 ## 도메인 지도
 
