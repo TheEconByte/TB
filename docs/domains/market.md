@@ -28,7 +28,6 @@
 - 상권 표시명 우선순위: 영역 파일 명칭 → 매출·점포 파일 관측 명칭. 업종 표시명 우선순위: 제품 문서 표시명 → 원천 명칭. 두 명칭은 응답에 함께 담는다.
 - 파일 적재는 manifest에 기록된 파일 크기와 SHA-256이 일치하는 원본만 허용한다. 새 원본은 입수일·기준기간·checksum·예상 행 수를 검증해 새 manifest와 정의 버전으로 추가하며, 명령행 옵션으로 검증을 우회하지 않는다.
 - 업종 메타데이터는 릴리스별로 저장한다. PENDING·FAILED 릴리스의 업종 원본 명칭이 현재 ACTIVE 릴리스 응답을 바꾸지 않는다.
-- 적재 명령은 Node 24의 TypeScript 실행을 그대로 쓴다. 생성된 Prisma client가 확장자 없는 상대 import를 만들지 않도록 `app/prisma/schema.prisma`의 generator에 `moduleFormat = "esm"`, `importFileExtension = "ts"`를 둔다.
 
 ## 공개 API
 
@@ -42,4 +41,7 @@
 
 ## 테스트
 
-테스트는 원본 파싱·헤더 매핑·checksum·거부 규칙을 항상 검증하고, `data/raw/`의 실제 파일이 있으면 기록된 행 수·결합·표본까지 대조한다. API 적재는 가짜 서울 API로 페이지 수신·전체 건수 대조·재시도·인증키 가림·순서와 무관한 릴리스 키·빈 분기 거부를 검증한다. 합성 릴리스를 PostgreSQL에 적재하는 변경 테스트는 일반 `DATABASE_URL`을 절대 사용하지 않으며, `TEST_DATABASE_URL` 환경변수 또는 `app/.env.test.local`의 전용 테스트 DB가 있을 때만 실행한다. 테스트는 합성 릴리스만 만들고 끝나면 삭제하며, 실행 전에 ACTIVE였던 테스트 DB 릴리스 상태를 복원한다.
+- 항상: 원본 파싱·헤더 매핑·checksum·거부 규칙, 가짜 서울 API로 API 적재.
+- `data/raw/`에 검증본 파일이 있을 때: 기록된 행 수·결합·표본 대조.
+- 전용 테스트 DB가 있을 때: 합성 릴리스 적재. 끝나면 지우고 실행 전 ACTIVE 상태를 복원한다.
+- 세부 사례: `market.test.ts`, `seoul-api.test.ts`.

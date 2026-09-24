@@ -60,6 +60,7 @@ npm --prefix app run dev
 모두 `npm --prefix app run <명령>`으로 실행한다.
 
 - schema를 바꾸면 실행 중인 개발 서버를 재시작한다. 재시작하지 않으면 이전 Prisma Client 때문에 500이 난다.
+- 적재·하네스 명령은 Node 24가 TypeScript를 그대로 실행한다. 생성된 Prisma client가 확장자 없는 상대 import를 만들지 않도록 `app/prisma/schema.prisma`의 generator에 `moduleFormat = "esm"`, `importFileExtension = "ts"`를 둔다.
 - 포맷은 Prettier가 정한다. `*.md`, 자금 카탈로그, migration은 포맷 대상이 아니다. 줄바꿈은 LF로 고정되어 있다.
 
 ## DB

@@ -12,9 +12,8 @@ npm --prefix app run funding:validate
 npm --prefix app run funding:load
 ```
 
-- `funding:validate`: JSON 스키마, productKey+version 중복, 공식 URL, 날짜·접수기간 모순, 지원 유형과 금융 조건 모순, checksum, 검수 기한, 상환 계산 사유 누락을 검사하고 결과만 출력한다(DB 사용 없음).
-- `funding:load`: 같은 검사를 통과한 카탈로그만 `funding_catalog_releases`(PENDING → ACTIVE), `funding_product_versions`, `funding_catalog_products`에 적재한다. 검수 기능이 생기기 전까지는 검수자가 UNASSIGNED여도 적재한다.
-- 검증을 우회하는 명령행 옵션은 없다. 검사에 실패한 카탈로그는 적재되지 않고 기존 ACTIVE 카탈로그도 바뀌지 않는다.
+- `funding:validate`는 DB 없이 검사 결과만 출력한다. `funding:load`는 같은 검사를 통과한 카탈로그만 적재한다.
+- 검사 항목, 오류·주의 구분, 적재·활성화 규칙은 [funding.md](../../../docs/domains/funding.md#카탈로그)에 있다.
 
 ## 갱신 절차
 
@@ -28,10 +27,10 @@ npm --prefix app run funding:load
 ## 확정 조건과 상환 계산
 
 - 금리·상환기간·원금 거치를 원문에서 확정 숫자로 확인했을 때만 `interestRateConfirmed`를 true로 두고 `interestRatePercent`(고정 연 금리 %)·`repaymentTermMonths`(전체 상환개월)·`repaymentGraceMonths`(원금 거치개월)를 기록한다. 범위 금리·변동금리는 확정 숫자가 아니므로 `null`로 남긴다.
-- `interestCondition`·`repaymentCondition`은 근거를 남기는 문장이며 숫자로 해석하지 않는다. 상환 계산은 이 문장을 파싱하지 않는다.
-- 공개 한도(`publicLimit`)·확정 금리·상환기간·거치·계산 엔진이 지원하는 상환방식(원리금균등·원금균등)이 모두 있어야 그 대출이 상환 계산 대상이 된다. 하나라도 없거나 거치개월이 전체 상환개월 이상이면 그 사유를 `unsupportedCalculationReasons`에 남기고 화면은 "상환 계산 대상 아님 + 사유"로 표시한다(0원 상환으로 대체하지 않는다).
-- `publicLimit`은 최대 금액 검증용 공개 정보다. 계획의 대출 원금으로 자동 복사하지 않으며, 적용 시 사용자가 초안에 저장한 신규 대출금이 1원 이상이고 공개 한도 이하인지 서버가 확인한다.
-- 상환 계산 대상 대출은 계획 화면에서 사용자가 명시적으로 눌렀을 때만 계획의 대출 가정으로 적용된다. 적용하면 상품 키·버전·카탈로그 버전이 계획과 계산 결과에 출처로 남는다.
+- `interestCondition`·`repaymentCondition`은 근거를 남기는 문장이며 숫자로 해석하지 않는다.
+- `publicLimit`에는 공고의 공개 한도를 적는다. 대출 원금이 아니라 최대 금액 검증용이다.
+- 상환 계산 대상이 아닌 대출은 그 사유를 `unsupportedCalculationReasons`에 적는다. 계산 엔진이 지원하는 상환방식은 원리금균등·원금균등이다.
+- 이 필드로 상환 계산 대상을 정하는 규칙과 계획의 대출 가정으로 적용하는 절차는 [funding.md](../../../docs/domains/funding.md#판정)에 있다.
 
 ## 원본 파일
 
