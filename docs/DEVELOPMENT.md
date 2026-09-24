@@ -40,8 +40,8 @@ npm --prefix app run dev
 | 서울시 상권 | 서울 열린데이터광장 인증키를 `SEOUL_OPEN_API_KEY`에 넣는다. 약 2분 걸린다 | `npm --prefix app run market:load` |
 | 소진공 점포 | 공공데이터포털에서 [상가(상권)정보](https://www.data.go.kr/data/15012005/openapi.do)를 활용신청하고, 인증키(Decoding)를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
 | 부동산원 임대료 | 부동산통계정보시스템(R-ONE) Open API 인증키를 `REB_API_KEY`에 넣는다. 약 30초 걸린다 | `npm --prefix app run rent:load` |
-| 공정위 프랜차이즈 | `SEMAS_SERVICE_KEY`(공공데이터포털 인증키)로 [가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)·[창업 금액](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청한다 | `npm --prefix app run franchise:load` |
-| 자금 카탈로그 | 준비 없음. 검수자가 UNASSIGNED여도 적재되며, 그런 상품은 현재 후보가 아니라 추가 확인으로 분류된다 | `npm --prefix app run funding:load` |
+| 공정위 프랜차이즈 | `SEMAS_SERVICE_KEY`(공공데이터포털 인증키)로 [가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)·[창업 금액](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청한다. 약 20~30초 걸린다 | `npm --prefix app run franchise:load` |
+| 자금 카탈로그 | 준비 없음. 원본은 `app/catalog/funding/catalog.json`이다 | `npm --prefix app run funding:load` |
 
 2026-09-09 검증본 ZIP으로 적재하려면 [verification/README.md](verification/README.md)의 파일 5개를 `data/raw/`(Git 제외)에 두고 `npm --prefix app run market:load -- --source-dir ../data/raw`를 실행한다. `data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어진다.
 

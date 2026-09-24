@@ -1,7 +1,5 @@
 # 웹 요청 보안 도메인
 
-이 도메인을 바꾸는 PR은 코드·테스트와 함께 이 문서를 고친다. 제품 전체의 데이터·계산 계약은 [AGENTS.md §3](../../AGENTS.md#3-데이터계산-계약)을 따른다.
-
 ## 코드 위치
 
 - `app/src/lib/auth.ts`, `session.ts`, `request-security.ts`, `rate-limit.ts`: Better Auth, 세션, 교차 출처·본문 크기 검사, 요청 빈도 제한.

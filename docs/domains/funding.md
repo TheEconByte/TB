@@ -1,7 +1,5 @@
 # 자금 카탈로그·후보 도메인
 
-이 도메인을 바꾸는 PR은 코드·테스트와 함께 이 문서를 고친다. 제품 전체의 데이터·계산 계약은 [AGENTS.md §3](../../AGENTS.md#3-데이터계산-계약)을 따른다.
-
 이 문서는 카탈로그 검증·적재, 판정, API 정책을 다룬다. 카탈로그 편집 절차, 필드 기록 규칙, 현재 검수 범위는 [app/catalog/funding/README.md](../../app/catalog/funding/README.md)에 있다.
 
 ## 코드 위치
@@ -10,12 +8,12 @@
   - 카탈로그 Zod 스키마(`schema.ts`), 규칙 검사(`validation.ts`), 고정 조건 판정(`eligibility.ts`)
   - 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`), 요청 스키마·응답 조립(`candidates.ts`)
   - 페이지 단위 후보 화면(`FundingMatcher.tsx`), 두 화면이 함께 쓰는 결과 표시(`FundingCandidatesPanel.tsx`)
-- `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서. 현재 상품은 검수자가 지정되지 않았다(#13).
+- `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서.
 
 ## 카탈로그
 
 - 실행: `npm --prefix app run funding:validate`, `npm --prefix app run funding:load [-- --catalog <경로>]`. 기본 카탈로그는 `app/catalog/funding/catalog.json`이다.
-- 원문 확인과 카탈로그 편집은 운영자가 수행한다. 웹 요청 처리 중에는 공고 수집이나 카탈로그 적재를 하지 않는다.
+- 원문 확인과 카탈로그 편집은 운영자가 수행한다.
 - Zod 스키마가 productKey·version 형식, 필수 필드, 날짜 형식, 금액의 원 단위 정수 문자열, supportType·사업단계·접수 상태·상환방식 열거, 공식 기관 HTTPS 호스트, checksum 형식을 검사한다.
 - 상환 계산은 구조화된 확정 조건 필드(`interestRatePercent`·`repaymentTermMonths`·`repaymentGraceMonths`)만 읽는다. 조건 문장(`interestCondition`·`repaymentCondition`)은 숫자로 해석하지 않는다. 기록 규칙은 카탈로그 README의 "확정 조건과 상환 계산"에 있다.
 - 규칙 검사 항목:
@@ -37,7 +35,7 @@
   - 이미 적재된 버전과 내용이 다르면 `PRODUCT_VERSION_IMMUTABLE`로 실패하고 기존 행을 덮어쓰지 않는다. 새 내용은 version을 올려 추가한다.
   - 릴리스와 상품 버전은 `funding_catalog_products` 연결 테이블로 묶어, 같은 불변 버전을 여러 릴리스가 재사용할 수 있다.
 - 적재는 PENDING으로 시작해 적재 후 검증까지 통과한 뒤 한 트랜잭션으로 ACTIVE가 된다. 활성화는 상태 전환만 하며 과거 릴리스와 상품 버전을 지우지 않는다.
-- 실패하면 이번 적재가 만든 상품 버전만 삭제하고, 이전에 이미 저장된 상품 버전은 그대로 둔다. 릴리스는 `FAILED`와 실패 사유(`오류 코드 + 메시지`)로 남고 기존 ACTIVE 카탈로그는 계속 서비스된다.
+- 실패하면 이번 적재가 만든 상품 버전만 삭제하고, 이전에 이미 저장된 상품 버전은 그대로 둔다. 릴리스는 `FAILED`와 실패 사유(`오류 코드 + 메시지`)로 남는다.
 
 ### 판정
 
@@ -99,4 +97,3 @@
 
 - DB 없이: 카탈로그 스키마·규칙 위반, 실제 카탈로그 5건의 규칙 통과, 조건 판정, 상환 계산 가능 여부, 상품 조건과 사용자 원금의 결합. 후보 조회·계획 조건 판정·상품 조건 적용 API의 경계(상태 코드)는 Prisma를 mock해 DB 없이 검증한다.
 - `TEST_DATABASE_URL` 전용 DB: 카탈로그 적재, 실제 DB에서의 후보 조회·계획 조건 판정·상품 조건 적용, 출처 저장과 과거 결과 불변성. 합성 카탈로그만 만들고 끝나면 지우며 실행 전 ACTIVE 상태를 복원한다. 실제 카탈로그 5건이 모두 상환 계산 대상이 아님(`supported=false`)을 확인하는 테스트도 이 묶음 안에 있어 전용 DB가 있을 때만 실행된다.
-- 세부 사례: `funding.test.ts`, `candidates.test.ts`, `app/src/features/plans/funding-matches.test.ts`, `loan-assumption.test.ts`.

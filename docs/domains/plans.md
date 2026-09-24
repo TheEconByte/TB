@@ -1,7 +1,5 @@
 # 계획·불변 결과 도메인
 
-이 도메인을 바꾸는 PR은 코드·테스트와 함께 이 문서를 고친다. 제품 전체의 데이터·계산 계약은 [AGENTS.md §3](../../AGENTS.md#3-데이터계산-계약)을 따른다.
-
 ## 코드 위치
 
 - `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI, 결과 키(`calculation-key.ts`), 계획에 저장한 자금 조건과 그 조건 판정 조립(`funding-matches.ts`), API 경계 테스트.
