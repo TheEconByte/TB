@@ -94,6 +94,21 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
   await expect(page.getByLabel('지역구')).toBeVisible();
 
+  // 사업 조건을 일부만 입력하면 저장하지 않는다(저장된 조건이 null로 지워지는 것을 막는다).
+  // 모두 비우면 사업 조건 없는 계획으로 저장된다.
+  await page.getByLabel('계획 제목').fill(`임대료 확인 ${suffix}`);
+  await page.getByLabel('지역구').selectOption('11200');
+  await page.getByRole('button', { name: '초안 저장' }).click();
+  await expect(page.locator('.status-message')).toContainText(
+    '사업 조건에 빠진 항목이 있어 저장하지 않았습니다: 업종, 면적, 층, 상가 유형',
+  );
+  await expect(page.getByText('저장된 계획이 없습니다.')).toBeVisible();
+  await wizard.getByRole('button', { name: /입력 확인/ }).click();
+  await wizard.getByRole('button', { name: '사업 조건 모두 비우기' }).click();
+  await page.getByRole('button', { name: '초안 저장' }).click();
+  await expect(page.locator('.status-message')).toContainText('초안을 저장했습니다.');
+  await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
+
   await page.getByLabel('지역구').selectOption('11200');
   await page.getByLabel('업종 대분류').selectOption('CS100010');
   await page.getByRole('button', { name: '다음' }).click();

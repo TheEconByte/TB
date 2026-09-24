@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { BusinessProfileForm } from '@/features/business-profile/BusinessProfileWizard';
+import type { BusinessProfileForm } from '@/features/business-profile/form';
 import { monthlyRentReferenceWon, squareMetersLabel } from './estimate';
 import type { FloorCode, RentBenchmarkPayload, RentRegionBenchmark } from './types';
 
