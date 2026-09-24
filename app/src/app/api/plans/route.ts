@@ -14,8 +14,6 @@ export async function GET() {
   try {
     const user = await currentUser();
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
-    const limit = consumeRateLimit(`plan-create:${user.id}`, { max: 30, windowMs: 60_000 });
-    if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
     const plans = await getPrisma().plan.findMany({
       where: { userId: user.id },
       orderBy: { updatedAt: 'desc' },
@@ -41,6 +39,8 @@ export async function POST(request: Request) {
     if (blocked) return blocked;
     const user = await currentUser();
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+    const limit = consumeRateLimit(`plan-create:${user.id}`, { max: 30, windowMs: 60_000 });
+    if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
     const parsed = planWriteSchema.safeParse(await request.json());
     if (!parsed.success) return invalidZod(parsed.error);
     const prisma = getPrisma();
