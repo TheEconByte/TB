@@ -335,7 +335,11 @@ export default function MarketExplorer() {
                   }}
                 >
                   <option value="">
-                    {filteredBusinessCategories.length === 0 ? '활성 세부 업종 자료 없음' : '선택하지 않음'}
+                    {!industryCode
+                      ? '업종을 먼저 선택하세요'
+                      : filteredBusinessCategories.length === 0
+                        ? '활성 세부 업종 자료 없음'
+                        : '선택하지 않음'}
                   </option>
                   {filteredBusinessCategories.map((category) => (
                     <option key={category.code} value={category.code}>
