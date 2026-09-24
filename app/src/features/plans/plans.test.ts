@@ -203,3 +203,20 @@ describe('요청 빈도 제한', () => {
     expect(deleted[30]).toBe(429);
   });
 });
+
+describe('사업 조건 입력 검증', () => {
+  it('형식이 틀린 면적은 500이 아니라 400이고 DB에 닿지 않는다', async () => {
+    const businessProfile = {
+      districtCode: '11200',
+      marketIndustryCode: 'CS100010',
+      detailedIndustryCode: null,
+      area: { value: 'abc', unit: 'PYEONG' },
+      floor: 'GROUND_1',
+      buildingType: 'SMALL_RETAIL',
+    };
+    const response = await createPlan(jsonRequest({ title: 'A', input, businessProfile }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_INPUT');
+    expect(mocks.getPrisma).not.toHaveBeenCalled();
+  });
+});

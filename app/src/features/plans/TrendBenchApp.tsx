@@ -26,12 +26,13 @@ import {
   type PlanLoanAssumption,
 } from '@/features/plans/loan-assumption';
 import { authClient } from '@/lib/auth-client';
-import BusinessProfileWizard, {
+import BusinessProfileWizard from '@/features/business-profile/BusinessProfileWizard';
+import {
   EMPTY_BUSINESS_PROFILE_FORM,
   businessProfileFormFromStored,
-  businessProfilePayload,
+  businessProfileSaveState,
   type BusinessProfileForm,
-} from '@/features/business-profile/BusinessProfileWizard';
+} from '@/features/business-profile/form';
 import FranchisePanel from '@/features/franchise/FranchisePanel';
 import RentBenchmarkPanel from '@/features/rent-benchmark/RentBenchmarkPanel';
 
@@ -297,13 +298,21 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
       setMessage(industryIssue);
       throw new Error(industryIssue);
     }
+    // 사업 조건을 일부만 입력한 채 저장하면 null이 가서 저장된 조건까지 지워진다. 저장 전에 막는다.
+    const profileState = businessProfileSaveState(businessForm);
+    if (profileState.kind === 'INCOMPLETE') {
+      const profileIssue = `사업 조건에 빠진 항목이 있어 저장하지 않았습니다: ${profileState.missing.join(', ')}. 사업 조건을 마저 입력하거나, 입력 확인 단계에서 모두 비운 뒤 다시 저장해 주세요.`;
+      setMessage(profileIssue);
+      requestAnimationFrame(() => document.querySelector('.status-message')?.scrollIntoView({ block: 'start' }));
+      throw new Error(profileIssue);
+    }
     setBusy(true);
     setMessage('');
     try {
       // 재무 입력과 저장된 자금 조건을 함께 보낸다. 서버는 계산 키·결과 스냅샷을
       // 건드리지 않고 조건만 따로 보존한다.
       const fundingProfile = fundingPayloadOrNull(fundingForm);
-      const businessProfile = businessProfilePayload(businessForm);
+      const businessProfile = profileState.kind === 'COMPLETE' ? profileState.payload : null;
       const data = plan
         ? await api<{ plan: PlanDetail }>(`/api/plans/${plan.id}`, {
             method: 'PUT',

@@ -1,11 +1,16 @@
 import Decimal from 'decimal.js';
 import { z } from 'zod';
 
+const AREA_PATTERN = /^\d+(?:\.\d{1,2})?$/;
+
+// Zod는 앞 검사가 실패해도 다음 검사를 실행한다. 형식이 틀린 값을 Decimal에 넣으면 예외가 나서
+// 400 대신 500이 되므로, 범위 검사는 형식이 맞을 때만 한다(형식 오류는 앞 검사가 보고한다).
 const positiveDecimalString = z
   .string()
   .trim()
-  .regex(/^\d+(?:\.\d{1,2})?$/, '면적은 소수 둘째 자리까지 입력해 주세요.')
+  .regex(AREA_PATTERN, '면적은 소수 둘째 자리까지 입력해 주세요.')
   .refine((value) => {
+    if (!AREA_PATTERN.test(value)) return true;
     const decimal = new Decimal(value);
     return decimal.greaterThan(0) && decimal.lessThanOrEqualTo(10_000);
   }, '면적은 0보다 크고 10,000 이하여야 합니다.');

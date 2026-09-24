@@ -4,72 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
 import { BUILDING_TYPE_CRITERIA, BUILDING_TYPE_LABELS, BUILDING_TYPES } from '@/features/rent-benchmark/types';
-import type { BusinessProfileInput } from './schema';
-
-export type BusinessProfileForm = {
-  districtCode: string;
-  marketIndustryCode: '' | 'CS100001' | 'CS100010';
-  detailedIndustryCode: string;
-  areaValue: string;
-  areaUnit: 'PYEONG' | 'SQUARE_METERS';
-  floor: '' | 'BASEMENT_1' | 'GROUND_1' | 'UPPER_2_PLUS';
-  buildingType: '' | 'SMALL_RETAIL' | 'MEDIUM_LARGE_RETAIL' | 'COLLECTIVE_RETAIL';
-};
-
-export const EMPTY_BUSINESS_PROFILE_FORM: BusinessProfileForm = {
-  districtCode: '',
-  marketIndustryCode: '',
-  detailedIndustryCode: '',
-  areaValue: '',
-  areaUnit: 'PYEONG',
-  floor: '',
-  buildingType: '',
-};
-
-export function businessProfilePayload(form: BusinessProfileForm): BusinessProfileInput | null {
-  if (
-    !form.districtCode ||
-    !form.marketIndustryCode ||
-    !/^\d+(?:\.\d{1,2})?$/.test(form.areaValue) ||
-    !form.floor ||
-    !form.buildingType
-  )
-    return null;
-  return {
-    districtCode: form.districtCode,
-    marketIndustryCode: form.marketIndustryCode,
-    detailedIndustryCode: form.detailedIndustryCode || null,
-    area: { value: form.areaValue, unit: form.areaUnit },
-    floor: form.floor,
-    buildingType: form.buildingType,
-  };
-}
-
-export function businessProfileFormFromStored(value: unknown): BusinessProfileForm {
-  if (!value || typeof value !== 'object') return EMPTY_BUSINESS_PROFILE_FORM;
-  const stored = value as Record<string, unknown>;
-  const area = stored.area && typeof stored.area === 'object' ? (stored.area as Record<string, unknown>) : {};
-  return {
-    districtCode: typeof stored.districtCode === 'string' ? stored.districtCode : '',
-    marketIndustryCode:
-      stored.marketIndustryCode === 'CS100001' || stored.marketIndustryCode === 'CS100010'
-        ? stored.marketIndustryCode
-        : '',
-    detailedIndustryCode: typeof stored.detailedIndustryCode === 'string' ? stored.detailedIndustryCode : '',
-    areaValue: typeof area.value === 'string' ? area.value : '',
-    areaUnit: area.unit === 'SQUARE_METERS' ? 'SQUARE_METERS' : 'PYEONG',
-    floor:
-      stored.floor === 'BASEMENT_1' || stored.floor === 'GROUND_1' || stored.floor === 'UPPER_2_PLUS'
-        ? stored.floor
-        : '',
-    buildingType:
-      stored.buildingType === 'SMALL_RETAIL' ||
-      stored.buildingType === 'MEDIUM_LARGE_RETAIL' ||
-      stored.buildingType === 'COLLECTIVE_RETAIL'
-        ? stored.buildingType
-        : '',
-  };
-}
+import {
+  EMPTY_BUSINESS_PROFILE_FORM,
+  businessProfileMissingFields,
+  businessProfileSaveState,
+  type BusinessProfileForm,
+} from './form';
 
 const STEPS = ['위치·업종', '매장 크기', '매장 층', '상가 유형', '입력 확인'] as const;
 
@@ -78,18 +18,6 @@ const FLOOR_LABELS: Readonly<Record<Exclude<BusinessProfileForm['floor'], ''>, s
   GROUND_1: '1층',
   UPPER_2_PLUS: '2층 이상',
 };
-
-// 입력 확인 단계에서 빠진 항목과 그 항목을 입력하는 단계를 알려 준다. 필수값이 하나라도
-// 빠지면 초안을 저장해도 사업 조건은 저장되지 않는다(businessProfilePayload가 null).
-function missingFields(form: BusinessProfileForm): Array<{ label: string; step: number }> {
-  return [
-    { label: '지역구', step: 0, missing: !form.districtCode },
-    { label: '업종', step: 0, missing: !form.marketIndustryCode },
-    { label: '면적', step: 1, missing: !/^\d+(?:\.\d{1,2})?$/.test(form.areaValue) },
-    { label: '층', step: 2, missing: !form.floor },
-    { label: '상가 유형', step: 3, missing: !form.buildingType },
-  ].filter((field) => field.missing);
-}
 
 export default function BusinessProfileWizard({
   form,
@@ -132,8 +60,9 @@ export default function BusinessProfileWizard({
     [categories, form.marketIndustryCode],
   );
   const selectedDetail = categories.find((category) => category.code === form.detailedIndustryCode) ?? null;
-  const complete = businessProfilePayload(form) !== null;
-  const missing = missingFields(form);
+  const saveState = businessProfileSaveState(form);
+  const complete = saveState.kind === 'COMPLETE';
+  const missing = businessProfileMissingFields(form);
   const district = SEOUL_DISTRICTS.find((item) => item.code === form.districtCode)?.name ?? '미선택';
   const broadName =
     form.marketIndustryCode === 'CS100001'
@@ -325,7 +254,9 @@ export default function BusinessProfileWizard({
               note={
                 complete
                   ? '화면 아래 "초안 저장"을 누르면 계획과 함께 저장됩니다. 재무 계산 입력과는 분리해 저장합니다.'
-                  : '필수값이 모두 있어야 사업 조건이 저장됩니다. 빠진 항목을 먼저 입력해 주세요.'
+                  : saveState.kind === 'EMPTY'
+                    ? '사업 조건 없이 재무 계획만 저장할 수 있습니다. 조건을 입력하면 임대료·프랜차이즈 참고 자료를 볼 수 있습니다.'
+                    : '일부만 입력한 상태에서는 초안을 저장할 수 없습니다. 빠진 항목을 입력하거나 사업 조건을 모두 비워 주세요.'
               }
             />
             <div className="profile-summary-grid">
@@ -363,6 +294,11 @@ export default function BusinessProfileWizard({
               </div>
             </div>
             <ScopeBanner detail={selectedDetail?.name ?? null} broad={broadName} />
+            {saveState.kind !== 'EMPTY' && (
+              <button type="button" className="link-button" onClick={() => onChange(EMPTY_BUSINESS_PROFILE_FORM)}>
+                사업 조건 모두 비우기
+              </button>
+            )}
           </>
         )}
         <div className="wizard-nav">
