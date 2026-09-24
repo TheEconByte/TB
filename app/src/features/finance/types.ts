@@ -1,4 +1,4 @@
-export const CALCULATION_VERSION = 'finance-v1.0.0';
+export const CALCULATION_VERSION = 'finance-v1.0.1';
 export const INPUT_SCHEMA_VERSION = 'finance-input-v1.0.0';
 
 export type ResultStatus = 'READY' | 'INSUFFICIENT_INPUT' | 'UNSUPPORTED';

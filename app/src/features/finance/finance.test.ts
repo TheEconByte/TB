@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateFinance } from './calculate';
 import { calculateLoanSchedule } from './loan';
 import { financeInputSchema } from './schema';
-import type { FinanceInput } from './types';
+import type { FinanceInput, FinanceResult, ValueResult } from './types';
 
 const exampleInput = (overrides: Partial<FinanceInput> = {}): FinanceInput => ({
   openingExpenses: {
@@ -27,6 +27,50 @@ const exampleInput = (overrides: Partial<FinanceInput> = {}): FinanceInput => ({
   cashBalanceMonths: 12,
   ...overrides,
 });
+
+// 결과에서 금액인 값만 모은다. 변동비율·상태·설명 같은 금액이 아닌 문자열은 뺀다.
+function moneyValues(result: FinanceResult): string[] {
+  const ready = (value: ValueResult<string>) => (value.status === 'READY' ? [value.value] : []);
+  const loan = result.loan.status === 'READY' ? result.loan.value : null;
+  return [
+    ...[
+      result.initialExpenseTotal,
+      result.targetInitialFunding,
+      result.plannedFundingGap,
+      result.preOpeningCashAfterFunding,
+      result.reserveShortfall,
+    ].flatMap(ready),
+    ...(loan
+      ? [
+          loan.firstPayment,
+          loan.firstPaymentAfterGrace,
+          loan.maximumPayment,
+          loan.totalPrincipal,
+          loan.totalInterest,
+          ...loan.schedule.flatMap((row) => [row.principal, row.interest, row.payment, row.remainingPrincipal]),
+        ]
+      : []),
+    ...result.scenarios.flatMap((scenario) => [
+      ...[scenario.assumptions.monthlyRevenue, scenario.assumptions.monthlyFixedCosts].filter(
+        (value): value is string => value !== null,
+      ),
+      ...[
+        scenario.monthlyOperatingBalance,
+        scenario.operatingBreakEvenRevenue,
+        scenario.debtInclusiveBreakEvenRevenue,
+        scenario.firstMonthLoanPayment,
+        scenario.firstMonthCashAfterDebtPayment,
+      ].flatMap(ready),
+      ...(scenario.cashBalances.status === 'READY'
+        ? scenario.cashBalances.value.flatMap((row) => [
+            row.loanPayment,
+            row.cashAfterDebtPayment,
+            row.closingCashBalance,
+          ])
+        : []),
+    ]),
+  ];
+}
 
 describe('입력 스키마', () => {
   it.each([
@@ -205,5 +249,44 @@ describe('시나리오', () => {
     });
     expect(adverse.changes.map((change) => change.kind)).toEqual(['PERCENT', 'PERCENT', 'PERCENTAGE_POINT']);
     expect(result.loan.status === 'READY' && result.loan.value.firstPayment).toBe('943562');
+  });
+  it('시나리오 금액 가정을 원 단위로 반올림하고 그 값으로 운영수지를 계산한다', () => {
+    const result = calculateFinance(
+      exampleInput({ monthlyRevenue: '1000001', monthlyFixedCosts: { rent: '1234567', labor: '0', other: '0' } }),
+    );
+    const [, adverse, improved] = result.scenarios;
+    // 1,000,001 × 0.8 = 800,000.8, 1,234,567 × 1.05 = 1,296,295.35
+    expect(adverse.assumptions).toMatchObject({ monthlyRevenue: '800001', monthlyFixedCosts: '1296295' });
+    expect(improved.assumptions).toMatchObject({ monthlyRevenue: '1100001', monthlyFixedCosts: '1172839' });
+    // 800,001 × (1 − 0.4) − 1,296,295 = −816,294.4
+    expect(adverse.monthlyOperatingBalance).toMatchObject({ status: 'READY', value: '-816294' });
+  });
+  it('결과의 모든 금액이 원 단위 정수 문자열이다', () => {
+    const result = calculateFinance(
+      exampleInput({
+        openingExpenses: {
+          deposit: '30000001',
+          facilities: '40000003',
+          initialInventory: '5000007',
+          otherPreparation: '9',
+        },
+        targetReserve: '10000011',
+        equity: '40000013',
+        monthlyRevenue: '20000017',
+        monthlyFixedCosts: { rent: '3000019', labor: '3000023', other: '1000029' },
+        variableCostRate: '0.355',
+        existingMonthlyDebtPayment: '12345',
+        newLoan: {
+          principal: '50000031',
+          annualInterestRatePercent: '4.7',
+          totalMonths: 37,
+          graceMonths: 5,
+          repaymentMethod: 'EQUAL_PAYMENT',
+        },
+      }),
+    );
+    const money = moneyValues(result);
+    expect(money.length).toBeGreaterThan(100);
+    for (const value of money) expect(value).toMatch(/^-?(0|[1-9]\d*)$/);
   });
 });
