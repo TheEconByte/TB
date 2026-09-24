@@ -23,7 +23,7 @@
 
 1. 금액은 API·JSON에서 원 단위 정수 문자열이며 계산은 decimal 연산을 사용한다.
 2. 누락 `null`, 실제 0, 미확정 `UNKNOWN`을 서로 바꾸지 않는다. 자료 부족이나 외부 장애를 빈 성공 응답 또는 0으로 위장하지 않는다.
-3. 상권·임대료 관측값을 사용자의 재무 가정에 자동으로 입력하지 않는다.
+3. 상권·임대료·프랜차이즈 관측값을 사용자의 재무 가정에 자동으로 입력하지 않는다.
 4. 서울시 상위 업종 관측 범위와 소진공 세부 업종 경쟁 범위를 함께 표시한다. 상위 업종 매출을 세부 업종 매출이나 개인 예상매출로 바꾸지 않는다.
 5. 매출의 시간 단위와 점포당 분모가 공식 확정되기 전에는 월 환산·점포당 매출을 [ADR 0002](docs/decisions/0002-provisional-market-sales.md)의 잠정 해석으로만 제공한다. "잠정"과 근거·원값을 함께 표시하고, 계산 결과에 저장하지 않는다.
 6. 계획의 소유자는 서버에서 검사한다. 없는 리소스와 타인 소유 리소스는 모두 404다. 계획 변경은 revision을 검사하고 충돌은 409다.
@@ -47,7 +47,7 @@
 - 제목은 영어 Conventional Commits: `<type>(<scope>): <명령형 요약>`. 예: `feat(plans): compare two saved results`
   - type: `feat` `fix` `refactor` `test` `docs` `style` `ci` `build` `chore`
   - scope: `finance` `plans` `market` `business-directory` `business-profile` `rent-benchmark` `franchise` `funding` `security` `e2e` `db` `deps` `harness`. 여러 영역의 문서만 고치면 생략한다.
-- branch: `<type>/<번호>-<영문-slug>`. 예: `feat/12-result-compare`
+- branch: `<type>/<번호>-<영문-slug>`. 예: `feat/12-result-compare`. Issue 없이 하는 작업은 번호를 뺀다. 예: `fix/plan-rate-limits`
 - PR 본문은 템플릿(변경 내용·검증·위험)을 채운다. CI `check`가 통과하면 병합한다.
 - 문서·주석·화면 문구는 한국어, 식별자·commit 메시지는 영어로 쓴다.
 

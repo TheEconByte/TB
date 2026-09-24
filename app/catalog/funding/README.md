@@ -1,6 +1,6 @@
 # 자금 공고 카탈로그
 
-이 폴더는 사람이 공식 원문을 확인한 자금·지원 공고를 버전이 고정된 JSON으로 보관한다. 사용자 화면이나 웹 요청이 외부 공고를 수집하지 않으며, 운영자가 검증·적재 명령을 직접 실행한다.
+이 폴더는 운영자가 공식 공고를 정리한 자금·지원 상품을 버전이 고정된 JSON으로 보관한다. 현재 상품은 검수자가 지정되지 않았고 근거 일부가 검색 결과 요약이다([검수 범위](#2026-09-20-검수-범위)). 사용자 화면이나 웹 요청이 외부 공고를 수집하지 않으며, 운영자가 검증·적재 명령을 직접 실행한다.
 
 - `catalog.json`: 현재 카탈로그. `catalogKey` + `catalogVersion`으로 식별하고, 파일 바이트의 SHA-256을 릴리스 checksum으로 쓴다.
 - 스키마는 `app/src/features/funding/schema.ts`, 규칙 검사는 `app/src/features/funding/validation.ts`, 후보 판정은 `app/src/features/funding/eligibility.ts`에 있다.

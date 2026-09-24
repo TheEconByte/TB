@@ -12,7 +12,7 @@ npm --prefix app run bootstrap
 npm --prefix app run dev
 ```
 
-앱은 <http://localhost:3000>, 상권 분석은 `/markets`, 자금 후보는 `/funding`이다. 상권·점포 데이터 준비는 [로컬 데이터 준비](docs/DEVELOPMENT.md#로컬-데이터-준비)를 따른다.
+앱은 <http://localhost:3000>, 상권 분석은 `/markets`, 자금 후보는 `/funding`이다. 운영 데이터(상권·점포·임대료·프랜차이즈·자금 카탈로그) 준비는 [로컬 데이터 준비](docs/DEVELOPMENT.md#로컬-데이터-준비)를 따른다.
 
 ## 문서
 

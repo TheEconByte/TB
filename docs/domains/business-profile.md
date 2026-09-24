@@ -11,3 +11,4 @@
 - `Plan.businessProfileJson`은 자치구·서울시 상위 업종·소진공 세부 업종·면적·층·상가 유형과 사용한 릴리스 키를 저장한다.
 - 재무 `inputJson`, `INPUT_SCHEMA_VERSION`, 과거 `plan_results`는 바꾸거나 재계산하지 않는다.
 - `PUT /api/plans/{planId}/business-profile`은 소유권과 revision을 검사한다. 계획 생성·일반 수정에서도 같은 스키마와 활성 릴리스 검증을 재사용한다.
+- 필수값(자치구·상위 업종·면적·층·상가 유형)이 모두 있어야 저장된다. 계획 화면은 필수값이 하나라도 빠지면 초안 저장 때 `businessProfile: null`을 보내고, 서버는 `null`을 받으면 저장된 사업 조건을 비운다. 그래서 이전에 저장한 조건도 지워진다.
