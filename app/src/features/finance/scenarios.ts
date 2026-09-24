@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { decimal } from './money';
+import { decimal, won } from './money';
 import type { FinanceInput, ScenarioChange, ScenarioName } from './types';
 
 export const SCENARIO_TEMPLATES: Record<Exclude<ScenarioName, 'BASE'>, ScenarioChange[]> = {
@@ -15,12 +15,10 @@ export const SCENARIO_TEMPLATES: Record<Exclude<ScenarioName, 'BASE'>, ScenarioC
   ],
 };
 
+// 시나리오 금액 가정은 원 단위로 반올림한 뒤 파생 값을 계산한다. 결과에 담긴 가정으로
+// 운영수지·균형 매출을 그대로 다시 계산할 수 있어야 한다.
 const changePercent = (value: string | null, percent: string) =>
-  value === null
-    ? null
-    : decimal(value)
-        .mul(decimal(1).plus(decimal(percent).div(100)))
-        .toString();
+  value === null ? null : won(decimal(value).mul(decimal(1).plus(decimal(percent).div(100))));
 const changePoint = (value: string | null, points: string) =>
   value === null ? null : Decimal.max(0, decimal(value).plus(decimal(points).div(100))).toString();
 
