@@ -162,3 +162,44 @@ describe('서버 계산과 불변 결과', () => {
     expect(await response.json()).toMatchObject({ result: existing, reused: true });
   });
 });
+
+describe('요청 빈도 제한', () => {
+  // 한도는 사용자별 프로세스 메모리 버킷이라, 다른 테스트와 섞이지 않게 사용자마다 따로 쓴다.
+  const repeat = async (count: number, call: () => Promise<Response>) => {
+    const statuses: number[] = [];
+    for (let index = 0; index < count; index += 1) statuses.push((await call()).status);
+    return statuses;
+  };
+
+  it('계획 목록·상세 조회에는 제한을 두지 않는다', async () => {
+    mocks.currentUser.mockResolvedValue({ id: 'rate-reader', email: 'r@example.com' });
+    mocks.getPrisma.mockReturnValue({
+      plan: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue({ id: 'plan-a', results: [] }),
+      },
+    });
+    expect(new Set(await repeat(70, () => listPlans()))).toEqual(new Set([200]));
+    expect(new Set(await repeat(70, () => getPlan(new Request('http://localhost'), context)))).toEqual(new Set([200]));
+  });
+
+  it('생성은 분당 30회, 수정은 60회, 삭제는 30회를 넘으면 429와 Retry-After를 준다', async () => {
+    mocks.getPrisma.mockReturnValue({ plan: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) } });
+    // 잘못된 본문은 한도 확인 뒤 400이 되므로, DB 없이 한도만 소모한다.
+    mocks.currentUser.mockResolvedValue({ id: 'rate-creator', email: 'c@example.com' });
+    expect(await repeat(30, () => createPlan(jsonRequest({})))).toEqual(Array(30).fill(400));
+    const createDenied = await createPlan(jsonRequest({}));
+    expect(createDenied.status).toBe(429);
+    expect(Number(createDenied.headers.get('Retry-After'))).toBeGreaterThan(0);
+
+    mocks.currentUser.mockResolvedValue({ id: 'rate-updater', email: 'u@example.com' });
+    const updated = await repeat(61, () => updatePlan(jsonRequest({}), context));
+    expect(updated.slice(0, 60)).toEqual(Array(60).fill(400));
+    expect(updated[60]).toBe(429);
+
+    mocks.currentUser.mockResolvedValue({ id: 'rate-deleter', email: 'd@example.com' });
+    const deleted = await repeat(31, () => deletePlan(new Request('http://localhost'), context));
+    expect(deleted.slice(0, 30)).toEqual(Array(30).fill(404));
+    expect(deleted[30]).toBe(429);
+  });
+});

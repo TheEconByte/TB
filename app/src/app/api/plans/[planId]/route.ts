@@ -17,8 +17,6 @@ export async function GET(_request: Request, context: Context) {
   try {
     const user = await currentUser();
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
-    const limit = consumeRateLimit(`plan-update:${user.id}`, { max: 60, windowMs: 60_000 });
-    if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
     const { planId } = await context.params;
     const plan = await getPrisma().plan.findFirst({
       where: { id: planId, userId: user.id },
@@ -42,7 +40,7 @@ export async function PUT(request: Request, context: Context) {
     if (blocked) return blocked;
     const user = await currentUser();
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
-    const limit = consumeRateLimit(`plan-delete:${user.id}`, { max: 30, windowMs: 60_000 });
+    const limit = consumeRateLimit(`plan-update:${user.id}`, { max: 60, windowMs: 60_000 });
     if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
     const parsed = planUpdateSchema.safeParse(await request.json());
     if (!parsed.success) return invalidZod(parsed.error);
@@ -117,6 +115,8 @@ export async function DELETE(request: Request, context: Context) {
     if (blocked) return blocked;
     const user = await currentUser();
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+    const limit = consumeRateLimit(`plan-delete:${user.id}`, { max: 30, windowMs: 60_000 });
+    if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
     const { planId } = await context.params;
     const deleted = await getPrisma().plan.deleteMany({ where: { id: planId, userId: user.id } });
     if (deleted.count === 0) return apiError(404, 'NOT_FOUND', '계획을 찾을 수 없습니다.');
