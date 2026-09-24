@@ -536,7 +536,13 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           {resultAssumption && (
             <p className="funding-position">저장 결과에 반영된 대출 가정: {describeLoanAssumption(resultAssumption)}</p>
           )}
-          <BusinessProfileWizard form={businessForm} onChange={setBusinessForm} />
+          <BusinessProfileWizard
+            form={businessForm}
+            onChange={setBusinessForm}
+            onFinish={() =>
+              document.getElementById('rent-benchmark-title')?.closest('section')?.scrollIntoView({ block: 'start' })
+            }
+          />
           <RentBenchmarkPanel
             profile={businessForm}
             savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null}

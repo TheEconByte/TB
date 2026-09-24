@@ -73,10 +73,29 @@ export function businessProfileFormFromStored(value: unknown): BusinessProfileFo
 
 const STEPS = ['위치·업종', '매장 크기', '매장 층', '상가 유형', '입력 확인'] as const;
 
+const FLOOR_LABELS: Readonly<Record<Exclude<BusinessProfileForm['floor'], ''>, string>> = {
+  BASEMENT_1: '지하 1층',
+  GROUND_1: '1층',
+  UPPER_2_PLUS: '2층 이상',
+};
+
+// 입력 확인 단계에서 빠진 항목과 그 항목을 입력하는 단계를 알려 준다. 필수값이 하나라도
+// 빠지면 초안을 저장해도 사업 조건은 저장되지 않는다(businessProfilePayload가 null).
+function missingFields(form: BusinessProfileForm): Array<{ label: string; step: number }> {
+  return [
+    { label: '지역구', step: 0, missing: !form.districtCode },
+    { label: '업종', step: 0, missing: !form.marketIndustryCode },
+    { label: '면적', step: 1, missing: !/^\d+(?:\.\d{1,2})?$/.test(form.areaValue) },
+    { label: '층', step: 2, missing: !form.floor },
+    { label: '상가 유형', step: 3, missing: !form.buildingType },
+  ].filter((field) => field.missing);
+}
+
 export default function BusinessProfileWizard({
   form,
   onChange,
-}: Readonly<{ form: BusinessProfileForm; onChange: (form: BusinessProfileForm) => void }>) {
+  onFinish,
+}: Readonly<{ form: BusinessProfileForm; onChange: (form: BusinessProfileForm) => void; onFinish?: () => void }>) {
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<BusinessCategoryInfo[]>([]);
   const [release, setRelease] = useState<BusinessDirectoryReleaseInfo | null>(null);
@@ -114,6 +133,7 @@ export default function BusinessProfileWizard({
   );
   const selectedDetail = categories.find((category) => category.code === form.detailedIndustryCode) ?? null;
   const complete = businessProfilePayload(form) !== null;
+  const missing = missingFields(form);
   const district = SEOUL_DISTRICTS.find((item) => item.code === form.districtCode)?.name ?? '미선택';
   const broadName =
     form.marketIndustryCode === 'CS100001'
@@ -263,13 +283,7 @@ export default function BusinessProfileWizard({
               note="층에 맞는 부동산원 층별 임대료를 참고로 보여 드립니다. 재무계획에는 자동으로 넣지 않습니다."
             />
             <div className="choice-grid three">
-              {(
-                [
-                  ['BASEMENT_1', '지하 1층'],
-                  ['GROUND_1', '1층'],
-                  ['UPPER_2_PLUS', '2층 이상'],
-                ] as const
-              ).map(([value, label]) => (
+              {(Object.entries(FLOOR_LABELS) as Array<[keyof typeof FLOOR_LABELS, string]>).map(([value, label]) => (
                 <button
                   type="button"
                   key={value}
@@ -306,7 +320,14 @@ export default function BusinessProfileWizard({
         )}
         {step === 4 && (
           <>
-            <WizardHeading title="입력 범위를 확인해 주세요." note="이 조건은 재무 계산 입력과 분리해 저장됩니다." />
+            <WizardHeading
+              title="입력 범위를 확인해 주세요."
+              note={
+                complete
+                  ? '화면 아래 "초안 저장"을 누르면 계획과 함께 저장됩니다. 재무 계산 입력과는 분리해 저장합니다.'
+                  : '필수값이 모두 있어야 사업 조건이 저장됩니다. 빠진 항목을 먼저 입력해 주세요.'
+              }
+            />
             <div className="profile-summary-grid">
               <div>
                 <span>지역</span>
@@ -323,8 +344,22 @@ export default function BusinessProfileWizard({
                 </strong>
               </div>
               <div>
+                <span>층</span>
+                <strong>{form.floor ? FLOOR_LABELS[form.floor] : '미선택'}</strong>
+              </div>
+              <div>
+                <span>상가 유형</span>
+                <strong>{form.buildingType ? BUILDING_TYPE_LABELS[form.buildingType] : '미선택'}</strong>
+              </div>
+              <div>
                 <span>입력 상태</span>
-                <strong>{complete ? '저장 가능' : '필수값 미입력'}</strong>
+                <strong>
+                  {complete
+                    ? '저장 가능'
+                    : missing.length > 0
+                      ? `빠진 항목: ${missing.map((field) => field.label).join(', ')}`
+                      : '필수값 미입력'}
+                </strong>
               </div>
             </div>
             <ScopeBanner detail={selectedDetail?.name ?? null} broad={broadName} />
@@ -339,13 +374,20 @@ export default function BusinessProfileWizard({
           >
             이전
           </button>
-          <button
-            type="button"
-            disabled={step === STEPS.length - 1}
-            onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))}
-          >
-            다음
-          </button>
+          {/* 마지막 단계에는 다음 단계가 없으므로, 빠진 항목으로 돌아가거나 아래 참고 자료로 넘어가게 한다. */}
+          {step < STEPS.length - 1 ? (
+            <button type="button" onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))}>
+              다음
+            </button>
+          ) : missing.length > 0 ? (
+            <button type="button" onClick={() => setStep(missing[0].step)}>
+              빠진 항목 입력
+            </button>
+          ) : (
+            <button type="button" disabled={!onFinish} onClick={() => onFinish?.()}>
+              다음: 참고 자료
+            </button>
+          )}
         </div>
       </div>
     </section>
