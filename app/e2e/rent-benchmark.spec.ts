@@ -87,6 +87,13 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   const panel = page.getByRole('region', { name: '임대료 참고' });
   await expect(panel.getByText('사업 조건에서 상가 유형을 고르면')).toBeVisible();
 
+  // 입력 확인 단계는 빠진 항목을 알려 주고, 그 항목을 입력하는 단계로 보낸다.
+  const wizard = page.locator('.business-wizard');
+  await wizard.getByRole('button', { name: /입력 확인/ }).click();
+  await expect(wizard.getByText('빠진 항목: 지역구, 업종, 면적, 층, 상가 유형')).toBeVisible();
+  await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
+  await expect(page.getByLabel('지역구')).toBeVisible();
+
   await page.getByLabel('지역구').selectOption('11200');
   await page.getByLabel('업종 대분류').selectOption('CS100010');
   await page.getByRole('button', { name: '다음' }).click();
@@ -95,6 +102,14 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await page.locator('.choice-card', { has: page.locator('strong', { hasText: /^1층$/ }) }).click();
   await page.getByRole('button', { name: '다음' }).click();
   await page.getByRole('button', { name: /소규모 상가/ }).click();
+
+  // 다 입력하면 입력 확인에 층·상가 유형까지 보이고, 다음 버튼이 아래 참고 자료로 넘어간다.
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await expect(wizard.getByText('저장 가능')).toBeVisible();
+  await expect(wizard.locator('.profile-summary-grid')).toContainText('1층');
+  await expect(wizard.locator('.profile-summary-grid')).toContainText('소규모 상가');
+  await wizard.getByRole('button', { name: '다음: 참고 자료', exact: true }).click();
+  await expect(panel.getByRole('heading', { name: '임대료 참고' })).toBeInViewport();
 
   // 성동구와 겹치는 조사 상권(뚝섬)이 먼저 선택되고, 10평(400/121㎡×10) × 1층 60천원/㎡로 계산한다.
   const region = panel.getByLabel('조사 지역');
