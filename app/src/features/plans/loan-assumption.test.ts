@@ -321,6 +321,22 @@ describe('상품 확정 조건에서 대출 가정으로의 매핑', () => {
       }).success,
     ).toBe(false);
   });
+
+  // 파일만 읽으므로 DB 없이 돈다. CI(unit 모드)에서도 실제 카탈로그를 검사하려면 DB 묶음 밖에 둔다.
+  it('실제 검수 카탈로그 5건은 모두 상환 계산 대상이 아니다', () => {
+    const real = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../../catalog/funding/catalog.json', import.meta.url)), 'utf8'),
+    ) as {
+      products: Array<Record<string, unknown>>;
+    };
+    expect(real.products).toHaveLength(5);
+    for (const entry of real.products) {
+      const repayment = assessProductRepayment(fundingProductSchema.parse(entry));
+      expect(repayment.supported).toBe(false);
+      expect(repayment.terms).toBeNull();
+      expect(repayment.reasons.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('POST /api/plans/{planId}/loan-assumption 경계', () => {
@@ -830,21 +846,6 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('PostgreSQL에서 상품 조건 
     const untouched = await db().plan.findUniqueOrThrow({ where: { id: created.id } });
     expect(untouched.revision).toBe(created.revision);
     expect(untouched.loanAssumptionJson).toBeNull();
-  });
-
-  it('실제 검수 카탈로그 5건은 모두 상환 계산 대상이 아니다', () => {
-    const real = JSON.parse(
-      readFileSync(fileURLToPath(new URL('../../../catalog/funding/catalog.json', import.meta.url)), 'utf8'),
-    ) as {
-      products: Array<Record<string, unknown>>;
-    };
-    expect(real.products).toHaveLength(5);
-    for (const entry of real.products) {
-      const repayment = assessProductRepayment(fundingProductSchema.parse(entry));
-      expect(repayment.supported).toBe(false);
-      expect(repayment.terms).toBeNull();
-      expect(repayment.reasons.length).toBeGreaterThan(0);
-    }
   });
 });
 
