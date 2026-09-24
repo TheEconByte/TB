@@ -12,6 +12,7 @@
 - `/api/plans`: 내 계획 생성·목록.
 - `/api/plans/{id}`: 소유자만 상세·revision 수정·삭제.
 - `/api/plans/{id}/calculations`: 저장된 입력만 서버에서 계산하고 결과를 append-only로 저장.
+- `/api/plans/{id}/business-profile`: 소유자만 사업 조건을 저장하고 revision을 올림([business-profile.md](business-profile.md)).
 - `/api/plans/{id}/funding-matches`: 저장된 계획 조건으로만 자금 후보를 판정하고 결과를 저장하지 않음.
 - `/api/plans/{id}/loan-assumption`: 사용자가 고른 상품 버전의 확정 조건을 계획의 신규 대출 가정으로 적용하고 revision을 올림.
 - `/api/plans/{id}/results[/{resultId}]`: 소유자만 결과 목록·상세 조회.

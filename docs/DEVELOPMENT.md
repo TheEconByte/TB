@@ -19,6 +19,7 @@ npm --prefix app run dev
 - PostgreSQL을 띄우고, 테스트 DB를 만들고, 앱·테스트 DB에 migration을 적용한다.
 - Prisma Client와 Playwright Chromium을 준비한다.
 - 운영 데이터는 적재하지 않는다.
+- 브라우저 설치를 건너뛰려면 `npm --prefix app run bootstrap -- --skip-browser`를 쓴다. 이미 설치했고 migration만 적용할 때 쓴다.
 
 ## 환경파일
 
@@ -32,12 +33,12 @@ npm --prefix app run dev
 
 ## 로컬 데이터 준비
 
-새 DB는 비어 있다. 적재 전에는 상권 조회가 `503 RELEASE_UNAVAILABLE`, 자금 후보 조회가 `503 CATALOG_UNAVAILABLE`, 임대료·프랜차이즈 조회가 `503 DATASET_UNAVAILABLE`로 응답한다.
+새 DB는 비어 있다. 적재 전에는 상권 조회가 `503 RELEASE_UNAVAILABLE`, 자금 후보 조회가 `503 CATALOG_UNAVAILABLE`, 경쟁 점포 조회가 `503 BUSINESS_DIRECTORY_UNAVAILABLE`(세부 업종 목록은 200과 빈 목록), 임대료·프랜차이즈 조회가 `503 DATASET_UNAVAILABLE`로 응답한다.
 
 | 데이터 | 준비 | 적재 |
 |---|---|---|
 | 서울시 상권 | 서울 열린데이터광장 인증키를 `SEOUL_OPEN_API_KEY`에 넣는다. 약 2분 걸린다 | `npm --prefix app run market:load` |
-| 소진공 점포 | 공공데이터포털 인증키를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
+| 소진공 점포 | 공공데이터포털에서 [상가(상권)정보](https://www.data.go.kr/data/15012005/openapi.do)를 활용신청하고, 인증키(Decoding)를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
 | 부동산원 임대료 | 부동산통계정보시스템(R-ONE) Open API 인증키를 `REB_API_KEY`에 넣는다. 약 30초 걸린다 | `npm --prefix app run rent:load` |
 | 공정위 프랜차이즈 | `SEMAS_SERVICE_KEY`(공공데이터포털 인증키)로 [가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)·[창업 금액](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청한다 | `npm --prefix app run franchise:load` |
 | 자금 카탈로그 | 준비 없음. 검수자가 UNASSIGNED여도 적재되며, 그런 상품은 현재 후보가 아니라 추가 확인으로 분류된다 | `npm --prefix app run funding:load` |

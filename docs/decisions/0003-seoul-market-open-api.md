@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-23
 - Owners: jhjh0512
-- Related issue/PR:
+- Related issue/PR: #9
 - Supersedes: 없음
 
 ## Context

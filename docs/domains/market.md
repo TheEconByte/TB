@@ -4,7 +4,7 @@
 
 ## 코드 위치
 
-- `app/src/features/market`: 상권 원본 ZIP·CSV·DBF 파싱, 릴리스 적재·활성화, 공개 조회. 순수 파싱·검증 함수는 React·DB에 의존하지 않는다.
+- `app/src/features/market`: 서울 열린데이터광장 Open API 수신(`seoul-api.ts`)과 검증본 ZIP·CSV·DBF 파싱, 릴리스 적재·활성화, 공개 조회. 순수 파싱·검증 함수는 React·DB에 의존하지 않는다.
 
 ## 기준 데이터
 

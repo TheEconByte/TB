@@ -7,7 +7,7 @@
 ## 코드 위치
 
 - `app/src/features/funding`: 자금 공고 카탈로그의 Zod 스키마, 규칙 검사, 고정 조건 판정 함수, 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`)와 요청 스키마·응답 조립(`candidates.ts`), 페이지 단위 후보 화면(`FundingMatcher.tsx`)과 두 화면이 함께 쓰는 결과 표시(`FundingCandidatesPanel.tsx`). 판정 함수는 React·DB·외부 API에 의존하지 않는다.
-- `app/catalog/funding`: 공식 원문을 확인해 정리한 공고 JSON 카탈로그와 갱신 절차 문서.
+- `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서. 현재 상품은 검수자가 지정되지 않았다(#13).
 
 ## 카탈로그
 
