@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-09-25
-- Owners: 미정 (자동 규칙·수집 출처·차단 목록 책임자. Accepted 전에 지정)
+- Owners: jhjh0512 (자동 규칙·수집 출처·차단 목록 책임자)
 - Related issue/PR: #5, #13, #15
 - Supersedes: 없음
 
