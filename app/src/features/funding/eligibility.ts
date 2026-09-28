@@ -2,6 +2,7 @@ import type { FundingCatalog, FundingProduct } from './schema.ts';
 import {
   REPAYABLE_SUPPORT_TYPES,
   combineVerdicts,
+  compareIsoDates,
   INDUSTRY_CODE_PATTERN,
   isPrimaryRetrievalMethod,
   isSupportedRepaymentMethod,
@@ -342,6 +343,9 @@ export function evaluateProduct(
   const state = reviewState(product, options.asOfDate);
   const repayment = assessProductRepayment(product);
   const primaryEvidenceVerified = hasPrimaryEvidence(product);
+  // 관측 접수 상태가 OPEN·UNKNOWN이어도 신청 종료일이 지나면 접수가 끝난 것이다. 종료일 당일까지는 접수 중으로 본다.
+  const periodEnd = product.applicationPeriod.end;
+  const periodEnded = periodEnd !== null && compareIsoDates(periodEnd, options.asOfDate) < 0;
 
   let candidateStatus: FundingCandidateStatus;
   let candidateReason: string;
@@ -351,6 +355,9 @@ export function evaluateProduct(
   } else if (product.observedApplicationStatus === 'CLOSED') {
     candidateStatus = 'CLOSED';
     candidateReason = `${product.observedAt} 기준 접수 상태가 CLOSED입니다.`;
+  } else if (periodEnded) {
+    candidateStatus = 'CLOSED';
+    candidateReason = `신청 종료일 ${periodEnd}이(가) 기준일 ${options.asOfDate} 이전이라 접수가 끝난 것으로 판정합니다.`;
   } else if (state === 'UNREVIEWED') {
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason =

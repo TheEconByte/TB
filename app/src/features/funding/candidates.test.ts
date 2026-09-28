@@ -56,7 +56,7 @@ const BASE_PRODUCT: Record<string, unknown> = {
   region: { scope: 'SEOUL', districtCodes: [], note: null },
   purpose: { included: ['OPERATING_FUNDS'], excluded: [], note: null },
   industryConditions: { scope: 'UNRESTRICTED', included: [], excluded: [], note: null },
-  applicationPeriod: { start: '2026-09-01', end: '2026-12-31', note: null },
+  applicationPeriod: { start: '2026-09-01', end: FAR_FUTURE, note: null },
   observedApplicationStatus: 'OPEN',
   observedAt: TEST_DATE,
   reviewedAt: TEST_DATE,
@@ -309,6 +309,34 @@ describe('후보 판정과 응답', () => {
     expect(payload.evaluations[0].candidateStatus).toBe('CLOSED');
     expect(payload.summary.CLOSED).toBe(1);
     expect(payload.summary.CURRENT_CANDIDATE).toBe(0);
+  });
+
+  it('신청 종료일이 지나면 접수 중으로 기록된 상품도 접수 종료로 분리한다', async () => {
+    const { prisma } = stubPrisma({
+      products: [
+        membership(rawProduct({ applicationPeriod: { start: '2026-09-01', end: '2026-09-30', note: null } }), 0),
+      ],
+    });
+    const lastDay = await candidatesOf(prisma, PRE_PROFILE, '2026-09-30');
+    expect(lastDay.evaluations[0].candidateStatus).toBe('CURRENT_CANDIDATE');
+
+    const after = await candidatesOf(prisma, PRE_PROFILE, '2026-10-01');
+    const [evaluation] = after.evaluations;
+    expect(evaluation.observedApplicationStatus).toBe('OPEN');
+    expect(evaluation.candidateStatus).toBe('CLOSED');
+    expect(evaluation.candidateReason).toContain('2026-09-30');
+    expect(after.summary.CLOSED).toBe(1);
+    expect(after.summary.CURRENT_CANDIDATE).toBe(0);
+  });
+
+  it('신청 종료일이 없으면 관측 접수 상태를 따른다', async () => {
+    const { prisma } = stubPrisma({
+      products: [
+        membership(rawProduct({ applicationPeriod: { start: '2026-09-01', end: null, note: '예산 소진 시까지' } }), 0),
+      ],
+    });
+    const payload = await candidatesOf(prisma, PRE_PROFILE, '2026-12-31');
+    expect(payload.evaluations[0].candidateStatus).toBe('CURRENT_CANDIDATE');
   });
 
   it('검수 기한이 지난 상품은 접수 중이어도 검수 기한 경과로 분리한다', async () => {
