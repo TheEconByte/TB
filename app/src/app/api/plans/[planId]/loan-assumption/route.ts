@@ -78,7 +78,10 @@ export async function POST(request: Request, context: Context) {
         '저장된 자금 조건이 없거나 현재 스키마와 맞지 않습니다. 자금 조건을 저장한 뒤 다시 조회해 주세요.',
       );
     }
-    const evaluation = evaluateProduct(product, parsedProfile.data, { asOfDate: todayInKst() });
+    const evaluation = evaluateProduct(product, parsedProfile.data, {
+      asOfDate: todayInKst(),
+      automation: active.automation,
+    });
     if (evaluation.candidateStatus !== 'CURRENT_CANDIDATE') {
       return apiError(
         400,
@@ -115,6 +118,16 @@ export async function POST(request: Request, context: Context) {
       );
     }
 
+    // 자동 수집 상품은 상환 계산 자동 승격 스위치까지 반영한 판정 결과로 확인한다.
+    if (!evaluation.repayment.supported) {
+      const reasons =
+        evaluation.repayment.reasons.length > 0 ? evaluation.repayment.reasons.join(' / ') : evaluation.repayment.note;
+      return apiError(
+        400,
+        'INVALID_INPUT',
+        `이 상품은 상환 계산 대상이 아니어서 대출 가정으로 적용할 수 없습니다. ${reasons}`,
+      );
+    }
     const loanAssumption = loanAssumptionFromProduct(
       product,
       { catalogKey: active.catalogKey, catalogVersion: active.catalogVersion },

@@ -322,6 +322,8 @@ model FundingCatalogRelease {
   reviewer          String
   sourceDocuments   Json                    @db.JsonB
   productVersions   Json                    @db.JsonB
+  // 자동 승격 스위치·차단 목록·출처별 동기화 결과(ADR 0006). v1.0.0 카탈로그 릴리스는 NULL이다.
+  automation        Json?                   @db.JsonB
   validationSummary Json                    @db.JsonB
   productCount      Int                     @default(0)
   activatedAt       DateTime?

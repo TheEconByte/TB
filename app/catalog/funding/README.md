@@ -13,6 +13,7 @@ npm --prefix app run funding:load
 ```
 
 - `funding:validate`는 DB 없이 검사 결과만 출력한다. `funding:load`는 같은 검사를 통과한 카탈로그만 적재한다.
+- 자동 수집 출처가 있으면 `funding:load` 대신 `npm --prefix app run funding:sync`로 이 카탈로그와 자동 상품을 합쳐 적재한다. `funding:load`로 이 파일만 적재하면 자동 상품이 빠진 릴리스가 ACTIVE가 된다.
 - 검사 항목, 오류·주의 구분, 적재·활성화 규칙은 [funding.md](../../../docs/domains/funding.md#카탈로그)에 있다.
 
 ## 갱신 절차
@@ -38,7 +39,7 @@ npm --prefix app run funding:load
 
 ## 2026-09-20 검수 범위
 
-현재 카탈로그 `2026-09-23.1`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다.
+현재 카탈로그 `2026-09-28.1`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다. `2026-09-28.1`은 `2026-09-23.1`에서 스키마를 v1.1.0으로 올리고 자동화 설정을 더한 것이며, 상품 내용과 검수 내용은 같다.
 
 - 접수 상태가 CLOSED로 확인된 상품 1건(예비창업패키지 2차), 접수 상태를 확정할 수 없어 UNKNOWN으로 남긴 상품 4건을 기록했다.
 - 같은 날 접수 상태가 OPEN으로 확인된 상품은 없어 현재 신청 가능 후보로 확정되는 상품은 0건이다.
@@ -46,3 +47,12 @@ npm --prefix app run funding:load
 - 2026-09-09에 확인했던 강북창업지원센터 입주 모집은 다시 확인하지 않아 검수 기한 경과 상태로 남겼고, 현재 후보에서 제외된다.
 - 서울여성 창업아이디어 공모전 등 2026-09-09 검토 항목은 이번 검수에서 다시 확인하지 않아 카탈로그에 넣지 않았다.
 - 검수자(`reviewer`)는 아직 지정되지 않아 `UNASSIGNED`다(#13). 근거 일부는 공식 원문이 아니라 검색 결과 요약이다.
+
+## 자동화 설정
+
+`catalog.json`의 `automation`은 funding:sync가 모은 자동 상품에만 적용된다. 규칙은 [funding.md](../../../docs/domains/funding.md#동기화)와 [ADR 0006](../../../docs/decisions/0006-funding-discovery-automation.md)에 있다.
+
+- `policyLoanPromotion`, `repaymentPromotion`: 정책자금 자동 승격과 상환 계산 자동 승격 스위치다. 기본으로 꺼져 있고, 켜고 끄는 일은 ADR 0006의 Owner가 정한다. 바꾼 뒤 funding:sync를 실행하면 새 릴리스에 반영된다.
+- `blockedSources`: 자동 승격을 막을 공고. `{ "source": "SEMAS_OLS", "externalId": "…", "reason": "…" }`처럼 출처·식별자·사유를 적는다.
+- `sourceSyncs`: funding:sync가 채운다. 이 파일에는 비워 둔다.
+- 자동 상품(검수자 `AUTO:…`)은 이 파일에 넣지 않는다. 같은 공고를 사람이 기록하려면 그 상품에 `sourceRef`를 적는다. 그러면 사람 기록이 자동 상품보다 우선한다.

@@ -8,7 +8,7 @@ import { PrismaClient } from '../../generated/prisma/client.ts';
 import { assessProductRepayment, evaluateCandidates, evaluateProduct, industryCodeIssue } from './eligibility.ts';
 import { loadFundingCatalog, readFundingCatalogFile } from './loader.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
-import { combineVerdicts, type Verdict } from './types.ts';
+import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION, combineVerdicts, type Verdict } from './types.ts';
 import { FundingCatalogError, validateFundingCatalog, type FundingCatalogValidation } from './validation.ts';
 
 const REAL_CATALOG_PATH = fileURLToPath(new URL('../../../catalog/funding/catalog.json', import.meta.url));
@@ -88,7 +88,7 @@ function catalog(
 ): Record<string, unknown> {
   return {
     catalogKey: 'test-catalog',
-    schemaVersion: 'funding-catalog-v1.0.0',
+    schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion: '2026-09-20.1',
     basisDate: REVIEW_DATE,
     reviewer: 'tester',
@@ -334,6 +334,73 @@ describe('funding catalog schema and rules', () => {
     const validation = validate(catalog([withoutConditionEvidence]));
     expect(validation.ok).toBe(false);
     expect(validation.issues.filter((issue) => issue.code === 'MISSING_EVIDENCE')).toHaveLength(3);
+  });
+});
+
+describe('automated products in the catalog (ADR 0006)', () => {
+  const sourceRef = { source: 'SEMAS_OLS', externalId: 'test-fund' };
+  const succeededSync = {
+    source: 'SEMAS_OLS',
+    status: 'SUCCEEDED',
+    attemptedAt: '2026-09-20T01:00:00.000Z',
+    lastSucceededOn: REVIEW_DATE,
+    fetchedCount: 1,
+    responseChecksum: null,
+    failureReason: null,
+  };
+  const automation = (overrides: Record<string, unknown> = {}) => ({
+    policyLoanPromotion: false,
+    repaymentPromotion: false,
+    blockedSources: [],
+    sourceSyncs: [succeededSync],
+    ...overrides,
+  });
+
+  it('checks an automated product against source freshness instead of a next review date', () => {
+    const validation = validate(
+      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null })], { automation: automation() }),
+    );
+    expect(issueCodes(validation)).not.toContain('NEXT_REVIEW_AT_MISSING');
+    expect(validation.ok).toBe(true);
+    expect(validation.reviewOverdue).toEqual([]);
+
+    const stale = validate(
+      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null })], {
+        automation: automation({ sourceSyncs: [] }),
+      }),
+    );
+    expect(stale.ok).toBe(true);
+    expect(warningCodes(stale)).toContain('REVIEW_OVERDUE');
+    expect(stale.reviewOverdue).toEqual(['test-loan@1.0.0']);
+  });
+
+  it('rejects an automated reviewer without a source reference', () => {
+    const validation = validate(catalog([product({ reviewer: AUTO_REVIEWER, nextReviewAt: null })]));
+    expect(issueCodes(validation)).toContain('AUTO_REVIEWER_WITHOUT_SOURCE');
+  });
+
+  it('rejects two products that point at the same source notice', () => {
+    const validation = validate(
+      catalog([product({ sourceRef }), product({ productKey: 'test-loan-copy', sourceRef })]),
+    );
+    expect(issueCodes(validation)).toContain('DUPLICATE_SOURCE_REF');
+  });
+
+  it('rejects two sync results for the same source', () => {
+    const validation = validate(
+      catalog([product()], { automation: automation({ sourceSyncs: [succeededSync, succeededSync] }) }),
+    );
+    expect(issueCodes(validation)).toContain('DUPLICATE_SOURCE_SYNC');
+  });
+
+  it('defaults a catalog without an automation block to every switch off', () => {
+    const parsed = catalogFrom(validate(catalog([product()])));
+    expect(parsed.automation).toEqual({
+      policyLoanPromotion: false,
+      repaymentPromotion: false,
+      blockedSources: [],
+      sourceSyncs: [],
+    });
   });
 });
 
@@ -633,7 +700,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   let client: PrismaClient | null = null;
   let startedAt = new Date(0);
   let previousActiveId: string | null = null;
-  const REAL_VERSION = '2026-09-23.1';
+  const REAL_VERSION = '2026-09-28.1';
   const REVIEWED_CATALOG_PATH = reviewedCatalogFile();
 
   const db = (): PrismaClient => {
