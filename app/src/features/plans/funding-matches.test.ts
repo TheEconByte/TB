@@ -215,7 +215,9 @@ describe('POST /api/plans/{planId}/funding-matches 경계', () => {
   it('저장된 프로필로 판정하고 계획·revision 식별 정보를 함께 반환한다', async () => {
     const stub = stubPrisma(planRow(PRE_PROFILE, 3), [PRE_MEMBERSHIP]);
     mocks.getPrisma.mockReturnValue(stub.getPrisma());
+    const dayBefore = todayInKst();
     const response = await postMatches(matchRequest(), context);
+    const dayAfter = todayInKst();
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.plan).toEqual({ id: 'plan-a', revision: 3 });
@@ -224,7 +226,8 @@ describe('POST /api/plans/{planId}/funding-matches 경계', () => {
     expect(body.summary.CURRENT_CANDIDATE).toBe(1);
     expect(body.evaluations).toHaveLength(1);
     // 판정 기준일은 서버의 한국 시간 오늘이며 요청 본문으로 바꿀 수 없다.
-    expect(body.asOfDate).toBe(todayInKst());
+    // 요청 중 한국 시간 자정을 넘길 수 있으므로 요청 전후 날짜 중 하나와 같으면 된다.
+    expect([dayBefore, dayAfter]).toContain(body.asOfDate);
   });
 
   it('상품이 사업자등록 이후 전용이면 저장된 단계에 따라 분류가 달라진다', async () => {
@@ -340,6 +343,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('PostgreSQL에서 저장된 계�
 
   // 검수자가 지정된 합성 카탈로그. 실제 검수 카탈로그 5건을 그대로 쓰되 productKey와
   // 검수자만 바꿔 적재 규칙을 통과한 상품만 판정에 쓴다.
+  // route는 서버의 오늘 날짜로 판정하므로, 실제 검토일이 지나도 결과가 바뀌지 않게
+  // 다음 검토일을 먼 미래로 둔다. 이미 검토일이 지난 상품은 그대로 둬 REVIEW_OVERDUE를 유지한다.
   const REVIEWED_CATALOG_PATH = writeCatalogFile({
     ...sourceCatalog,
     catalogKey: 'test-plan-funding-catalog',
@@ -348,6 +353,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('PostgreSQL에서 저장된 계�
       ...product,
       productKey: 'test-plan-funding-' + product.productKey,
       reviewer: 'test-reviewer',
+      nextReviewAt:
+        typeof product.nextReviewAt === 'string' && product.nextReviewAt < TEST_DATE
+          ? product.nextReviewAt
+          : FAR_FUTURE,
     })),
   });
 
