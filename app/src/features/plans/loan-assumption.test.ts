@@ -90,7 +90,7 @@ const BASE_PRODUCT: Record<string, unknown> = {
   region: { scope: 'SEOUL', districtCodes: [], note: null },
   purpose: { included: ['OPERATING_FUNDS'], excluded: [], note: null },
   industryConditions: { scope: 'UNRESTRICTED', included: [], excluded: [], note: null },
-  applicationPeriod: { start: '2026-09-01', end: '2026-12-31', note: null },
+  applicationPeriod: { start: '2026-09-01', end: FAR_FUTURE, note: null },
   observedApplicationStatus: 'OPEN',
   observedAt: TEST_DATE,
   reviewedAt: TEST_DATE,
