@@ -35,6 +35,9 @@ export const UNKNOWN_FUNDING_PROFILE: FundingProfile = {
 
 export type FundingConditionKey = 'BUSINESS_STAGE' | 'REGION' | 'PURPOSE' | 'INDUSTRY';
 
+// 공식 출처가 구조화해 주지 않는 조건. UNKNOWN이면 현재 후보를 막지 않고 신청 전 확인 항목이 된다.
+const PRE_APPLICATION_CHECK_KEYS: ReadonlySet<FundingConditionKey> = new Set(['PURPOSE', 'INDUSTRY']);
+
 export type FundingConditionResult = {
   key: FundingConditionKey;
   label: string;
@@ -346,6 +349,17 @@ export function evaluateProduct(
   // 관측 접수 상태가 OPEN·UNKNOWN이어도 신청 종료일이 지나면 접수가 끝난 것이다. 종료일 당일까지는 접수 중으로 본다.
   const periodEnd = product.applicationPeriod.end;
   const periodEnded = periodEnd !== null && compareIsoDates(periodEnd, options.asOfDate) < 0;
+  // 업종·용도가 확인되지 않은 것은 현재 후보를 막지 않고 신청 전 확인 항목으로 남긴다(ADR 0006).
+  // 사업 단계·지역이 확인되지 않으면 지금처럼 추가 확인으로 둔다.
+  const blockingUnknown = conditions.find(
+    (condition) => condition.verdict === 'UNKNOWN' && !PRE_APPLICATION_CHECK_KEYS.has(condition.key),
+  );
+  const manualChecks = [
+    ...product.additionalChecks,
+    ...conditions
+      .filter((condition) => condition.verdict === 'UNKNOWN' && PRE_APPLICATION_CHECK_KEYS.has(condition.key))
+      .map((condition) => `${condition.label}: ${condition.detail}`),
+  ];
 
   let candidateStatus: FundingCandidateStatus;
   let candidateReason: string;
@@ -373,16 +387,15 @@ export function evaluateProduct(
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason =
       '검색 결과 요약으로만 확인되어 공식 원문 페이지·첨부를 직접 확인한 근거가 없습니다. 재검수 전에는 현재 후보로 확정하지 않습니다.';
-  } else if (eligibilityVerdict === 'UNKNOWN') {
+  } else if (blockingUnknown) {
     candidateStatus = 'NEEDS_CONFIRMATION';
-    candidateReason =
-      conditions.find((condition) => condition.verdict === 'UNKNOWN')?.detail ?? '확인되지 않은 조건이 있습니다.';
+    candidateReason = blockingUnknown.detail;
   } else if (product.observedApplicationStatus === 'OPEN') {
     candidateStatus = 'CURRENT_CANDIDATE';
     candidateReason =
-      product.additionalChecks.length === 0
+      manualChecks.length === 0
         ? '확인된 조건이 모두 충족되고 접수 상태가 OPEN입니다. 승인 확정은 아닙니다.'
-        : `확인된 조건은 충족하지만 신청 전 ${product.additionalChecks.length}건을 더 확인해야 합니다. 승인 확정은 아닙니다.`;
+        : `확인된 조건은 충족하지만 신청 전 ${manualChecks.length}건을 더 확인해야 합니다. 승인 확정은 아닙니다.`;
   } else {
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason = '접수 상태가 OPEN으로 확인되지 않아 현재 신청 가능 후보로 확정하지 않습니다.';
@@ -406,7 +419,7 @@ export function evaluateProduct(
     eligibilityVerdict,
     candidateStatus,
     candidateReason,
-    manualChecks: [...product.additionalChecks],
+    manualChecks,
     unsupportedCalculationReasons: [...product.unsupportedCalculationReasons],
     repayment,
   };

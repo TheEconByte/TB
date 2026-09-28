@@ -41,6 +41,10 @@
 
 - 판정 규칙(`eligibility.ts`): 조건별로 PASS/FAIL/UNKNOWN을 계산한다. FAIL이 하나라도 있으면 FAIL, FAIL 없이 UNKNOWN이 있으면 UNKNOWN, 모두 PASS면 PASS다.
 - REGION·PURPOSE·INDUSTRY를 포함한 각 조건에 직접 확인한 공식 근거가 없으면 UNKNOWN이다.
+- 조건별 UNKNOWN의 효과([ADR 0006](../decisions/0006-funding-discovery-automation.md)):
+  - 사업 단계·지역이 UNKNOWN이면 현재 후보로 확정하지 않고 추가 확인으로 분류한다.
+  - 업종·용도가 UNKNOWN이면 현재 후보를 막지 않는다. 대신 "업종: …", "용도: …" 형태로 신청 전 추가 확인(`manualChecks`)에 더한다. 이때 자격 판정(`eligibilityVerdict`)은 그대로 UNKNOWN이다.
+  - FAIL은 조건과 상관없이 조건 미충족이다.
 - 접수 상태 OPEN/CLOSED/UNKNOWN은 자격 판정과 별도로 유지한다.
 - 신청 종료일이 판정 기준일보다 앞서면 관측 접수 상태가 OPEN·UNKNOWN이어도 접수 종료(CLOSED)로 판정한다. 종료일 당일까지는 접수 중으로 보고, 종료일이 없으면(예: 예산 소진 시까지) 관측 접수 상태를 따른다.
 - 검수 기한이 지난 상품, 검수일 또는 검수자가 없는 상품, 검색 결과 요약으로만 확인한 상품은 현재 후보로 확정하지 않는다.

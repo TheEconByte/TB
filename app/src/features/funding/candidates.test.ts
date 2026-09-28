@@ -265,21 +265,39 @@ describe('후보 판정과 응답', () => {
     expect(payload.summary.NOT_ELIGIBLE).toBe(1);
   });
 
-  it('FAIL 없이 UNKNOWN만 있으면 추가 확인으로 분류한다', async () => {
+  it('업종·용도만 확인되지 않으면 신청 전 확인 항목과 함께 검토 후보로 분류한다', async () => {
     const { prisma } = stubPrisma({
       products: [
         membership(
           rawProduct({
             industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 매핑 미검수' },
+            additionalChecks: ['사업계획서 제출 여부'],
           }),
           0,
         ),
       ],
     });
-    const payload = await candidatesOf(prisma);
-    expect(payload.evaluations[0].eligibilityVerdict).toBe('UNKNOWN');
-    expect(payload.evaluations[0].candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(payload.summary.CURRENT_CANDIDATE).toBe(0);
+    const payload = await candidatesOf(prisma, { ...PRE_PROFILE, purpose: 'UNKNOWN' });
+    const [evaluation] = payload.evaluations;
+    expect(evaluation.eligibilityVerdict).toBe('UNKNOWN');
+    expect(evaluation.candidateStatus).toBe('CURRENT_CANDIDATE');
+    expect(evaluation.manualChecks).toEqual([
+      '사업계획서 제출 여부',
+      '용도: 사업 용도가 입력되지 않았습니다.',
+      '업종: 업종 매핑 미검수',
+    ]);
+    expect(evaluation.candidateReason).toContain('신청 전 3건');
+    expect(payload.summary.CURRENT_CANDIDATE).toBe(1);
+  });
+
+  it('사업 단계나 지역이 확인되지 않으면 추가 확인으로 분류한다', async () => {
+    const { prisma } = stubPrisma({ products: [membership(rawProduct(), 0)] });
+    const noDistrict = await candidatesOf(prisma, { ...PRE_PROFILE, districtCode: null });
+    expect(noDistrict.evaluations[0].candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(noDistrict.evaluations[0].candidateReason).toContain('자치구');
+    const noStage = await candidatesOf(prisma, { ...PRE_PROFILE, businessStage: 'UNKNOWN' });
+    expect(noStage.evaluations[0].candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(noStage.summary.CURRENT_CANDIDATE).toBe(0);
   });
 
   it('검수자가 지정되지 않은 상품은 검토 후보가 되지 않는다', async () => {

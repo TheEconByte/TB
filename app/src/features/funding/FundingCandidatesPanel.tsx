@@ -54,13 +54,13 @@ const GROUPS: { status: FundingCandidateStatus; title: string; note: string; sep
   {
     status: 'CURRENT_CANDIDATE',
     title: '현재 검토 후보',
-    note: '확인된 조건이 모두 충족되고 접수 중으로 확인된 상품입니다. 승인 확정이 아닙니다.',
+    note: '사업 단계·지역 조건이 충족되고 접수 중으로 확인된 상품입니다. 확인되지 않은 업종·용도는 신청 전 추가 확인에 적었습니다. 승인 확정이 아닙니다.',
     separated: false,
   },
   {
     status: 'NEEDS_CONFIRMATION',
     title: '추가 확인 필요',
-    note: '확인되지 않은 조건, 원문 근거 부족, 검수 미완료 중 하나 이상이 있습니다.',
+    note: '사업 단계·지역 미확인, 원문 근거 부족, 검수 미완료 중 하나 이상이 있습니다.',
     separated: false,
   },
   {
