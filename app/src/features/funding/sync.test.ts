@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
+import { evaluateCandidates } from './eligibility.ts';
 import { findActiveFundingCatalog } from './read.ts';
+import { createBizinfoAdapter } from './sources/bizinfo.ts';
 import {
   nextPatchVersion,
   productContentFingerprint,
@@ -17,6 +19,8 @@ import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 import { FundingCatalogError } from './validation.ts';
 
 const CREATED_DIRS: string[] = [];
+// 기업마당 테스트 공고의 상품 키 앞부분. 테스트 DB에서 지울 때 쓴다.
+const BIZINFO_TEST_KEY_PREFIX = 'bizinfo-pbln-test';
 const OLS_URL = 'https://ols.semas.or.kr/ols/man/SMAN018M/page.do';
 
 function tempDir(): string {
@@ -194,6 +198,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       await db().fundingCatalogRelease.deleteMany({ where: { id: { in: staleIds } } });
     }
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
+    await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     const baseline = await db().fundingCatalogRelease.findFirst({
       where: { catalogKey: { not: { startsWith: 'test-' } }, status: { in: ['ACTIVE', 'SUPERSEDED'] } },
       orderBy: { activatedAt: 'desc' },
@@ -210,6 +215,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     const releases = await db().fundingCatalogRelease.findMany({ where: { createdAt: { gte: startedAt } } });
     for (const release of releases) await db().fundingCatalogRelease.delete({ where: { id: release.id } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
+    await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     if (previousActiveId) {
       const previous = await db().fundingCatalogRelease.findUnique({ where: { id: previousActiveId } });
       if (previous && previous.status !== 'ACTIVE') {
@@ -230,6 +236,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(report.catalogVersion).toBe('2026-09-20.2');
     expect(report.sources).toMatchObject([
       { source: 'SEMAS_OLS', status: 'SUCCEEDED', lastSucceededOn: '2026-09-20', fetchedCount: 10, productCount: 2 },
+    ]);
+    expect(report.sources[0].addedProducts.map((product) => product.productKey)).toEqual([
+      'test-sync-fund-a',
+      'test-sync-fund-b',
     ]);
 
     const active = await findActiveFundingCatalog(db());
@@ -254,6 +264,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
         collection([collected('fund-a', '2026-09-21'), collected('fund-b', '2026-09-21', { publicLimit: '50000000' })]),
     });
     expect(report.catalogVersion).toBe('2026-09-21.1');
+    // 직전 릴리스에 있던 공고는 새 공고로 알리지 않는다.
+    expect(report.sources[0].addedProducts).toEqual([]);
     const active = await findActiveFundingCatalog(db());
     const byKey = new Map(active?.catalog.products.map((product) => [product.productKey, product]));
     expect(byKey.get('test-sync-fund-a')?.version).toBe('1.0.0');
@@ -277,6 +289,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       fetchedCount: 10,
       carriedOver: true,
       productCount: 2,
+      addedProducts: [],
     });
     expect(report.sources[0].failureReason).toContain('출처 응답 403');
     const active = await findActiveFundingCatalog(db());
@@ -352,6 +365,71 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(report.load).toBeNull();
     expect(existsSync(report.catalogFile)).toBe(true);
     expect(await db().fundingCatalogRelease.count()).toBe(before);
+  });
+
+  it('기업마당 공고를 유형·사업 단계 미확인 상품으로 적재하고 추가 확인으로 둔다', async () => {
+    const response = JSON.stringify({
+      jsonArray: [
+        {
+          pblancId: 'PBLN_TEST_0001',
+          pblancNm: '[서울] 소상공인 경영 개선 지원사업 공고',
+          pblancUrl: '/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_TEST_0001',
+          jrsdInsttNm: '서울특별시',
+          excInsttNm: '서울신용보증재단',
+          reqstBeginEndDe: '2026-09-01 ~ 2026-10-31',
+          trgetNm: '소상공인',
+          pldirSportRealmLclasCodeNm: '경영',
+          totCnt: 2,
+        },
+        {
+          pblancId: 'PBLN_TEST_0002',
+          pblancNm: '[경기] 소상공인 지원사업 공고',
+          pblancUrl: '/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_TEST_0002',
+          jrsdInsttNm: '경기도',
+          excInsttNm: '',
+          reqstBeginEndDe: '2026-09-01 ~ 2026-10-31',
+          trgetNm: '소상공인',
+          pldirSportRealmLclasCodeNm: '경영',
+          totCnt: 2,
+        },
+      ],
+    });
+    const report = await runFundingSync({
+      prisma: db(),
+      catalogPath: manualCatalogFile(),
+      adapters: [
+        createBizinfoAdapter({
+          apiKey: 'test-key',
+          fetchImpl: async () => ({ status: 200, text: async () => response }),
+        }),
+      ],
+      asOfDate: '2026-09-28',
+      outputDir: tempDir(),
+      now: () => new Date('2026-09-28T01:00:00.000Z'),
+    });
+    expect(report.load?.outcome).toBe('ACTIVATED');
+    expect(report.sources).toMatchObject([
+      { source: 'BIZINFO', status: 'SUCCEEDED', lastSucceededOn: '2026-09-28', fetchedCount: 2, productCount: 1 },
+    ]);
+    expect(report.sources[0].addedProducts).toEqual([
+      { productKey: 'bizinfo-pbln-test-0001', name: '[서울] 소상공인 경영 개선 지원사업 공고' },
+    ]);
+
+    const stored = await db().fundingProductVersion.findUnique({
+      where: { productKey_version: { productKey: 'bizinfo-pbln-test-0001', version: '1.0.0' } },
+    });
+    expect(stored?.supportType).toBe('UNKNOWN');
+    expect(stored?.repaymentCalculationSupported).toBe(false);
+
+    const active = await findActiveFundingCatalog(db());
+    if (!active) throw new Error('ACTIVE 카탈로그가 없습니다.');
+    const list = evaluateCandidates(
+      active.catalog,
+      { businessStage: 'PRE_REGISTRATION', districtCode: '11140', industryCode: 'CS100010', purpose: 'STARTUP_COST' },
+      { asOfDate: '2026-09-28' },
+    );
+    const bizinfo = list.evaluations.find((evaluation) => evaluation.productKey === 'bizinfo-pbln-test-0001');
+    expect(bizinfo).toMatchObject({ supportType: 'UNKNOWN', candidateStatus: 'NEEDS_CONFIRMATION' });
   });
 
   it('사람이 관리하는 카탈로그에 자동 검수자 상품이 있으면 거부한다', async () => {

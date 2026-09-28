@@ -1024,6 +1024,10 @@ footer {
   background: #e6f0f2;
   color: #295c66;
 }
+.support-unknown {
+  background: #ecebe6;
+  color: #4c4a3d;
+}
 .candidate-status {
   background: #e3e0d4;
   color: #4c4a3d;

@@ -2,12 +2,14 @@
 // stored as-is in the JSON catalog and mirrored by the Prisma enums, so a name
 // change here is a catalog schema change too.
 
-export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.1.0';
+export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.2.0';
 
 // 이미 적재된 릴리스를 읽을 수 있는 스키마 버전. v1.1.0은 v1.0.0에 출처 식별자와
-// 자동화 설정을 더했을 뿐이라 v1.0.0 릴리스도 그대로 읽는다.
+// 자동화 설정을, v1.2.0은 지원 유형 UNKNOWN과 사업 단계 미확인(빈 배열)을 더했을
+// 뿐이라 이전 릴리스도 그대로 읽는다.
 export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
   'funding-catalog-v1.0.0',
+  'funding-catalog-v1.1.0',
   FUNDING_CATALOG_SCHEMA_VERSION,
 ];
 
@@ -27,21 +29,29 @@ export function isAutoReviewer(reviewer: string): boolean {
 }
 
 // funding:sync가 상품을 모으는 공식 출처.
-export const FUNDING_SOURCES = ['SEMAS_OLS'] as const;
+export const FUNDING_SOURCES = ['SEMAS_OLS', 'BIZINFO'] as const;
 export type FundingSource = (typeof FUNDING_SOURCES)[number];
 
 export const FUNDING_SOURCE_LABELS: Record<FundingSource, string> = {
   SEMAS_OLS: '소상공인시장진흥공단 정책자금 사이트',
+  BIZINFO: '기업마당 지원사업정보',
 };
+
+// 새 공고를 찾는 데만 쓰는 출처. 사업 단계·지원 유형을 알 수 없어, 이 출처만으로 확인된
+// 상품은 사람이 확인하기 전에는 현재 후보가 되지 않는다(ADR 0006 2절).
+export const DISCOVERY_ONLY_SOURCES: readonly FundingSource[] = ['BIZINFO'];
 
 // 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 현재 후보에서 빠진다.
 export const SOURCE_FRESHNESS_DAYS = 3;
 
-export const SUPPORT_TYPES = ['GRANT', 'GUARANTEE', 'LOAN', 'SPACE', 'PROGRAM'] as const;
+// UNKNOWN은 원문이 지원 유형을 알려 주지 않는 공고(예: 기업마당 공고)다. 지원금이나
+// 대출로 추측해 표시하지 않고, 원 공고에서 확인해야 하는 값으로 남긴다.
+export const SUPPORT_TYPES = ['GRANT', 'GUARANTEE', 'LOAN', 'SPACE', 'PROGRAM', 'UNKNOWN'] as const;
 export type SupportType = (typeof SUPPORT_TYPES)[number];
 
 // GRANT is a non-repayable subsidy. GUARANTEE, LOAN, SPACE and PROGRAM do not
 // repay the same way, so only LOAN products can ever reach repayment math.
+// UNKNOWN은 대출인지 알 수 없으므로 상환 계산 대상이 아니다.
 export const REPAYABLE_SUPPORT_TYPES: readonly SupportType[] = ['LOAN'];
 
 // 정책자금 갈래(대출·보증). ADR 0006에 따라 자동 승격은 이 갈래에만 쓴다. 지원금·공간·
@@ -112,11 +122,17 @@ export const EVIDENCE_SUBJECTS = [
 ] as const;
 export type EvidenceSubject = (typeof EVIDENCE_SUBJECTS)[number];
 
-export const REQUIRED_EVIDENCE_SUBJECTS: readonly EvidenceSubject[] = [
-  'IDENTITY',
-  'APPLICATION_PERIOD',
-  'BUSINESS_STAGE',
-];
+// 상품마다 공식 원문 근거가 있어야 하는 조건. 사업 단계는 원문에서 확인해 기록했을 때만,
+// 금융 조건은 대출·보증일 때만 요구한다. 사업 단계를 빈 배열(미확인)로 두면 근거도 없다.
+export function requiredEvidenceSubjects(product: {
+  supportType: SupportType;
+  eligibleBusinessStages: readonly BusinessStage[];
+}): EvidenceSubject[] {
+  const subjects: EvidenceSubject[] = ['IDENTITY', 'APPLICATION_PERIOD'];
+  if (product.eligibleBusinessStages.length > 0) subjects.push('BUSINESS_STAGE');
+  if (POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType)) subjects.push('FINANCIAL_CONDITION');
+  return subjects;
+}
 
 export const RETRIEVAL_METHODS = [
   'OFFICIAL_WEB_PAGE',

@@ -2,12 +2,12 @@ import { ZodError } from 'zod';
 import {
   REPAYABLE_SUPPORT_TYPES,
   REVIEWER_UNASSIGNED,
-  REQUIRED_EVIDENCE_SUBJECTS,
   SOURCE_FRESHNESS_DAYS,
   compareIsoDates,
   isAutoReviewer,
   isSupportedRepaymentMethod,
   isPrimaryRetrievalMethod,
+  requiredEvidenceSubjects,
   reviewState,
   type EvidenceSubject,
   type SourceFreshness,
@@ -231,8 +231,7 @@ function checkProduct(
     }
   }
   const subjects = new Set<EvidenceSubject>(evidence.map((entry) => entry.subject));
-  const required: EvidenceSubject[] = [...REQUIRED_EVIDENCE_SUBJECTS];
-  if (product.supportType === 'LOAN' || product.supportType === 'GUARANTEE') required.push('FINANCIAL_CONDITION');
+  const required: EvidenceSubject[] = requiredEvidenceSubjects(product);
   if (product.region.scope !== 'UNKNOWN') required.push('REGION');
   if (product.purpose.included.length > 0 || product.purpose.excluded.length > 0) required.push('PURPOSE');
   if (product.industryConditions.scope !== 'UNKNOWN') required.push('INDUSTRY');
@@ -416,7 +415,23 @@ function checkProduct(
     product.interestRatePercent !== null ||
     product.repaymentTermMonths !== null ||
     product.repaymentGraceMonths !== null;
-  if (!repayable) {
+  if (product.supportType === 'UNKNOWN') {
+    // 지원 유형을 모르면 대출인지도 모른다. 상환방식은 NOT_APPLICABLE이 아니라 UNKNOWN이다.
+    if (product.repaymentMethod !== 'UNKNOWN') {
+      collector.add(
+        'SUPPORT_TYPE_FINANCIAL_CONTRADICTION',
+        source,
+        '지원 유형이 확인되지 않았으면(UNKNOWN) 상환방식도 UNKNOWN이어야 합니다.',
+      );
+    }
+    if (product.interestRateConfirmed || structuredTerms) {
+      collector.add(
+        'SUPPORT_TYPE_FINANCIAL_CONTRADICTION',
+        source,
+        '지원 유형이 확인되지 않았는데 확정 금리·상환기간·거치 조건을 기록했습니다. 대출로 확인했으면 지원 유형을 LOAN으로 기록하세요.',
+      );
+    }
+  } else if (!repayable) {
     if (product.interestCondition !== null || product.repaymentCondition !== null) {
       collector.add(
         'SUPPORT_TYPE_FINANCIAL_CONTRADICTION',

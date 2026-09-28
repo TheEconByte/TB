@@ -298,6 +298,8 @@ enum FundingSupportType {
   LOAN
   SPACE
   PROGRAM
+  // 원문이 지원 유형을 알려 주지 않는 공고(기업마당 등). 상환 계산 대상이 아니다.
+  UNKNOWN
 }
 
 enum FundingApplicationStatus {

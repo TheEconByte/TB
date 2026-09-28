@@ -6,6 +6,7 @@ import {
   type FundingProduct,
 } from './schema.ts';
 import {
+  DISCOVERY_ONLY_SOURCES,
   FUNDING_SOURCE_LABELS,
   POLICY_LOAN_SUPPORT_TYPES,
   REPAYABLE_SUPPORT_TYPES,
@@ -16,7 +17,7 @@ import {
   isAutoReviewer,
   isPrimaryRetrievalMethod,
   isSupportedRepaymentMethod,
-  REQUIRED_EVIDENCE_SUBJECTS,
+  requiredEvidenceSubjects,
   reviewState,
   type BusinessStage,
   type EvidenceSubject,
@@ -182,6 +183,13 @@ function stageCondition(product: FundingProduct, profile: FundingProfile): Fundi
   if (profile.businessStage === 'UNKNOWN') {
     return { ...base, verdict: 'UNKNOWN', detail: '사업 단계가 입력되지 않아 대상 여부를 판정하지 않았습니다.' };
   }
+  if (product.eligibleBusinessStages.length === 0) {
+    return {
+      ...base,
+      verdict: 'UNKNOWN',
+      detail: '원문에서 신청 가능한 사업 단계를 확인하지 못했습니다. 원 공고에서 대상 여부를 확인해야 합니다.',
+    };
+  }
   const unverified = unverifiedCondition(product, 'BUSINESS_STAGE', base);
   if (unverified) return unverified;
   const stages = product.eligibleBusinessStages.map((stage) => STAGE_LABELS[stage]).join(', ');
@@ -283,6 +291,16 @@ function industryCondition(product: FundingProduct, profile: FundingProfile): Fu
 
 export function assessProductRepayment(product: FundingProduct): ProductRepaymentAvailability {
   const reasons = [...product.unsupportedCalculationReasons];
+  if (product.supportType === 'UNKNOWN') {
+    if (reasons.length === 0) reasons.push('지원 유형이 확인되지 않았습니다.');
+    return {
+      supported: false,
+      publicLimitKrw: null,
+      terms: null,
+      reasons: [...new Set(reasons)],
+      note: '지원 유형이 확인되지 않은 공고는 조달액으로 자동 반영하지 않으며 상환 계산 대상이 아닙니다.',
+    };
+  }
   if (!REPAYABLE_SUPPORT_TYPES.includes(product.supportType)) {
     if (reasons.length === 0) {
       reasons.push(`지원 유형 ${product.supportType}은(는) 대출 원금·상환 일정으로 변환하지 않습니다.`);
@@ -333,9 +351,7 @@ export function productAudience(product: FundingProduct): ProductAudience {
 }
 
 export function hasPrimaryEvidence(product: FundingProduct): boolean {
-  const subjects: EvidenceSubject[] = [...REQUIRED_EVIDENCE_SUBJECTS];
-  if (product.supportType === 'LOAN' || product.supportType === 'GUARANTEE') subjects.push('FINANCIAL_CONDITION');
-  return subjects.every((subject) =>
+  return requiredEvidenceSubjects(product).every((subject) =>
     product.evidence.some((entry) => entry.subject === subject && isPrimaryRetrievalMethod(entry.retrievalMethod)),
   );
 }
@@ -346,6 +362,9 @@ function automationHold(product: FundingProduct, automation: FundingAutomation):
   const refKey = sourceRefKey(product.sourceRef);
   const blocked = automation.blockedSources.find((entry) => sourceRefKey(entry) === refKey);
   if (blocked) return `운영자가 이 공고의 자동 승격을 막았습니다: ${blocked.reason}`;
+  if (DISCOVERY_ONLY_SOURCES.includes(product.sourceRef.source)) {
+    return `${FUNDING_SOURCE_LABELS[product.sourceRef.source]}에서 찾은 공고는 사업 단계·지원 유형을 알 수 없어 사람이 확인해야 현재 후보가 됩니다.`;
+  }
   if (!POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType)) {
     return '지원사업은 자동으로 모아도 사람이 확인해야 현재 후보가 됩니다.';
   }

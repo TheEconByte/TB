@@ -402,6 +402,113 @@ describe('automated products in the catalog (ADR 0006)', () => {
       sourceSyncs: [],
     });
   });
+
+  it('keeps a notice found only through Bizinfo out of current candidates even when every switch is on', () => {
+    const bizinfoSync = { ...succeededSync, source: 'BIZINFO' };
+    const parsed = catalogFrom(
+      validate(
+        catalog(
+          [
+            product({
+              reviewer: AUTO_REVIEWER,
+              nextReviewAt: null,
+              sourceRef: { source: 'BIZINFO', externalId: 'PBLN_TEST' },
+              industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 미확인' },
+            }),
+          ],
+          {
+            automation: automation({ policyLoanPromotion: true, repaymentPromotion: true, sourceSyncs: [bizinfoSync] }),
+          },
+        ),
+      ),
+    );
+    const evaluation = evaluateProduct(
+      parsed.products[0],
+      {
+        businessStage: 'PRE_REGISTRATION',
+        districtCode: '11200',
+        industryCode: 'CS100010',
+        purpose: 'OPERATING_FUNDS',
+      },
+      { asOfDate: REVIEW_DATE, automation: parsed.automation },
+    );
+    expect(evaluation.reviewState).toBe('CURRENT');
+    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toContain('기업마당 지원사업정보에서 찾은 공고');
+  });
+});
+
+describe('notices whose business stage or support type is unknown', () => {
+  const preProfile = {
+    businessStage: 'PRE_REGISTRATION',
+    districtCode: '11200',
+    industryCode: 'CS100010',
+    purpose: 'OPERATING_FUNDS',
+  } as const;
+  const unknownType = (overrides: Record<string, unknown> = {}) =>
+    product({
+      supportType: 'UNKNOWN',
+      publicLimit: null,
+      repaymentMethod: 'UNKNOWN',
+      unsupportedCalculationReasons: ['지원 유형이 확인되지 않았습니다.'],
+      evidence: [
+        evidence('identity', 'IDENTITY'),
+        evidence('period', 'APPLICATION_PERIOD'),
+        evidence('stage', 'BUSINESS_STAGE'),
+        evidence('region', 'REGION'),
+        evidence('purpose', 'PURPOSE'),
+        evidence('industry', 'INDUSTRY'),
+      ],
+      ...overrides,
+    });
+
+  it('accepts an empty stage list without stage evidence and keeps the stage unconfirmed', () => {
+    const validation = validate(
+      catalog([
+        product({
+          eligibleBusinessStages: [],
+          evidence: [
+            evidence('identity', 'IDENTITY'),
+            evidence('period', 'APPLICATION_PERIOD'),
+            evidence('financial', 'FINANCIAL_CONDITION'),
+            evidence('region', 'REGION'),
+            evidence('purpose', 'PURPOSE'),
+            evidence('industry', 'INDUSTRY'),
+          ],
+        }),
+      ]),
+    );
+    expect(validation.issues).toEqual([]);
+    const evaluation = evaluateProduct(catalogFrom(validation).products[0], preProfile, { asOfDate: REVIEW_DATE });
+    expect(evaluation.audience).toBe('UNKNOWN');
+    expect(evaluation.primaryEvidenceVerified).toBe(true);
+    expect(evaluation.conditions.find((condition) => condition.key === 'BUSINESS_STAGE')?.verdict).toBe('UNKNOWN');
+    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toContain('사업 단계를 확인하지 못했습니다');
+  });
+
+  it('accepts an unknown support type without financial evidence and never calculates its repayment', () => {
+    const validation = validate(catalog([unknownType()]));
+    expect(validation.issues).toEqual([]);
+    const repayment = assessProductRepayment(catalogFrom(validation).products[0]);
+    expect(repayment).toMatchObject({ supported: false, publicLimitKrw: null, terms: null });
+    expect(repayment.note).toContain('지원 유형이 확인되지 않은');
+  });
+
+  it('rejects an unknown support type recorded as not repayable or with confirmed lending terms', () => {
+    expect(issueCodes(validate(catalog([unknownType({ repaymentMethod: 'NOT_APPLICABLE' })])))).toContain(
+      'SUPPORT_TYPE_FINANCIAL_CONTRADICTION',
+    );
+    expect(
+      issueCodes(
+        validate(
+          catalog([
+            unknownType({ interestRateConfirmed: true, interestCondition: '연 3% 고정', interestRatePercent: '3' }),
+          ]),
+        ),
+      ),
+    ).toContain('SUPPORT_TYPE_FINANCIAL_CONTRADICTION');
+  });
 });
 
 describe('the reviewed 2026-09-20 catalog', () => {
@@ -700,7 +807,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   let client: PrismaClient | null = null;
   let startedAt = new Date(0);
   let previousActiveId: string | null = null;
-  const REAL_VERSION = '2026-09-28.1';
+  const REAL_VERSION = '2026-09-28.2';
   const REVIEWED_CATALOG_PATH = reviewedCatalogFile();
 
   const db = (): PrismaClient => {
