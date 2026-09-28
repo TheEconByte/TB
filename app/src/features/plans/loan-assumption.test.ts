@@ -21,7 +21,8 @@ import type { FinanceInput } from '@/features/finance/types';
 import { assessProductRepayment } from '@/features/funding/eligibility.ts';
 import { loadFundingCatalog } from '@/features/funding/loader.ts';
 import { fundingProductSchema } from '@/features/funding/schema.ts';
-import { FUNDING_CATALOG_SCHEMA_VERSION } from '@/features/funding/types.ts';
+import { todayInKst } from '@/features/funding/dates.ts';
+import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from '@/features/funding/types.ts';
 import {
   loanAssumptionFromProduct,
   planLoanAssumptionSchema,
@@ -156,7 +157,7 @@ function membership(product: Record<string, unknown>, position: number): Members
   return { position, productVersion: { productJson: product } };
 }
 
-function releaseRow(products: Membership[]) {
+function releaseRow(products: Membership[], automation: unknown = null) {
   return {
     id: 'release-1',
     catalogKey: 'test-catalog',
@@ -167,6 +168,7 @@ function releaseRow(products: Membership[]) {
     activatedAt: new Date('2026-09-20T03:00:00.000Z'),
     reviewer: 'test-reviewer',
     productCount: products.length,
+    automation,
     products,
   };
 }
@@ -346,13 +348,16 @@ describe('POST /api/plans/{planId}/loan-assumption 경계', () => {
     updateCount?: number;
     conflictRevision?: number;
     updated?: Record<string, unknown>;
+    automation?: unknown;
   }) {
     const findPlan = vi.fn();
     findPlan.mockResolvedValueOnce(options.plan ?? null);
     if (options.conflictRevision !== undefined) findPlan.mockResolvedValueOnce({ revision: options.conflictRevision });
     const updateMany = vi.fn().mockResolvedValue({ count: options.updateCount ?? 1 });
     const findUniqueOrThrow = vi.fn().mockResolvedValue(options.updated ?? { id: 'plan-a', revision: 2 });
-    const findRelease = vi.fn().mockResolvedValue(options.products ? releaseRow(options.products) : null);
+    const findRelease = vi
+      .fn()
+      .mockResolvedValue(options.products ? releaseRow(options.products, options.automation ?? null) : null);
     return {
       prisma: {
         plan: { findFirst: findPlan, updateMany, findUniqueOrThrow },
@@ -440,6 +445,49 @@ describe('POST /api/plans/{planId}/loan-assumption 경계', () => {
     expect(grantBody.error.message).toContain('상환 계산 대상이 아니');
     expect(grantBody.error.message).toMatch(/대출 원금|상환 일정/);
     expect(grant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('자동으로 모은 대출은 상환 계산 자동 승격이 켜져 있을 때만 적용한다', async () => {
+    const automated = [
+      membership(
+        rawProduct({
+          ...CONFIRMED_TERMS,
+          reviewer: AUTO_REVIEWER,
+          sourceRef: { source: 'SEMAS_OLS', externalId: 'test-fund' },
+          nextReviewAt: null,
+        }),
+        0,
+      ),
+    ];
+    const automation = (repaymentPromotion: boolean) => ({
+      policyLoanPromotion: true,
+      repaymentPromotion,
+      blockedSources: [],
+      sourceSyncs: [
+        {
+          source: 'SEMAS_OLS',
+          status: 'SUCCEEDED',
+          attemptedAt: new Date().toISOString(),
+          lastSucceededOn: todayInKst(),
+          fetchedCount: 1,
+          responseChecksum: null,
+          failureReason: null,
+        },
+      ],
+    });
+
+    const off = stubApply({ plan: planRow, products: automated, automation: automation(false) });
+    mocks.getPrisma.mockReturnValue(off.prisma);
+    const rejected = await applyLoanAssumption(applyRequest(body), context);
+    expect(rejected.status).toBe(400);
+    expect((await rejected.json()).error.message).toContain('상환 계산 자동 승격');
+    expect(off.updateMany).not.toHaveBeenCalled();
+
+    const on = stubApply({ plan: planRow, products: automated, automation: automation(true) });
+    mocks.getPrisma.mockReturnValue(on.prisma);
+    const applied = await applyLoanAssumption(applyRequest(body), context);
+    expect(applied.status).toBe(200);
+    expect(on.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('상환 조건이 확정돼도 현재 계획의 CURRENT_CANDIDATE가 아니면 적용을 거부한다', async () => {

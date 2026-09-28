@@ -1,7 +1,14 @@
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { fromDate } from './dates.ts';
-import { fundingProductSchema, type FundingCatalog, type FundingProduct } from './schema.ts';
-import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import {
+  defaultFundingAutomation,
+  fundingAutomationSchema,
+  fundingProductSchema,
+  type FundingAutomation,
+  type FundingCatalog,
+  type FundingProduct,
+} from './schema.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION, READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS } from './types.ts';
 
 // The active catalog is read through the release → membership → immutable
 // product version chain. The membership table keeps each release's own order,
@@ -16,6 +23,8 @@ export type ActiveFundingCatalog = {
   activatedAt: string | null;
   reviewer: string;
   productCount: number;
+  // 자동 승격 스위치·차단 목록·출처별 동기화 결과. v1.0.0 릴리스는 저장된 값이 없어 기본값(모두 꺼짐)이다.
+  automation: FundingAutomation;
   // 판정 함수가 그대로 쓰는 카탈로그. 저장된 상품 JSON을 다시 스키마로 검증한다.
   catalog: FundingCatalog;
 };
@@ -35,6 +44,7 @@ export async function findActiveFundingCatalog(prisma: PrismaClient): Promise<Ac
       reviewedAt: true,
       activatedAt: true,
       reviewer: true,
+      automation: true,
       products: {
         orderBy: { position: 'asc' },
         select: { position: true, productVersion: { select: { productJson: true } } },
@@ -42,7 +52,7 @@ export async function findActiveFundingCatalog(prisma: PrismaClient): Promise<Ac
     },
   });
   if (!release) return null;
-  if (release.schemaVersion !== FUNDING_CATALOG_SCHEMA_VERSION) {
+  if (!READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS.includes(release.schemaVersion)) {
     // 카탈로그를 읽을 수 없는 상태를 빈 후보로 속이지 않는다.
     throw new Error(
       `활성 자금 카탈로그의 스키마 버전(${release.schemaVersion})을 이 앱이 지원하지 않습니다. 카탈로그를 다시 검수해 적재하세요.`,
@@ -55,6 +65,8 @@ export async function findActiveFundingCatalog(prisma: PrismaClient): Promise<Ac
   const products: FundingProduct[] = ordered.map((membership) =>
     fundingProductSchema.parse(membership.productVersion.productJson),
   );
+  const automation =
+    release.automation === null ? defaultFundingAutomation() : fundingAutomationSchema.parse(release.automation);
 
   return {
     releaseId: release.id,
@@ -66,6 +78,7 @@ export async function findActiveFundingCatalog(prisma: PrismaClient): Promise<Ac
     activatedAt: release.activatedAt === null ? null : release.activatedAt.toISOString(),
     reviewer: release.reviewer,
     productCount: products.length,
+    automation,
     catalog: {
       catalogKey: release.catalogKey,
       schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
@@ -74,6 +87,7 @@ export async function findActiveFundingCatalog(prisma: PrismaClient): Promise<Ac
       reviewer: release.reviewer,
       // 카탈로그 notes는 릴리스에 저장하지 않는다. 판정에는 쓰이지 않는다.
       notes: [],
+      automation,
       products,
     },
   };

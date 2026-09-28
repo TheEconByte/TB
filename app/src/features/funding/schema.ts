@@ -4,6 +4,7 @@ import {
   BUSINESS_STAGES,
   EVIDENCE_SUBJECTS,
   FUNDING_CATALOG_SCHEMA_VERSION,
+  FUNDING_SOURCES,
   INDUSTRY_SCOPES,
   OBSERVED_APPLICATION_STATUSES,
   PURPOSES,
@@ -84,6 +85,11 @@ const evidenceSchema = z.object({
   checksum: sha256Hex.nullable(),
 });
 
+const sourceRefSchema = z.object({
+  source: z.enum(FUNDING_SOURCES),
+  externalId: z.string().trim().min(1).max(200),
+});
+
 export const fundingProductSchema = z.object({
   productKey: productKeySchema,
   version: productVersionSchema,
@@ -134,7 +140,42 @@ export const fundingProductSchema = z.object({
   additionalChecks: z.array(z.string().trim().min(1)).default([]),
   reviewer: z.string().trim().min(1),
   evidence: z.array(evidenceSchema).min(1, '상품마다 공식 원문 근거를 하나 이상 기록해 주세요.'),
+  // funding:sync가 모은 공고의 출처와 식별자. 사람이 기록한 상품도 같은 공고를 가리키면
+  // 적어 두며, 그때는 사람 기록이 자동 상품보다 우선한다. 기본값을 두지 않아 이 필드가
+  // 없는 기존 상품 버전의 저장 내용이 바뀌지 않는다.
+  sourceRef: sourceRefSchema.optional(),
 });
+
+// 출처별 동기화 결과. 자동 상품의 최신성(마지막 성공 동기화일)과 실패 사유를 남긴다.
+const sourceSyncSchema = z.object({
+  source: z.enum(FUNDING_SOURCES),
+  status: z.enum(['SUCCEEDED', 'FAILED']),
+  attemptedAt: z.iso.datetime(),
+  // 마지막으로 성공한 동기화의 한국 시간 날짜. 한 번도 성공하지 못했으면 null이다.
+  lastSucceededOn: isoDate.nullable(),
+  // 마지막 성공 동기화에서 받은 공고 수. 다음 동기화의 급감 판정에 쓴다.
+  fetchedCount: z.number().int().nonnegative().nullable(),
+  responseChecksum: sha256Hex.nullable(),
+  failureReason: z.string().trim().min(1).max(2000).nullable(),
+});
+
+const blockedSourceSchema = sourceRefSchema.extend({
+  reason: z.string().trim().min(1, '차단 사유를 입력해 주세요.'),
+});
+
+// 자동 상품의 승격 스위치와 차단 목록, 출처별 동기화 결과(ADR 0006). 스위치는 기본으로
+// 꺼져 있어, 사람이 켜기 전에는 자동 상품이 현재 후보나 상환 계산 가능으로 올라가지 않는다.
+export const fundingAutomationSchema = z.object({
+  policyLoanPromotion: z.boolean(),
+  repaymentPromotion: z.boolean(),
+  blockedSources: z.array(blockedSourceSchema),
+  sourceSyncs: z.array(sourceSyncSchema),
+});
+
+// 모든 스위치가 꺼진 기본 자동화 설정. 배열을 공유하지 않도록 매번 새 객체를 만든다.
+export function defaultFundingAutomation(): FundingAutomation {
+  return { policyLoanPromotion: false, repaymentPromotion: false, blockedSources: [], sourceSyncs: [] };
+}
 
 export const fundingCatalogSchema = z.object({
   catalogKey: productKeySchema,
@@ -144,11 +185,19 @@ export const fundingCatalogSchema = z.object({
   basisDate: isoDate,
   reviewer: z.string().trim().min(1),
   notes: z.array(z.string().trim().min(1)).default([]),
+  automation: fundingAutomationSchema.default(defaultFundingAutomation),
   products: z.array(fundingProductSchema).min(1, '상품을 하나 이상 기록해 주세요.'),
 });
 
 export type FundingProduct = z.infer<typeof fundingProductSchema>;
 export type FundingCatalog = z.infer<typeof fundingCatalogSchema>;
+export type FundingAutomation = z.infer<typeof fundingAutomationSchema>;
+export type FundingSourceSync = z.infer<typeof sourceSyncSchema>;
+export type FundingSourceRef = z.infer<typeof sourceRefSchema>;
+
+export function sourceRefKey(ref: FundingSourceRef): string {
+  return `${ref.source}:${ref.externalId}`;
+}
 export function productVersionKey(product: { productKey: string; version: string }): string {
   return `${product.productKey}@${product.version}`;
 }

@@ -20,6 +20,8 @@ next-env.d.ts
 
 # 공공 원본 데이터. 준비 방법은 docs/DEVELOPMENT.md의 로컬 데이터 준비를 따른다.
 data/raw/
+# funding:sync가 합친 자금 카탈로그. 적재한 릴리스의 원본이며 저장소에 넣지 않는다.
+data/funding-sync/
 
 # Claude Code 개인 설정. 팀 공통 설정은 .claude/settings.json에 둔다.
 .claude/settings.local.json

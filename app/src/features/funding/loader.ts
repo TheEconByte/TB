@@ -180,6 +180,7 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
         })),
       ),
       productVersions: products,
+      automation: catalog.automation,
       validationSummary: { checks, warnings, reviewOverdue, asOfDate: options.asOfDate, productCount: products.length },
       productCount: products.length,
     },

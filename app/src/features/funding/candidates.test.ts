@@ -14,7 +14,7 @@ import { POST as postCandidates } from '@/app/api/funding/candidates/route';
 import { listFundingCandidates, type FundingCandidatesResponse } from './candidates.ts';
 import { loadFundingCatalog } from './loader.ts';
 import { findActiveFundingCatalog } from './read.ts';
-import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 import type { FundingProfile } from './eligibility.ts';
 
 const TEST_DATE = '2026-09-20';
@@ -93,8 +93,11 @@ type StubMembership = { position: number; productVersion: { productJson: unknown
 
 type StubReleaseInput = {
   catalogVersion?: string;
+  schemaVersion?: string;
   basisDate?: string;
   reviewer?: string;
+  // 릴리스의 automation 열. 비어 있으면 실제 DB처럼 null이다.
+  automation?: unknown;
   products: StubMembership[];
 };
 
@@ -107,11 +110,12 @@ function stubPrisma(release: StubReleaseInput | null) {
           id: 'release-1',
           catalogKey: 'test-catalog',
           catalogVersion: release.catalogVersion ?? '2026-09-20.1',
-          schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
+          schemaVersion: release.schemaVersion ?? FUNDING_CATALOG_SCHEMA_VERSION,
           basisDate: new Date(`${release.basisDate ?? TEST_DATE}T00:00:00.000Z`),
           reviewedAt: new Date(`${TEST_DATE}T00:00:00.000Z`),
           activatedAt: new Date('2026-09-20T03:00:00.000Z'),
           reviewer: release.reviewer ?? 'test-reviewer',
+          automation: release.automation ?? null,
           products: release.products,
         },
   );
@@ -357,6 +361,16 @@ describe('후보 판정과 응답', () => {
     expect(payload.evaluations[0].candidateStatus).toBe('CURRENT_CANDIDATE');
   });
 
+  it('v1.0.0 스키마로 적재된 릴리스도 자동화 설정 없이 읽는다', async () => {
+    const { prisma } = stubPrisma({
+      schemaVersion: 'funding-catalog-v1.0.0',
+      products: [membership(rawProduct(), 0)],
+    });
+    const payload = await candidatesOf(prisma);
+    expect(payload.release.schemaVersion).toBe('funding-catalog-v1.0.0');
+    expect(payload.evaluations[0].candidateStatus).toBe('CURRENT_CANDIDATE');
+  });
+
   it('검수 기한이 지난 상품은 접수 중이어도 검수 기한 경과로 분리한다', async () => {
     const { prisma } = stubPrisma({
       products: [
@@ -516,6 +530,103 @@ describe('후보 판정과 응답', () => {
     });
     expect(payload.evaluations[1].repayment).toMatchObject({ supported: false, publicLimitKrw: null, terms: null });
     expect(payload.evaluations[1].repayment.reasons.join(' ')).toContain('상환기간');
+  });
+});
+
+describe('자동으로 모은 상품(ADR 0006)', () => {
+  const SOURCE_REF = { source: 'SEMAS_OLS', externalId: 'test-fund' };
+  const autoProduct = (overrides: Record<string, unknown> = {}) =>
+    rawProduct({ reviewer: AUTO_REVIEWER, sourceRef: SOURCE_REF, nextReviewAt: null, ...overrides });
+  const sync = (lastSucceededOn: string | null) => ({
+    source: 'SEMAS_OLS',
+    status: lastSucceededOn === null ? 'FAILED' : 'SUCCEEDED',
+    attemptedAt: '2026-09-20T01:00:00.000Z',
+    lastSucceededOn,
+    fetchedCount: lastSucceededOn === null ? null : 5,
+    responseChecksum: null,
+    failureReason: lastSucceededOn === null ? '테스트 실패' : null,
+  });
+  const automation = (overrides: Record<string, unknown> = {}) => ({
+    policyLoanPromotion: true,
+    repaymentPromotion: false,
+    blockedSources: [],
+    sourceSyncs: [sync(TEST_DATE)],
+    ...overrides,
+  });
+  const evaluate = async (product: Record<string, unknown>, automationValue: unknown, asOfDate: string = TEST_DATE) => {
+    const { prisma } = stubPrisma({ automation: automationValue, products: [membership(product, 0)] });
+    return (await candidatesOf(prisma, PRE_PROFILE, asOfDate)).evaluations[0];
+  };
+
+  it('출처의 마지막 성공 동기화가 3일 안이면 다음 검토일 없이도 현재 후보가 된다', async () => {
+    const lastDay = await evaluate(autoProduct(), automation(), '2026-09-23');
+    expect(lastDay.reviewState).toBe('CURRENT');
+    expect(lastDay.candidateStatus).toBe('CURRENT_CANDIDATE');
+  });
+
+  it('마지막 성공 동기화가 3일을 넘기거나 없으면 검수 기한 경과로 내린다', async () => {
+    const stale = await evaluate(autoProduct(), automation(), '2026-09-24');
+    expect(stale.candidateStatus).toBe('REVIEW_OVERDUE');
+    expect(stale.candidateReason).toContain('2026-09-20');
+    const neverSucceeded = await evaluate(autoProduct(), automation({ sourceSyncs: [sync(null)] }));
+    expect(neverSucceeded.candidateStatus).toBe('REVIEW_OVERDUE');
+    const noAutomation = await evaluate(autoProduct(), null);
+    expect(noAutomation.candidateStatus).toBe('REVIEW_OVERDUE');
+  });
+
+  it('정책자금 자동 승격이 꺼져 있으면 추가 확인에 머문다', async () => {
+    const evaluation = await evaluate(autoProduct(), automation({ policyLoanPromotion: false }));
+    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toContain('자동 승격이 꺼져');
+  });
+
+  it('차단 목록의 공고는 사유와 함께 추가 확인에 머문다', async () => {
+    const evaluation = await evaluate(
+      autoProduct(),
+      automation({ blockedSources: [{ ...SOURCE_REF, reason: '첨부에 음식점 제외 조항' }] }),
+    );
+    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toContain('첨부에 음식점 제외 조항');
+  });
+
+  it('지원사업 자동 상품은 조건을 모두 채워도 현재 후보가 되지 않는다', async () => {
+    const evaluation = await evaluate(
+      autoProduct({
+        supportType: 'GRANT',
+        repaymentMethod: 'NOT_APPLICABLE',
+        unsupportedCalculationReasons: ['지원금은 상환 계산 대상이 아닙니다.'],
+      }),
+      automation(),
+    );
+    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toContain('사람이 확인해야');
+  });
+
+  it('상환 계산 자동 승격이 꺼져 있으면 확정 조건이 있어도 상환 계산 대상이 아니다', async () => {
+    const confirmed = autoProduct({
+      interestCondition: '연 3.0% 고정',
+      interestRateConfirmed: true,
+      interestRatePercent: '3',
+      repaymentCondition: '5년(거치 1년 포함) 원금균등',
+      repaymentMethod: 'EQUAL_PRINCIPAL',
+      repaymentTermMonths: 60,
+      repaymentGraceMonths: 12,
+      unsupportedCalculationReasons: [],
+    });
+    const off = await evaluate(confirmed, automation());
+    expect(off.candidateStatus).toBe('CURRENT_CANDIDATE');
+    expect(off.repayment.supported).toBe(false);
+    expect(off.repayment.reasons.join(' ')).toContain('상환 계산 자동 승격');
+    const on = await evaluate(confirmed, automation({ repaymentPromotion: true }));
+    expect(on.repayment.supported).toBe(true);
+  });
+
+  it('사람이 기록한 상품은 자동화 설정과 상관없이 지금 규칙을 따른다', async () => {
+    const evaluation = await evaluate(
+      rawProduct({ sourceRef: SOURCE_REF }),
+      automation({ policyLoanPromotion: false, sourceSyncs: [] }),
+    );
+    expect(evaluation.candidateStatus).toBe('CURRENT_CANDIDATE');
   });
 });
 

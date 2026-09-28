@@ -120,6 +120,7 @@ function releaseRow(products: Membership[]) {
     reviewedAt: new Date(TEST_DATE + 'T00:00:00.000Z'),
     activatedAt: new Date('2026-09-20T03:00:00.000Z'),
     reviewer: 'test-reviewer',
+    automation: null,
     products,
   };
 }

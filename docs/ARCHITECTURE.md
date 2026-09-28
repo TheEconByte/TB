@@ -33,7 +33,7 @@ Operator load commands (*:load)
 | 임대료 참고 | `app/src/features/rent-benchmark` | rent-benchmarks API, `/`의 임대료 참고 패널 | `rent-benchmark.test.ts`, `rent-benchmark.spec.ts` | [rent-benchmark.md](domains/rent-benchmark.md) |
 | 프랜차이즈 참고 | `app/src/features/franchise` | franchises API, `/`의 프랜차이즈 참고 패널 | `franchise.test.ts`, `franchise.spec.ts` | [franchise.md](domains/franchise.md) |
 | 사업 조건 | `app/src/features/business-profile` | 계획 business-profile API, 입력 플로우 | `business-profile.test.ts`, `form.test.ts` | [business-profile.md](domains/business-profile.md) |
-| 자금 카탈로그·후보 | `app/src/features/funding`, `app/catalog/funding` | `/funding`, candidates API | `funding.test.ts`, `candidates.test.ts` | [funding.md](domains/funding.md) |
+| 자금 카탈로그·후보 | `app/src/features/funding`, `app/catalog/funding` | `/funding`, candidates API, `funding:sync` | `funding.test.ts`, `candidates.test.ts`, `sync.test.ts` | [funding.md](domains/funding.md) |
 | 인증·요청 보안 | `app/src/lib/auth.ts`, `session.ts`, `request-security.ts`, `rate-limit.ts` | `/api/auth/*`, 업무 API 공통 경계 | `request-security.test.ts`, 계획 API 테스트 | [security.md](domains/security.md) |
 
 ## 그 밖의 위치
