@@ -459,14 +459,23 @@ describe('condition verdicts and candidate status', () => {
     expect(evaluation.candidateStatus).toBe('NOT_ELIGIBLE');
   });
 
-  it('returns UNKNOWN when no condition fails but one is unknown', () => {
+  it('keeps an unknown industry as a pre-application check instead of blocking the candidate', () => {
     const unknownScope = product({
       industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 매핑 미검수' },
     });
     const parsed = catalogFrom(validate(catalog([unknownScope])));
     const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
     expect(evaluation.eligibilityVerdict).toBe<Verdict>('UNKNOWN');
+    expect(evaluation.candidateStatus).toBe('CURRENT_CANDIDATE');
+    expect(evaluation.manualChecks).toContain('업종: 업종 매핑 미검수');
+  });
+
+  it('still blocks a candidate whose region is unknown', () => {
+    const unknownRegion = product({ region: { scope: 'UNKNOWN', districtCodes: [], note: '지역 조건 미확인' } });
+    const parsed = catalogFrom(validate(catalog([unknownRegion])));
+    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
     expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
+    expect(evaluation.candidateReason).toBe('지역 조건 미확인');
   });
 
   it('keeps a post-registration product out of the pre-registration candidate group', () => {
