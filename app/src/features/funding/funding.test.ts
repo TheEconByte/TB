@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
-import { assessProductRepayment, evaluateCandidates, evaluateProduct, industryCodeIssue } from './eligibility.ts';
+import {
+  UNKNOWN_FUNDING_PROFILE,
+  assessProductRepayment,
+  evaluateCandidates,
+  evaluateProduct,
+  industryCodeIssue,
+} from './eligibility.ts';
 import { loadFundingCatalog, readFundingCatalogFile } from './loader.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
 import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION, combineVerdicts, type Verdict } from './types.ts';
@@ -508,6 +514,121 @@ describe('notices whose business stage or support type is unknown', () => {
         ),
       ),
     ).toContain('SUPPORT_TYPE_FINANCIAL_CONTRADICTION');
+  });
+});
+
+describe('policy fund and support program branches (ADR 0006)', () => {
+  const grant = (overrides: Record<string, unknown> = {}) =>
+    product({
+      productKey: 'test-grant',
+      supportType: 'GRANT',
+      publicLimit: null,
+      repaymentMethod: 'NOT_APPLICABLE',
+      unsupportedCalculationReasons: ['지원금은 상환하지 않습니다.'],
+      evidence: [
+        evidence('identity', 'IDENTITY'),
+        evidence('period', 'APPLICATION_PERIOD'),
+        evidence('stage', 'BUSINESS_STAGE'),
+        evidence('region', 'REGION'),
+        evidence('purpose', 'PURPOSE'),
+        evidence('industry', 'INDUSTRY'),
+      ],
+      ...overrides,
+    });
+  const unknownType = product({
+    productKey: 'test-unknown-type',
+    supportType: 'UNKNOWN',
+    publicLimit: null,
+    repaymentMethod: 'UNKNOWN',
+    unsupportedCalculationReasons: ['지원 유형이 확인되지 않았습니다.'],
+    evidence: [
+      evidence('identity', 'IDENTITY'),
+      evidence('period', 'APPLICATION_PERIOD'),
+      evidence('stage', 'BUSINESS_STAGE'),
+      evidence('region', 'REGION'),
+      evidence('purpose', 'PURPOSE'),
+      evidence('industry', 'INDUSTRY'),
+    ],
+  });
+
+  it('derives the branch from the support type and counts each branch separately', () => {
+    const parsed = catalogFrom(
+      validate(
+        catalog([
+          product(),
+          product({ productKey: 'test-guarantee', supportType: 'GUARANTEE', repaymentMethod: 'NOT_APPLICABLE' }),
+          grant(),
+          grant({ productKey: 'test-space', supportType: 'SPACE' }),
+          grant({ productKey: 'test-program', supportType: 'PROGRAM' }),
+          unknownType,
+        ]),
+      ),
+    );
+    const list = evaluateCandidates(parsed, UNKNOWN_FUNDING_PROFILE, { asOfDate: REVIEW_DATE });
+    expect(
+      Object.fromEntries(list.evaluations.map((evaluation) => [evaluation.productKey, evaluation.branch])),
+    ).toEqual({
+      'test-loan': 'POLICY_FUND',
+      'test-guarantee': 'POLICY_FUND',
+      'test-grant': 'SUPPORT_PROGRAM',
+      'test-space': 'SUPPORT_PROGRAM',
+      'test-program': 'SUPPORT_PROGRAM',
+      'test-unknown-type': 'UNCLASSIFIED',
+    });
+    expect(list.summaryByBranch.POLICY_FUND.total).toBe(2);
+    expect(list.summaryByBranch.SUPPORT_PROGRAM.total).toBe(3);
+    expect(list.summaryByBranch.UNCLASSIFIED.total).toBe(1);
+    for (const status of Object.keys(list.summary) as Array<keyof typeof list.summary>) {
+      expect(
+        list.summaryByBranch.POLICY_FUND[status] +
+          list.summaryByBranch.SUPPORT_PROGRAM[status] +
+          list.summaryByBranch.UNCLASSIFIED[status],
+      ).toBe(list.summary[status]);
+    }
+  });
+
+  it('shows the source and last confirmation only for automatically collected products', () => {
+    const parsed = catalogFrom(
+      validate(
+        catalog(
+          [
+            product(),
+            product({
+              productKey: 'test-auto-loan',
+              reviewer: AUTO_REVIEWER,
+              nextReviewAt: null,
+              sourceRef: { source: 'SEMAS_OLS', externalId: 'test-fund' },
+            }),
+          ],
+          {
+            automation: {
+              policyLoanPromotion: false,
+              repaymentPromotion: false,
+              blockedSources: [],
+              sourceSyncs: [
+                {
+                  source: 'SEMAS_OLS',
+                  status: 'FAILED',
+                  attemptedAt: '2026-09-20T01:00:00.000Z',
+                  lastSucceededOn: '2026-09-19',
+                  fetchedCount: 1,
+                  responseChecksum: null,
+                  failureReason: '출처 응답 500',
+                },
+              ],
+            },
+          },
+        ),
+      ),
+    );
+    const list = evaluateCandidates(parsed, UNKNOWN_FUNDING_PROFILE, { asOfDate: REVIEW_DATE });
+    const byKey = new Map(list.evaluations.map((evaluation) => [evaluation.productKey, evaluation]));
+    expect(byKey.get('test-loan')?.automation).toBeNull();
+    expect(byKey.get('test-auto-loan')?.automation).toEqual({
+      source: 'SEMAS_OLS',
+      sourceLabel: '소상공인시장진흥공단 정책자금 사이트',
+      lastSucceededOn: '2026-09-19',
+    });
   });
 });
 

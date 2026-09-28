@@ -58,6 +58,16 @@ export const REPAYABLE_SUPPORT_TYPES: readonly SupportType[] = ['LOAN'];
 // 프로그램(지원사업)은 자동으로 모아도 사람이 확인해야 현재 후보가 된다.
 export const POLICY_LOAN_SUPPORT_TYPES: readonly SupportType[] = ['LOAN', 'GUARANTEE'];
 
+// 후보 API와 화면의 갈래(ADR 0006 1절). 저장하지 않고 지원 유형에서 정하므로 카탈로그에는 없다.
+// 지원 유형을 모르는 공고는 정책자금·지원사업 어느 쪽으로도 추측하지 않고 따로 둔다.
+export const FUNDING_BRANCHES = ['POLICY_FUND', 'SUPPORT_PROGRAM', 'UNCLASSIFIED'] as const;
+export type FundingBranch = (typeof FUNDING_BRANCHES)[number];
+
+export function fundingBranch(supportType: SupportType): FundingBranch {
+  if (POLICY_LOAN_SUPPORT_TYPES.includes(supportType)) return 'POLICY_FUND';
+  return supportType === 'UNKNOWN' ? 'UNCLASSIFIED' : 'SUPPORT_PROGRAM';
+}
+
 export const BUSINESS_STAGES = ['PRE_REGISTRATION', 'POST_REGISTRATION'] as const;
 export type BusinessStage = (typeof BUSINESS_STAGES)[number];
 

@@ -9,7 +9,7 @@ import {
   type FundingCandidateStatus,
   type FundingProfile,
 } from './eligibility.ts';
-import type { ObservedApplicationStatus, ReviewState, SupportType, Verdict } from './types.ts';
+import type { FundingBranch, ObservedApplicationStatus, ReviewState, SupportType, Verdict } from './types.ts';
 
 // 페이지 단위 입력(/funding)과 저장된 계획 조건(/plans)이 같은 판정 결과를 같은
 // 모양으로 보여주도록 결과 표시를 한 곳에 둔다. 두 화면은 조회 진입점만 다르다.
@@ -49,6 +49,40 @@ const REVIEW_STATE_LABELS: Record<ReviewState, string> = {
   UNREVIEWED: '검수자 미지정',
   REVIEW_OVERDUE: '검수 기한 경과',
 };
+
+// 자동으로 모은 상품은 사람의 검수 대신 출처의 마지막 성공 확인으로 최신성을 판단한다.
+const AUTO_REVIEW_STATE_LABELS: Record<ReviewState, string> = {
+  CURRENT: '출처 확인 최신',
+  UNREVIEWED: '검수자 미지정',
+  REVIEW_OVERDUE: '출처 확인 끊김',
+};
+
+// 정책자금과 지원사업을 나눠 보여 준다(ADR 0006 1절). 유형을 모르는 공고는 어느 쪽으로도
+// 추측하지 않고 따로 보여 주며, 그런 공고가 있을 때만 표시한다.
+const BRANCHES: { branch: FundingBranch; title: string; note: string; hideWhenEmpty: boolean }[] = [
+  {
+    branch: 'POLICY_FUND',
+    title: '정책자금(대출·보증)',
+    note: '정책 대출과 보증입니다. 대출은 금리·기간·상환방식이 모두 확정된 상품만 상환 계산에 씁니다. 자동으로 모은 공고는 운영자가 자동 승격을 켰을 때만 검토 후보가 됩니다.',
+    hideWhenEmpty: false,
+  },
+  {
+    branch: 'SUPPORT_PROGRAM',
+    title: '지원사업(지원금·공간·프로그램)',
+    note: '상환하지 않는 지원금과 공간·교육 프로그램입니다. 조달액이나 대출 상환으로 계산하지 않습니다. 자동으로 찾은 공고는 사람이 확인해야 검토 후보가 됩니다.',
+    hideWhenEmpty: false,
+  },
+  {
+    branch: 'UNCLASSIFIED',
+    title: '유형 미확인',
+    note: '공고가 지원 유형을 알려 주지 않아 정책자금·지원사업 어느 쪽으로도 나누지 않았습니다. 원 공고에서 유형과 대상을 확인해 주세요.',
+    hideWhenEmpty: true,
+  },
+];
+
+function branchAnchor(branch: FundingBranch): string {
+  return `funding-branch-${branch.toLowerCase().replace('_', '-')}`;
+}
 
 // 결과는 현재 후보와 그렇지 않은 상태를 섞지 않고 나눠서 보여준다.
 const GROUPS: { status: FundingCandidateStatus; title: string; note: string; separated: boolean }[] = [
@@ -188,6 +222,7 @@ export function FundingCandidatesPanel({
 }) {
   const { summary } = result;
   const emptyProfile = isEmptyFundingProfile(result.profile);
+  const branches = BRANCHES.filter((entry) => !entry.hideWhenEmpty || result.summaryByBranch[entry.branch].total > 0);
   return (
     <>
       <section className="release-card" aria-labelledby="funding-release">
@@ -234,24 +269,23 @@ export function FundingCandidatesPanel({
         <p className="picker-note">판정에 쓴 조건: {profileSummary}</p>
       </section>
 
-      <section className="status-counts" aria-label="상태별 개수">
-        {GROUPS.map((group) => (
-          <div key={group.status} className={`status-count count-${group.status.toLowerCase()}`}>
-            <span>{group.title}</span>
-            <strong>{numberFormat.format(summary[group.status])}건</strong>
-          </div>
-        ))}
-        <div className="status-count count-total">
-          <span>전체 상품</span>
-          <strong>{numberFormat.format(summary.total)}건</strong>
-        </div>
-      </section>
-
       {summary.total === 0 && (
         <div className="empty-panel" role="status">
           <h2>활성 카탈로그에 상품이 없습니다.</h2>
           <p>카탈로그에 적재된 상품이 없습니다. 후보 0건과 카탈로그 없음은 다른 상태입니다.</p>
         </div>
+      )}
+
+      {summary.total > 0 && (
+        <nav className="branch-overview" aria-label="자금 갈래">
+          {branches.map(({ branch, title }) => (
+            <a key={branch} href={`#${branchAnchor(branch)}`} className={`branch-card branch-${branch.toLowerCase()}`}>
+              <span>{title}</span>
+              <strong>검토 후보 {numberFormat.format(result.summaryByBranch[branch].CURRENT_CANDIDATE)}건</strong>
+              <small>전체 {numberFormat.format(result.summaryByBranch[branch].total)}건</small>
+            </a>
+          ))}
+        </nav>
       )}
 
       {summary.total > 0 && summary.CURRENT_CANDIDATE === 0 && (
@@ -266,20 +300,68 @@ export function FundingCandidatesPanel({
         </div>
       )}
 
-      {GROUPS.map((group) => {
-        const items = result.evaluations.filter((evaluation) => evaluation.candidateStatus === group.status);
-        return (
-          <section key={group.status} className={`candidate-group${group.separated ? ' separated-group' : ''}`}>
-            <div className="group-head">
-              <h2>{group.title}</h2>
-              <span>{numberFormat.format(items.length)}건</span>
-            </div>
-            <p className="group-note">
-              {group.separated && <strong className="separated-tag">현재 후보와 분리</strong>} {group.note}
-            </p>
-            {items.length === 0 ? (
-              <p className="empty-state">해당하는 상품이 없습니다.</p>
-            ) : (
+      {summary.total > 0 &&
+        branches.map(({ branch, title, note }) => (
+          <BranchSection
+            key={branch}
+            branch={branch}
+            title={title}
+            note={note}
+            evaluations={result.evaluations.filter((evaluation) => evaluation.branch === branch)}
+            branchSummary={result.summaryByBranch[branch]}
+            apply={apply}
+          />
+        ))}
+    </>
+  );
+}
+
+function BranchSection({
+  branch,
+  title,
+  note,
+  evaluations,
+  branchSummary,
+  apply,
+}: {
+  readonly branch: FundingBranch;
+  readonly title: string;
+  readonly note: string;
+  readonly evaluations: readonly FundingCandidateEvaluation[];
+  readonly branchSummary: FundingCandidatesResponse['summary'];
+  readonly apply?: FundingApplyContext;
+}) {
+  const anchor = branchAnchor(branch);
+  return (
+    <section id={anchor} className="funding-branch" aria-labelledby={`${anchor}-title`}>
+      <div className="branch-head">
+        <h2 id={`${anchor}-title`}>{title}</h2>
+        <span>{numberFormat.format(branchSummary.total)}건</span>
+      </div>
+      <p className="branch-note">{note}</p>
+      <div className="status-counts branch-counts" aria-label={`${title} 상태별 개수`}>
+        {GROUPS.map((group) => (
+          <div key={group.status} className={`status-count count-${group.status.toLowerCase()}`}>
+            <span>{group.title}</span>
+            <strong>{numberFormat.format(branchSummary[group.status])}건</strong>
+          </div>
+        ))}
+      </div>
+      {evaluations.length === 0 ? (
+        <p className="empty-state">이 갈래에 적재된 상품이 없습니다.</p>
+      ) : (
+        GROUPS.map((group) => {
+          const items = evaluations.filter((evaluation) => evaluation.candidateStatus === group.status);
+          if (items.length === 0) return null;
+          return (
+            <div key={group.status} className={`candidate-group${group.separated ? ' separated-group' : ''}`}>
+              <div className="group-head">
+                <h3>{group.title}</h3>
+                <span>{numberFormat.format(items.length)}건</span>
+              </div>
+              <p className="group-note">
+                {group.separated && <strong className="separated-tag">현재 후보와 분리</strong>} {group.note}
+              </p>
               <div className="candidate-list">
                 {items.map((evaluation) => (
                   <CandidateCard
@@ -289,11 +371,11 @@ export function FundingCandidatesPanel({
                   />
                 ))}
               </div>
-            )}
-          </section>
-        );
-      })}
-    </>
+            </div>
+          );
+        })
+      )}
+    </section>
   );
 }
 
@@ -318,10 +400,11 @@ function CandidateCard({
     <article className="candidate-card">
       <div className="candidate-head">
         <div>
-          <h3>{evaluation.name}</h3>
+          <h4>{evaluation.name}</h4>
           <p className="candidate-org">{evaluation.organization}</p>
         </div>
         <div className="candidate-tags">
+          {evaluation.automation && <span className="auto-badge">자동 확인</span>}
           <span className={`support-badge support-${evaluation.supportType.toLowerCase()}`}>
             {SUPPORT_TYPE_LABELS[evaluation.supportType]}
           </span>
@@ -347,13 +430,23 @@ function CandidateCard({
             {formatFundingDate(evaluation.observedAt)} 확인
           </dd>
         </div>
-        <div>
-          <dt>검수 상태</dt>
-          <dd>
-            {REVIEW_STATE_LABELS[evaluation.reviewState]} · 검수일 {formatFundingDate(evaluation.reviewedAt)} · 다음
-            검토일 {formatFundingDate(evaluation.nextReviewAt)}
-          </dd>
-        </div>
+        {evaluation.automation ? (
+          <div>
+            <dt>확인 방식</dt>
+            <dd>
+              자동 확인({AUTO_REVIEW_STATE_LABELS[evaluation.reviewState]}) · 출처 {evaluation.automation.sourceLabel} ·
+              마지막 확인일 {formatFundingDate(evaluation.automation.lastSucceededOn)}
+            </dd>
+          </div>
+        ) : (
+          <div>
+            <dt>검수 상태</dt>
+            <dd>
+              {REVIEW_STATE_LABELS[evaluation.reviewState]} · 검수일 {formatFundingDate(evaluation.reviewedAt)} · 다음
+              검토일 {formatFundingDate(evaluation.nextReviewAt)}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>자격 판정</dt>
           <dd>{VERDICT_LABELS[evaluation.eligibilityVerdict]}</dd>
@@ -392,7 +485,7 @@ function CandidateCard({
 
       <div className="candidate-detail">
         <div>
-          <h4>신청 전 추가 확인</h4>
+          <h5>신청 전 추가 확인</h5>
           {evaluation.manualChecks.length === 0 ? (
             <p className="empty-state">기록된 추가 확인 항목이 없습니다.</p>
           ) : (
@@ -404,7 +497,7 @@ function CandidateCard({
           )}
         </div>
         <div>
-          <h4>상환 계산 가능 여부</h4>
+          <h5>상환 계산 가능 여부</h5>
           {repayment.supported && repayment.terms ? (
             <>
               <p className="repayment-ok">
@@ -468,7 +561,7 @@ function CandidateCard({
 
       <p className="source-link">
         <a href={evaluation.officialUrl} target="_blank" rel="noreferrer">
-          공식 원문 열기
+          {evaluation.automation ? '원 공고 열기' : '공식 원문 열기'}
         </a>
       </p>
     </article>
