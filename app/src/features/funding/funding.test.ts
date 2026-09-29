@@ -380,6 +380,23 @@ describe('automated products in the catalog (ADR 0006)', () => {
     expect(stale.reviewOverdue).toEqual(['test-loan@1.0.0']);
   });
 
+  it('lets an automated product keep the checksum of a crawled web page, but not a manual product', () => {
+    const crawled = (BASE_PRODUCT.evidence as Record<string, unknown>[]).map((entry) => ({
+      ...entry,
+      checksum: 'a'.repeat(64),
+    }));
+    const automated = validate(
+      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null, evidence: crawled })], {
+        automation: automation(),
+      }),
+    );
+    expect(issueCodes(automated)).not.toContain('EVIDENCE_CHECKSUM_NOT_APPLICABLE');
+    expect(automated.ok).toBe(true);
+
+    const manual = validate(catalog([product({ evidence: crawled })]));
+    expect(issueCodes(manual)).toContain('EVIDENCE_CHECKSUM_NOT_APPLICABLE');
+  });
+
   it('rejects an automated reviewer without a source reference', () => {
     const validation = validate(catalog([product({ reviewer: AUTO_REVIEWER, nextReviewAt: null })]));
     expect(issueCodes(validation)).toContain('AUTO_REVIEWER_WITHOUT_SOURCE');

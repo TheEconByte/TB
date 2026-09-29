@@ -5,6 +5,7 @@ import { PrismaClient } from '../src/generated/prisma/client.ts';
 import { secretMasker } from '../src/features/market/seoul-api.ts';
 import { todayInKst } from '../src/features/funding/dates.ts';
 import { createBizinfoAdapter } from '../src/features/funding/sources/bizinfo.ts';
+import { createSemasOlsAdapter } from '../src/features/funding/sources/semas-ols.ts';
 import { runFundingSync, type FundingSourceAdapter } from '../src/features/funding/sync.ts';
 import { FundingCatalogError } from '../src/features/funding/validation.ts';
 
@@ -12,8 +13,9 @@ const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json',
 const DEFAULT_OUTPUT_DIR = fileURLToPath(new URL('../../data/funding-sync/', import.meta.url));
 
 // funding:sync가 공고를 모으는 출처별 수집기. ADR 0006의 출처 확인(robots.txt·약관)을 거친 출처만 등록한다.
-// 키가 없어도 등록한다. 그러면 그 출처는 실패로 기록되고, 직전 릴리스의 상품이 그대로 남는다.
+// 키·연락처가 없어도 등록한다. 그러면 그 출처는 실패로 기록되고, 직전 릴리스의 상품이 그대로 남는다.
 const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [
+  createSemasOlsAdapter({ contact: process.env.FUNDING_SYNC_CONTACT }),
   createBizinfoAdapter({ apiKey: process.env.BIZINFO_API_KEY }),
 ];
 
@@ -30,6 +32,9 @@ const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하�
 환경변수:
   DATABASE_URL       PostgreSQL 연결 문자열
   BIZINFO_API_KEY    기업마당 지원사업정보 API 인증키. 없으면 기업마당 출처는 실패로 기록됩니다
+  FUNDING_SYNC_CONTACT
+                     소진공 정책자금 사이트 요청의 User-Agent에 밝힐 운영자 연락처(메일 주소나 웹 주소, ASCII).
+                     없으면 소진공 출처는 실패로 기록됩니다
 
 옵션:
   --catalog <경로>      사람이 관리하는 카탈로그 JSON (기본값: app/catalog/funding/catalog.json)
@@ -39,6 +44,7 @@ const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하�
 
 동작:
   - 웹 요청 중에는 실행하지 않습니다. 운영자나 정기 실행이 하루 한 번 실행합니다.
+  - 소진공 정책자금 사이트는 요청 사이 1초 이상 쉬며 읽고, 403·429·자동 입력 방지 화면이나 robots.txt 변경을 만나면 그 출처를 멈춥니다.
   - 출처가 실패하면(장애, 빈 응답, 직전 성공 대비 절반 미만, 검증 실패) 그 출처의 상품은 직전 ACTIVE 릴리스의 것을 그대로 두고 마지막 성공일도 그대로 둡니다.
   - 자동 상품은 출처의 마지막 성공 동기화가 3일을 넘기면 현재 후보에서 빠집니다.
   - 사람이 기록한 상품이 같은 공고를 가리키면 사람 기록이 우선합니다.
