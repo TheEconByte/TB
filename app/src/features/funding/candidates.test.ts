@@ -720,7 +720,12 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('PostgreSQL에서 활성 카탈�
     expect(payload.evaluations.map((evaluation) => evaluation.productKey)).toEqual(SOURCE_ORDER);
     for (const evaluation of payload.evaluations) {
       expect(evaluation.repayment.supported).toBe(false);
+      expect(evaluation.automation).toBeNull();
     }
+    // 서울시 육성자금 대출 3건은 정책자금, 예비창업패키지(지원금)와 창업센터 입주(공간)는 지원사업이다.
+    expect(payload.summaryByBranch.POLICY_FUND).toMatchObject({ total: 3, POST_REGISTRATION: 3 });
+    expect(payload.summaryByBranch.SUPPORT_PROGRAM).toMatchObject({ total: 2, CLOSED: 1, REVIEW_OVERDUE: 1 });
+    expect(payload.summaryByBranch.UNCLASSIFIED.total).toBe(0);
   });
 
   it('사업자등록 이후 프로필에서는 등록 이후 검토 상품이 추가 확인으로 바뀐다', async () => {

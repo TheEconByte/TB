@@ -7,12 +7,14 @@ import {
 } from './schema.ts';
 import {
   DISCOVERY_ONLY_SOURCES,
+  FUNDING_BRANCHES,
   FUNDING_SOURCE_LABELS,
   POLICY_LOAN_SUPPORT_TYPES,
   REPAYABLE_SUPPORT_TYPES,
   SOURCE_FRESHNESS_DAYS,
   combineVerdicts,
   compareIsoDates,
+  fundingBranch,
   INDUSTRY_CODE_PATTERN,
   isAutoReviewer,
   isPrimaryRetrievalMethod,
@@ -21,6 +23,8 @@ import {
   reviewState,
   type BusinessStage,
   type EvidenceSubject,
+  type FundingBranch,
+  type FundingSource,
   type ObservedApplicationStatus,
   type Purpose,
   type ReviewState,
@@ -84,12 +88,24 @@ export type ProductLoanTerms = {
   repaymentMethod: 'EQUAL_INSTALLMENT' | 'EQUAL_PRINCIPAL';
 };
 
+// 자동으로 모은 상품의 출처 표시. 화면은 "자동 확인"과 함께 출처와 마지막 성공 확인일을 보여 준다.
+export type FundingEvaluationAutomation = {
+  source: FundingSource;
+  sourceLabel: string;
+  // 출처의 마지막 성공 동기화일(한국 시간). 한 번도 성공하지 못했으면 null이다.
+  lastSucceededOn: string | null;
+};
+
 export type FundingCandidateEvaluation = {
   productKey: string;
   version: string;
   name: string;
   organization: string;
   supportType: SupportType;
+  // 정책자금·지원사업·유형 미확인 갈래. 지원 유형에서 정한다(ADR 0006 1절).
+  branch: FundingBranch;
+  // 자동으로 모은 상품이면 출처 정보, 사람이 기록한 상품이면 null이다.
+  automation: FundingEvaluationAutomation | null;
   observedApplicationStatus: ObservedApplicationStatus;
   observedAt: string;
   reviewedAt: string | null;
@@ -119,6 +135,8 @@ export type FundingCandidateList = {
   profile: FundingProfile;
   evaluations: FundingCandidateEvaluation[];
   summary: FundingCandidateSummary;
+  // 갈래별 상태 개수. 모든 갈래의 합이 summary다.
+  summaryByBranch: Record<FundingBranch, FundingCandidateSummary>;
 };
 
 const STAGE_LABELS: Record<BusinessStage, string> = {
@@ -365,6 +383,9 @@ function automationHold(product: FundingProduct, automation: FundingAutomation):
   if (DISCOVERY_ONLY_SOURCES.includes(product.sourceRef.source)) {
     return `${FUNDING_SOURCE_LABELS[product.sourceRef.source]}에서 찾은 공고는 사업 단계·지원 유형을 알 수 없어 사람이 확인해야 현재 후보가 됩니다.`;
   }
+  if (product.supportType === 'UNKNOWN') {
+    return '지원 유형이 확인되지 않은 공고는 자동으로 모아도 사람이 확인해야 현재 후보가 됩니다.';
+  }
   if (!POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType)) {
     return '지원사업은 자동으로 모아도 사람이 확인해야 현재 후보가 됩니다.';
   }
@@ -403,6 +424,11 @@ export function evaluateProduct(
   const audience = productAudience(product);
   const state = reviewState(product, options.asOfDate, automation.sourceSyncs);
   const automated = isAutoReviewer(product.reviewer);
+  const source = automated ? product.sourceRef?.source : undefined;
+  const lastSucceededOn =
+    source === undefined
+      ? null
+      : (automation.sourceSyncs.find((entry) => entry.source === source)?.lastSucceededOn ?? null);
   const hold = automationHold(product, automation);
   const repayment = repaymentFor(product, automation);
   const primaryEvidenceVerified = hasPrimaryEvidence(product);
@@ -424,10 +450,8 @@ export function evaluateProduct(
   let candidateStatus: FundingCandidateStatus;
   let candidateReason: string;
   if (state === 'REVIEW_OVERDUE' && automated) {
-    const source = product.sourceRef?.source;
-    const lastSucceededOn = automation.sourceSyncs.find((entry) => entry.source === source)?.lastSucceededOn ?? '없음';
     candidateStatus = 'REVIEW_OVERDUE';
-    candidateReason = `자동으로 모은 출처(${source ? FUNDING_SOURCE_LABELS[source] : '없음'})의 마지막 성공 확인일 ${lastSucceededOn}이(가) 기준일 ${options.asOfDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없어 재확인 전에는 현재 후보로 표시하지 않습니다.`;
+    candidateReason = `자동으로 모은 출처(${source ? FUNDING_SOURCE_LABELS[source] : '없음'})의 마지막 성공 확인일 ${lastSucceededOn ?? '없음'}이(가) 기준일 ${options.asOfDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없어 재확인 전에는 현재 후보로 표시하지 않습니다.`;
   } else if (state === 'REVIEW_OVERDUE') {
     candidateStatus = 'REVIEW_OVERDUE';
     candidateReason = `다음 검토일 ${product.nextReviewAt ?? '없음'}이(가) 기준일 ${options.asOfDate} 이전이라 재확인 전에는 현재 후보로 표시하지 않습니다.`;
@@ -475,6 +499,8 @@ export function evaluateProduct(
     name: product.name,
     organization: product.organization,
     supportType: product.supportType,
+    branch: fundingBranch(product.supportType),
+    automation: source === undefined ? null : { source, sourceLabel: FUNDING_SOURCE_LABELS[source], lastSucceededOn },
     observedApplicationStatus: product.observedApplicationStatus,
     observedAt: product.observedAt,
     reviewedAt: product.reviewedAt,
@@ -501,16 +527,17 @@ export function evaluateCandidates(
   const evaluations = catalog.products.map((product) =>
     evaluateProduct(product, profile, { asOfDate: options.asOfDate, automation: catalog.automation }),
   );
-  const summary = {
-    total: evaluations.length,
-    CURRENT_CANDIDATE: 0,
-    NEEDS_CONFIRMATION: 0,
-    NOT_ELIGIBLE: 0,
-    POST_REGISTRATION: 0,
-    CLOSED: 0,
-    REVIEW_OVERDUE: 0,
-  } satisfies FundingCandidateSummary;
-  for (const evaluation of evaluations) summary[evaluation.candidateStatus] += 1;
+  const summary = emptySummary();
+  const summaryByBranch = Object.fromEntries(FUNDING_BRANCHES.map((branch) => [branch, emptySummary()])) as Record<
+    FundingBranch,
+    FundingCandidateSummary
+  >;
+  for (const evaluation of evaluations) {
+    for (const target of [summary, summaryByBranch[evaluation.branch]]) {
+      target.total += 1;
+      target[evaluation.candidateStatus] += 1;
+    }
+  }
   return {
     asOfDate: options.asOfDate,
     basisDate: catalog.basisDate,
@@ -519,5 +546,18 @@ export function evaluateCandidates(
     profile,
     evaluations,
     summary,
+    summaryByBranch,
+  };
+}
+
+function emptySummary(): FundingCandidateSummary {
+  return {
+    total: 0,
+    CURRENT_CANDIDATE: 0,
+    NEEDS_CONFIRMATION: 0,
+    NOT_ELIGIBLE: 0,
+    POST_REGISTRATION: 0,
+    CLOSED: 0,
+    REVIEW_OVERDUE: 0,
   };
 }

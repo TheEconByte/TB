@@ -921,6 +921,83 @@ footer {
 .status-count.count-total {
   border-left: 4px solid var(--ink);
 }
+.branch-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.branch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--ink);
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.branch-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.branch-card strong {
+  font-size: 19px;
+  letter-spacing: -0.5px;
+}
+.branch-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.branch-card.branch-policy_fund {
+  border-top-color: #8a5320;
+}
+.branch-card.branch-support_program {
+  border-top-color: #245c39;
+}
+.branch-card.branch-unclassified {
+  border-top-color: #8f9c93;
+}
+.funding-branch {
+  margin: 34px 0 12px;
+  scroll-margin-top: 16px;
+}
+.branch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--ink);
+}
+.branch-head h2 {
+  margin: 0;
+  font-size: 22px;
+  word-break: keep-all;
+}
+.branch-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+.branch-note {
+  margin: 10px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.status-counts.branch-counts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+.status-counts.branch-counts .status-count {
+  padding: 10px 14px;
+}
+.status-counts.branch-counts strong {
+  font-size: 16px;
+}
 .candidate-group {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -938,9 +1015,9 @@ footer {
   justify-content: space-between;
   gap: 12px;
 }
-.group-head h2 {
+.group-head h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 19px;
 }
 .group-head span {
   color: var(--muted);
@@ -978,7 +1055,7 @@ footer {
   gap: 14px;
   align-items: flex-start;
 }
-.candidate-head h3 {
+.candidate-head h4 {
   margin: 0;
   font-size: 17px;
   word-break: keep-all;
@@ -996,6 +1073,7 @@ footer {
   flex: 0 0 auto;
 }
 .support-badge,
+.auto-badge,
 .candidate-status {
   display: inline-block;
   padding: 4px 11px;
@@ -1027,6 +1105,10 @@ footer {
 .support-unknown {
   background: #ecebe6;
   color: #4c4a3d;
+}
+.auto-badge {
+  background: #e7edf6;
+  color: #2c4a72;
 }
 .candidate-status {
   background: #e3e0d4;
@@ -1106,7 +1188,7 @@ footer {
   gap: 20px;
   margin-top: 18px;
 }
-.candidate-detail h4 {
+.candidate-detail h5 {
   margin: 0 0 8px;
   font-size: 14px;
 }
@@ -1142,6 +1224,9 @@ footer {
 @media (max-width: 560px) {
   .status-counts {
     grid-template-columns: 1fr;
+  }
+  .status-counts.branch-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .candidate-group {
     padding: 18px;
