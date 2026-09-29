@@ -420,6 +420,26 @@ describe('the reviewed 2026-09-20 catalog', () => {
       expect(repayment.reasons.length).toBeGreaterThan(0);
     }
   });
+
+  it('shows the announced limit as recorded without turning it into a repayment term', () => {
+    const parsed = catalogFrom(validate(REAL_CATALOG));
+    const startupFund = parsed.products.find((entry) => entry.productKey === 'seoul-fund-2026-startup-company')!;
+    const evaluation = evaluateProduct(
+      startupFund,
+      { businessStage: 'POST_REGISTRATION', districtCode: '11440', industryCode: 'CS100001', purpose: 'UNKNOWN' },
+      { asOfDate: '2026-09-20' },
+    );
+    expect(evaluation.announcement).toEqual({
+      publicLimitKrw: startupFund.publicLimit,
+      interestCondition: startupFund.interestCondition,
+      repaymentCondition: startupFund.repaymentCondition,
+      applicationPeriod: startupFund.applicationPeriod,
+    });
+    expect(evaluation.announcement.publicLimitKrw).toBe('100000000');
+    expect(evaluation.repayment.publicLimitKrw).toBeNull();
+    expect(evaluation.repayment.supported).toBe(false);
+    expect(evaluation.candidateStatus).not.toBe('CURRENT_CANDIDATE');
+  });
 });
 
 describe('condition verdicts and candidate status', () => {
