@@ -18,7 +18,7 @@ const numberFormat = new Intl.NumberFormat('ko-KR');
 
 // 지원 유형은 대출과 다른 성격을 이름부터 구분한다. GRANT·SPACE·PROGRAM을
 // 대출처럼 보이게 하는 표현을 쓰지 않는다.
-const SUPPORT_TYPE_LABELS: Record<SupportType, string> = {
+export const SUPPORT_TYPE_LABELS: Record<SupportType, string> = {
   GRANT: '지원금(상환 없음)',
   GUARANTEE: '보증(대출 아님)',
   LOAN: '대출(상환 대상)',
@@ -26,7 +26,7 @@ const SUPPORT_TYPE_LABELS: Record<SupportType, string> = {
   PROGRAM: '프로그램(대출 아님)',
 };
 
-const STATUS_LABELS: Record<FundingCandidateStatus, string> = {
+export const STATUS_LABELS: Record<FundingCandidateStatus, string> = {
   CURRENT_CANDIDATE: '검토 후보',
   NEEDS_CONFIRMATION: '추가 확인 필요',
   NOT_ELIGIBLE: '조건 미충족',
@@ -35,15 +35,15 @@ const STATUS_LABELS: Record<FundingCandidateStatus, string> = {
   REVIEW_OVERDUE: '검수 기한 경과',
 };
 
-const VERDICT_LABELS: Record<Verdict, string> = { PASS: '충족', FAIL: '미충족', UNKNOWN: '미확인' };
+export const VERDICT_LABELS: Record<Verdict, string> = { PASS: '충족', FAIL: '미충족', UNKNOWN: '미확인' };
 
-const APPLICATION_STATUS_LABELS: Record<ObservedApplicationStatus, string> = {
+export const APPLICATION_STATUS_LABELS: Record<ObservedApplicationStatus, string> = {
   OPEN: '접수 중으로 확인',
   CLOSED: '접수 종료로 확인',
   UNKNOWN: '접수 상태 미확인',
 };
 
-const REVIEW_STATE_LABELS: Record<ReviewState, string> = {
+export const REVIEW_STATE_LABELS: Record<ReviewState, string> = {
   CURRENT: '검수 최신',
   UNREVIEWED: '검수자 미지정',
   REVIEW_OVERDUE: '검수 기한 경과',
@@ -296,6 +296,40 @@ export function FundingCandidatesPanel({
   );
 }
 
+export function ConditionTable({ evaluation }: { readonly evaluation: FundingCandidateEvaluation }) {
+  return (
+    <div className="table-scroll">
+      <table className="condition-table">
+        <caption>조건별 판정과 이유</caption>
+        <thead>
+          <tr>
+            <th scope="col">조건</th>
+            <th scope="col">판정</th>
+            <th scope="col">이유</th>
+            <th scope="col">근거</th>
+          </tr>
+        </thead>
+        <tbody>
+          {evaluation.conditions.map((condition) => (
+            <tr key={condition.key}>
+              <th scope="row">{condition.label}</th>
+              <td>
+                <span className={`verdict verdict-${condition.verdict.toLowerCase()}`}>
+                  {VERDICT_LABELS[condition.verdict]}
+                </span>
+              </td>
+              <td className="reason-cell">{condition.detail}</td>
+              <td className="reason-cell">
+                {condition.evidenceIds.length === 0 ? '기록 없음' : condition.evidenceIds.join(', ')}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CandidateCard({
   evaluation,
   apply,
@@ -359,35 +393,7 @@ function CandidateCard({
         </div>
       </dl>
 
-      <div className="table-scroll">
-        <table className="condition-table">
-          <caption>조건별 판정과 이유</caption>
-          <thead>
-            <tr>
-              <th scope="col">조건</th>
-              <th scope="col">판정</th>
-              <th scope="col">이유</th>
-              <th scope="col">근거</th>
-            </tr>
-          </thead>
-          <tbody>
-            {evaluation.conditions.map((condition) => (
-              <tr key={condition.key}>
-                <th scope="row">{condition.label}</th>
-                <td>
-                  <span className={`verdict verdict-${condition.verdict.toLowerCase()}`}>
-                    {VERDICT_LABELS[condition.verdict]}
-                  </span>
-                </td>
-                <td className="reason-cell">{condition.detail}</td>
-                <td className="reason-cell">
-                  {condition.evidenceIds.length === 0 ? '기록 없음' : condition.evidenceIds.join(', ')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ConditionTable evaluation={evaluation} />
 
       <div className="candidate-detail">
         <div>

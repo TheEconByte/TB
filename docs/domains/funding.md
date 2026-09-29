@@ -7,7 +7,8 @@
 - `app/src/features/funding`: 판정 함수는 React·DB·외부 API에 의존하지 않는다.
   - 카탈로그 Zod 스키마(`schema.ts`), 규칙 검사(`validation.ts`), 고정 조건 판정(`eligibility.ts`)
   - 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`), 요청 스키마·응답 조립(`candidates.ts`)
-  - 페이지 단위 후보 화면(`FundingMatcher.tsx`), 두 화면이 함께 쓰는 결과 표시(`FundingCandidatesPanel.tsx`)
+  - `/funding` 보고서(`FundingMatcher.tsx`, `FundingReport.tsx`), 계획 화면의 결과 표시(`FundingCandidatesPanel.tsx`). 두 화면은 라벨과 조건별 판정표를 함께 쓴다.
+  - `/funding` 보고서의 "가장 낮은 확정 금리"는 현재 검토 후보 중 확정 금리(`interestRatePercent`)가 있는 상품만 비교한다. 금리 문장은 비교하지 않는다.
 - `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서.
 
 ## 카탈로그
@@ -66,6 +67,7 @@
   - 상품명·기관·지원 유형·후보 상태, 포함·제외·추가 확인 이유
   - 조건별 PASS/FAIL/UNKNOWN과 근거 id, 공식 링크·접수·검수 상태
   - 상환 계산 가능 여부와 불가 사유
+  - 카탈로그에 기록한 공고 요약(`announcement`): 공개 한도, 금리·상환 조건 문장, 신청기간. 화면 표시에만 쓰고 판정·상환 계산에는 쓰지 않는다.
 
 ### 계획에 저장한 조건으로 판정
 

@@ -92,6 +92,16 @@ export type FundingCandidateEvaluation = {
   manualChecks: string[];
   unsupportedCalculationReasons: string[];
   repayment: ProductRepaymentAvailability;
+  // 카탈로그에 기록한 공고 요약 그대로다. 판정과 상환 계산에 쓰지 않고 화면 표시에만
+  // 쓴다. 조건 문장은 숫자로 해석하지 않는다.
+  announcement: FundingAnnouncement;
+};
+
+export type FundingAnnouncement = {
+  publicLimitKrw: string | null;
+  interestCondition: string | null;
+  repaymentCondition: string | null;
+  applicationPeriod: { start: string | null; end: string | null; note: string | null };
 };
 
 export type FundingCandidateSummary = Record<FundingCandidateStatus, number> & { total: number };
@@ -402,6 +412,12 @@ export function evaluateProduct(
     manualChecks: [...product.additionalChecks],
     unsupportedCalculationReasons: [...product.unsupportedCalculationReasons],
     repayment,
+    announcement: {
+      publicLimitKrw: product.publicLimit,
+      interestCondition: product.interestCondition,
+      repaymentCondition: product.repaymentCondition,
+      applicationPeriod: { ...product.applicationPeriod },
+    },
   };
 }
 
