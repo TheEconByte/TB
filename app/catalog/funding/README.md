@@ -20,7 +20,7 @@ npm --prefix app run funding:load
 
 1. 공식 기관 원문(기업마당, 중소벤처기업부, 서울시, 서울신보, K-Startup 등)에서 공고명·기관·접수기간·접수 상태·대상 사업단계·지역·용도·업종·금리·한도·상환 조건을 확인한다.
 2. 확인한 날짜를 `observedAt`, 사람이 검수한 날짜를 `reviewedAt`, 다음 재확인 날짜를 `nextReviewAt`에 기록한다.
-3. 원문에서 확정하지 못한 값은 0이나 추정값으로 채우지 않고 `null` 또는 `UNKNOWN`으로 남기고, 왜 확정할 수 없는지 `unsupportedCalculationReasons`·`additionalChecks`·`note`에 적는다.
+3. 원문에서 확정하지 못한 값은 0이나 추정값으로 채우지 않고 `null` 또는 `UNKNOWN`으로 남기고, 왜 확정할 수 없는지 `unsupportedCalculationReasons`·`additionalChecks`·`note`에 적는다. 지원 유형을 확인하지 못했으면 `supportType`을 `UNKNOWN`, 신청 가능한 사업 단계를 확인하지 못했으면 `eligibleBusinessStages`를 빈 배열로 둔다.
 4. 조건별로 `evidence`에 공식 URL·문서명·확인일·확인 방법을 남긴다. 지역·용도·업종을 PASS 또는 FAIL로 판정하려면 각각 REGION·PURPOSE·INDUSTRY의 공식 원문 근거가 필요하다. 검색 결과 요약만 확인한 경우 `retrievalMethod`를 `SEARCH_RESULT_SUMMARY`로 기록하며 해당 조건은 UNKNOWN으로 남는다.
 5. 내용이 바뀌면 기존 항목을 덮어쓰지 않고 `version`을 올려 새 항목으로 추가하고, 카탈로그 `catalogVersion`도 올린다.
 6. `npm --prefix app run funding:validate`로 확인한 뒤 `funding:load`를 실행한다.
@@ -39,7 +39,7 @@ npm --prefix app run funding:load
 
 ## 2026-09-20 검수 범위
 
-현재 카탈로그 `2026-09-28.1`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다. `2026-09-28.1`은 `2026-09-23.1`에서 스키마를 v1.1.0으로 올리고 자동화 설정을 더한 것이며, 상품 내용과 검수 내용은 같다.
+현재 카탈로그 `2026-09-28.2`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다. `2026-09-28.1`은 `2026-09-23.1`에서 스키마를 v1.1.0으로 올리고 자동화 설정을 더한 것이고, `2026-09-28.2`는 스키마를 v1.2.0으로 올린 것이다. 상품 내용과 검수 내용은 같다.
 
 - 접수 상태가 CLOSED로 확인된 상품 1건(예비창업패키지 2차), 접수 상태를 확정할 수 없어 UNKNOWN으로 남긴 상품 4건을 기록했다.
 - 같은 날 접수 상태가 OPEN으로 확인된 상품은 없어 현재 신청 가능 후보로 확정되는 상품은 0건이다.

@@ -17,13 +17,14 @@ import type { ObservedApplicationStatus, ReviewState, SupportType, Verdict } fro
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
 // 지원 유형은 대출과 다른 성격을 이름부터 구분한다. GRANT·SPACE·PROGRAM을
-// 대출처럼 보이게 하는 표현을 쓰지 않는다.
+// 대출처럼 보이게 하는 표현을 쓰지 않는다. 유형을 모르는 공고는 어느 쪽으로도 추측하지 않는다.
 const SUPPORT_TYPE_LABELS: Record<SupportType, string> = {
   GRANT: '지원금(상환 없음)',
   GUARANTEE: '보증(대출 아님)',
   LOAN: '대출(상환 대상)',
   SPACE: '공간·보육(대출 아님)',
   PROGRAM: '프로그램(대출 아님)',
+  UNKNOWN: '유형 미확인(원 공고 확인)',
 };
 
 const STATUS_LABELS: Record<FundingCandidateStatus, string> = {

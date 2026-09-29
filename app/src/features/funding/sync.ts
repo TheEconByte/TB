@@ -53,6 +53,8 @@ export type FundingSourceSyncReport = FundingSourceSync & {
   productCount: number;
   // 실패해서 직전 ACTIVE 릴리스의 상품을 그대로 가져왔는지.
   carriedOver: boolean;
+  // 직전 ACTIVE 릴리스에 없던 공고로 만든 상품. 운영자가 새 공고·변경공고를 살펴보는 데 쓴다.
+  addedProducts: Array<{ productKey: string; name: string }>;
 };
 
 export type FundingSyncReport = {
@@ -231,9 +233,17 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
   for (const adapter of options.adapters) {
     const previousSync = previous?.automation.sourceSyncs.find((entry) => entry.source === adapter.source) ?? null;
     const attemptedAt = now().toISOString();
+    const previousProducts = (previous?.catalog.products ?? []).filter(
+      (product) => isAutoReviewer(product.reviewer) && product.sourceRef?.source === adapter.source,
+    );
     try {
       const collected = await collectSource(adapter, { prisma, manual, previousSync, asOfDate, log });
       automatedProducts.push(...collected.products);
+      const previousRefs = new Set(
+        previousProducts.flatMap((product) =>
+          product.sourceRef === undefined ? [] : [sourceRefKey(product.sourceRef)],
+        ),
+      );
       sources.push({
         source: adapter.source,
         status: 'SUCCEEDED',
@@ -244,15 +254,15 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
         failureReason: null,
         productCount: collected.products.length,
         carriedOver: false,
+        addedProducts: collected.products
+          .filter((product) => product.sourceRef !== undefined && !previousRefs.has(sourceRefKey(product.sourceRef)))
+          .map((product) => ({ productKey: product.productKey, name: product.name })),
       });
       log(
         `출처 ${adapter.source}: 공고 ${collected.fetchedCount}건을 받아 상품 ${collected.products.length}건을 만들었습니다.`,
       );
     } catch (error) {
-      const carried = (previous?.catalog.products ?? []).filter(
-        (product) => isAutoReviewer(product.reviewer) && product.sourceRef?.source === adapter.source,
-      );
-      automatedProducts.push(...carried);
+      automatedProducts.push(...previousProducts);
       sources.push({
         source: adapter.source,
         status: 'FAILED',
@@ -261,11 +271,12 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
         fetchedCount: previousSync?.fetchedCount ?? null,
         responseChecksum: previousSync?.responseChecksum ?? null,
         failureReason: describeError(error),
-        productCount: carried.length,
+        productCount: previousProducts.length,
         carriedOver: true,
+        addedProducts: [],
       });
       log(
-        `출처 ${adapter.source} 동기화 실패: ${describeError(error)} 직전 ACTIVE 릴리스의 상품 ${carried.length}건을 그대로 둡니다.`,
+        `출처 ${adapter.source} 동기화 실패: ${describeError(error)} 직전 ACTIVE 릴리스의 상품 ${previousProducts.length}건을 그대로 둡니다.`,
       );
     }
   }

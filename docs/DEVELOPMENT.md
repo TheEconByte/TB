@@ -26,7 +26,7 @@ npm --prefix app run dev
 | 파일 | 값 |
 |---|---|
 | `infra/.env` | `POSTGRES_PASSWORD`, `POSTGRES_PORT` |
-| `app/.env.local` | `DATABASE_URL`, `BETTER_AUTH_SECRET`(32자 이상), `BETTER_AUTH_URL`, 상권 적재 시 `SEOUL_OPEN_API_KEY`, 점포·프랜차이즈 적재 시 `SEMAS_SERVICE_KEY`, 임대료 적재 시 `REB_API_KEY` |
+| `app/.env.local` | `DATABASE_URL`, `BETTER_AUTH_SECRET`(32자 이상), `BETTER_AUTH_URL`, 상권 적재 시 `SEOUL_OPEN_API_KEY`, 점포·프랜차이즈 적재 시 `SEMAS_SERVICE_KEY`, 임대료 적재 시 `REB_API_KEY`, 자금 동기화 시 `BIZINFO_API_KEY` |
 | `app/.env.test.local` | `TEST_DATABASE_URL`(DB명 `trendbench_mvp_test`) |
 
 직접 만들 때는 세 파일을 모두 만든다. 비밀번호는 같은 값을 쓰고 URL의 특수문자는 인코딩한다. 예시는 `infra/.env.example`과 `app/.env.example`에 있다. Prisma CLI와 적재 명령도 `app/.env.local`을 읽는다.
@@ -43,7 +43,7 @@ npm --prefix app run dev
 | 공정위 프랜차이즈 | `SEMAS_SERVICE_KEY`(공공데이터포털 인증키)로 [가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)·[창업 금액](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청한다. 약 20~30초 걸린다 | `npm --prefix app run franchise:load` |
 | 자금 카탈로그 | 준비 없음. 원본은 `app/catalog/funding/catalog.json`이다 | `npm --prefix app run funding:load` |
 
-자동 수집 출처와 합쳐 자금 카탈로그를 적재하려면 `npm --prefix app run funding:sync`를 실행한다. `-- --dry-run`을 붙이면 합친 카탈로그를 쓰고 검증만 한다. 합친 카탈로그는 `data/funding-sync/`(Git 제외)에 남는다. 규칙은 [funding.md](domains/funding.md#동기화)에 있다.
+자동 수집 출처와 합쳐 자금 카탈로그를 적재하려면 `npm --prefix app run funding:sync`를 실행한다. 기업마당(www.bizinfo.go.kr)에서 지원사업정보 API 인증키를 발급받아 `BIZINFO_API_KEY`에 넣는다. 키가 없으면 기업마당 출처는 실패로 기록되고 직전 릴리스의 기업마당 상품이 그대로 남는다. `-- --dry-run`을 붙이면 합친 카탈로그를 쓰고 검증만 한다. 합친 카탈로그는 `data/funding-sync/`(Git 제외)에 남는다. 규칙은 [funding.md](domains/funding.md#동기화)에 있다.
 
 2026-09-09 검증본 ZIP으로 적재하려면 [verification/README.md](verification/README.md)의 파일 5개를 `data/raw/`(Git 제외)에 두고 `npm --prefix app run market:load -- --source-dir ../data/raw`를 실행한다. `data/raw/`가 없으면 원본 대조 테스트 6개가 건너뛰어진다.
 

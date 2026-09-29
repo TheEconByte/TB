@@ -96,7 +96,9 @@ export const fundingProductSchema = z.object({
   name: z.string().trim().min(2).max(200),
   organization: z.string().trim().min(2).max(200),
   supportType: z.enum(SUPPORT_TYPES),
-  eligibleBusinessStages: z.array(z.enum(BUSINESS_STAGES)).min(1, '신청 가능한 사업단계를 하나 이상 기록해 주세요.'),
+  // 빈 배열은 원문에서 신청 가능한 사업 단계를 확인하지 못했다는 뜻이다. 사업 단계 판정은
+  // 미확인이 되고 사업 단계 근거도 요구하지 않는다. 확인했으면 하나 이상 기록한다.
+  eligibleBusinessStages: z.array(z.enum(BUSINESS_STAGES)),
   region: regionSchema,
   purpose: purposeSchema,
   industryConditions: industryConditionSchema,

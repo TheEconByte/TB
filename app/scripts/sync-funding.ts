@@ -2,7 +2,9 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.ts';
+import { secretMasker } from '../src/features/market/seoul-api.ts';
 import { todayInKst } from '../src/features/funding/dates.ts';
+import { createBizinfoAdapter } from '../src/features/funding/sources/bizinfo.ts';
 import { runFundingSync, type FundingSourceAdapter } from '../src/features/funding/sync.ts';
 import { FundingCatalogError } from '../src/features/funding/validation.ts';
 
@@ -10,13 +12,24 @@ const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json',
 const DEFAULT_OUTPUT_DIR = fileURLToPath(new URL('../../data/funding-sync/', import.meta.url));
 
 // funding:sync가 공고를 모으는 출처별 수집기. ADR 0006의 출처 확인(robots.txt·약관)을 거친 출처만 등록한다.
-// 등록된 수집기가 없으면 사람이 관리하는 카탈로그만 새 릴리스로 적재한다.
-const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [];
+// 키가 없어도 등록한다. 그러면 그 출처는 실패로 기록되고, 직전 릴리스의 상품이 그대로 남는다.
+const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [
+  createBizinfoAdapter({ apiKey: process.env.BIZINFO_API_KEY }),
+];
+
+// 출력에 인증키가 남지 않게 가린다.
+const mask = secretMasker(process.env.BIZINFO_API_KEY ?? '');
+// 새 공고 이름은 이 수까지만 출력한다.
+const MAX_LISTED_NEW_PRODUCTS = 30;
 
 const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하는 카탈로그와 합치고 새 릴리스로 적재합니다(ADR 0006).
 
 사용법:
   npm run funding:sync -- [옵션]
+
+환경변수:
+  DATABASE_URL       PostgreSQL 연결 문자열
+  BIZINFO_API_KEY    기업마당 지원사업정보 API 인증키. 없으면 기업마당 출처는 실패로 기록됩니다
 
 옵션:
   --catalog <경로>      사람이 관리하는 카탈로그 JSON (기본값: app/catalog/funding/catalog.json)
@@ -68,9 +81,6 @@ async function main() {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL이 없습니다. app/.env.local을 준비하거나 DATABASE_URL을 지정해 주세요.');
   }
-  if (SOURCE_ADAPTERS.length === 0) {
-    console.log('등록된 출처 수집기가 없습니다. 사람이 관리하는 카탈로그만 합쳐 적재합니다.');
-  }
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   try {
     const report = await runFundingSync({
@@ -80,14 +90,27 @@ async function main() {
       asOfDate: todayInKst(),
       outputDir: options.outputDir,
       dryRun: options.dryRun,
-      log: (message) => console.log(message),
+      log: (message) => console.log(mask(message)),
     });
     console.log('');
     for (const source of report.sources) {
       const state = source.status === 'SUCCEEDED' ? '성공' : `실패(${source.failureReason ?? '사유 없음'})`;
       console.log(
-        `출처 ${source.source}: ${state} · 상품 ${source.productCount}건${source.carriedOver ? '(직전 릴리스에서 유지)' : ''} · 마지막 성공일 ${source.lastSucceededOn ?? '없음'}`,
+        mask(
+          `출처 ${source.source}: ${state} · 상품 ${source.productCount}건${source.carriedOver ? '(직전 릴리스에서 유지)' : ''} · 마지막 성공일 ${source.lastSucceededOn ?? '없음'}`,
+        ),
       );
+      if (source.addedProducts.length > 0) {
+        console.log(`  직전 릴리스에 없던 공고 ${source.addedProducts.length}건:`);
+        for (const product of source.addedProducts.slice(0, MAX_LISTED_NEW_PRODUCTS)) {
+          console.log(`  - ${product.name} (${product.productKey})`);
+        }
+        if (source.addedProducts.length > MAX_LISTED_NEW_PRODUCTS) {
+          console.log(
+            `  - 외 ${source.addedProducts.length - MAX_LISTED_NEW_PRODUCTS}건은 ${report.catalogFile}에서 확인하세요.`,
+          );
+        }
+      }
     }
     console.log(`사람이 기록한 상품 ${report.manualProductCount}건 · 자동 상품 ${report.automatedProductCount}건`);
     if (report.overriddenByManual.length > 0) {
@@ -111,10 +134,10 @@ async function main() {
 
 main().catch((error: unknown) => {
   if (error instanceof FundingCatalogError) {
-    console.error(`오류 [${error.code}] ${error.message}`);
-    for (const issue of error.issues ?? []) console.error(`  - [${issue.code}] ${issue.source}: ${issue.detail}`);
+    console.error(mask(`오류 [${error.code}] ${error.message}`));
+    for (const issue of error.issues ?? []) console.error(mask(`  - [${issue.code}] ${issue.source}: ${issue.detail}`));
   } else {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(mask(error instanceof Error ? error.message : String(error)));
   }
   process.exitCode = 1;
 });
