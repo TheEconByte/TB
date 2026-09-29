@@ -205,10 +205,12 @@ function checkProduct(
         `근거 '${entry.id}'의 확인일 ${entry.observedAt}이(가) 기준일 ${basisDate} 이후입니다.`,
       );
     }
-    // 첨부·API만 원문 파일 checksum을 남길 수 있다. 웹 페이지 확인과 검색 요약은
-    // 내려받은 파일이 없으므로 checksum이 null이어야 한다.
+    // 첨부·API만 원문 파일 checksum을 남길 수 있다. 사람이 확인한 웹 페이지와 검색 요약은
+    // 내려받은 파일이 없으므로 checksum이 null이어야 한다. 자동 상품의 웹 페이지 근거는
+    // funding:sync가 실제로 받은 응답이라 그 페이지의 checksum을 남길 수 있다(ADR 0006 2절).
     const fileBacked = entry.retrievalMethod === 'OFFICIAL_ATTACHMENT' || entry.retrievalMethod === 'OFFICIAL_API';
-    if (!fileBacked && entry.checksum !== null) {
+    const crawledPage = automated && entry.retrievalMethod === 'OFFICIAL_WEB_PAGE';
+    if (!fileBacked && !crawledPage && entry.checksum !== null) {
       collector.add(
         'EVIDENCE_CHECKSUM_NOT_APPLICABLE',
         source,
