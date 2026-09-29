@@ -24,6 +24,7 @@ import { loadMarketRelease, readMarketSources } from './loader.ts';
 import { basisPeriodCode, compareQuarters, parseQuarter, quarterLabel } from './quarter.ts';
 import { MARKET_SOURCE_FILES, releaseKeyFor, type SourceFileRecord } from './source-files.ts';
 import { MarketSourceError, isQuarterCode, parseAmountCell, parseCountCell } from './validation.ts';
+import { provisionalQuarterSales } from './provisional.ts';
 import { getMarketSummary, listMarketAreas, listSupportedIndustries } from './read.ts';
 import { readZipMember } from './zip.ts';
 
@@ -399,6 +400,50 @@ describe('quarter codes', () => {
 
   it('orders quarters oldest first', () => {
     expect(['20251', '20241', '20254'].sort(compareQuarters)).toEqual(['20241', '20251', '20254']);
+  });
+});
+
+describe('provisional sales (ADR 0002)', () => {
+  it('matches the hand-checked sample: 성수1가1동 커피·음료 2025년 4분기', () => {
+    const result = provisionalQuarterSales({
+      quarter: '20254',
+      salesAmount: '184219542',
+      salesCount: null,
+      similarIndustryStoreCount: 11,
+    });
+    expect(result.monthlySalesAmount).toBe('184219542');
+    expect(result.perStoreMonthlySalesAmount).toBe('16747231');
+    expect(result.averagePaymentAmount).toBeNull();
+  });
+
+  it('rounds half up to whole won as strings', () => {
+    const result = provisionalQuarterSales({
+      quarter: '20251',
+      salesAmount: '5',
+      salesCount: '2',
+      similarIndustryStoreCount: 2,
+    });
+    expect(result.perStoreMonthlySalesAmount).toBe('3');
+    expect(result.averagePaymentAmount).toBe('3');
+  });
+
+  it('keeps a missing or zero denominator as null instead of 0', () => {
+    expect(
+      provisionalQuarterSales({ quarter: '20251', salesAmount: '1000', salesCount: '0', similarIndustryStoreCount: 0 }),
+    ).toEqual({
+      quarter: '20251',
+      monthlySalesAmount: '1000',
+      perStoreMonthlySalesAmount: null,
+      averagePaymentAmount: null,
+    });
+    expect(
+      provisionalQuarterSales({ quarter: '20251', salesAmount: null, salesCount: '10', similarIndustryStoreCount: 3 }),
+    ).toEqual({
+      quarter: '20251',
+      monthlySalesAmount: null,
+      perStoreMonthlySalesAmount: null,
+      averagePaymentAmount: null,
+    });
   });
 });
 
