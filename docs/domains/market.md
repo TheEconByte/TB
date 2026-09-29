@@ -27,6 +27,10 @@
 - `/api/markets/areas?districtCode=...`: 자치구 목록은 항상 반환하고, `districtCode`가 있으면 그 자치구의 상권을 반환한다. 없는 자치구 코드는 400 `INVALID_DISTRICT_CODE`다.
 - `/api/markets/summary?areaCode=...&industryCode=...[&areaType=...]`: 가용 분기를 오래된 순으로, 분기별 원본 지표를 반환한다. 매출 원값은 원 단위 정수 문자열이고 점포 수는 숫자다.
 - `/api/markets/report?areaCode=...&industryCode=...[&areaType=...]`: summary에 상위 업종 집계 범위, 기준분기, 요일·시간대·성별·연령별 원본 구성을 더한다.
+  - `provisionalSales`에 분기별 [ADR 0002](../decisions/0002-provisional-market-sales.md) 잠정 값과 근거 링크를 담는다. 계산은 `app/src/features/market/provisional.ts`가 한다.
+  - 월매출(잠정)은 매출 원값 그대로, 점포당 월매출(잠정)은 원값 ÷ 유사 업종 점포 수, 결제 1건당 평균 금액은 원값 ÷ 매출 건수다. 원 단위 정수 문자열이며 `ROUND_HALF_UP`로 반올림한다.
+  - 원값이나 분모가 없거나 분모가 0이면 `null`이다. 0으로 채우지 않는다.
+  - `/markets` 보고서는 이 값 옆에 "잠정"과 근거, 원값을 함께 표시한다. 계산 결과(`plan_results`)에 저장하지 않고 재무 가정에 자동으로 넣지 않는다.
 - 상태 구분: 활성 릴리스 없음 503 `RELEASE_UNAVAILABLE`, 형식 오류 400 `INVALID_AREA_CODE`·`INVALID_INDUSTRY_CODE`, 없는 상권 404 `AREA_NOT_FOUND`, 같은 코드가 여러 상권 구분에 있으면 400 `AMBIGUOUS_AREA_CODE`, 원천에 있으나 미지원 업종은 400 `UNSUPPORTED_INDUSTRY`다.
 - 자료가 없는 조합은 0이 아니라 `dataStatus: NOT_PROVIDED`와 빈 `quarters`로, 매출만 없는 분기는 `salesStatus: NOT_PROVIDED`와 `salesAmount: null`로 응답한다.
 - 응답에는 지표 정의(원본 열·단위·해석 제한)와 제한 문구, 릴리스 출처·기준기간·입수일·파일별 SHA-256을 함께 담는다.
