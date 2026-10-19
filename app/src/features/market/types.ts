@@ -1,3 +1,5 @@
+import type { PROVISIONAL_SALES_BASIS, ProvisionalQuarterSales } from './provisional.ts';
+
 export const MARKET_SCHEMA_VERSION = 'market-schema-v1.1.0';
 export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v2';
 export const INDUSTRY_CATEGORY_VERSION = 'seoul-service-industry-2024-2025';
@@ -47,7 +49,7 @@ export const INDICATOR_DEFINITIONS: readonly IndicatorDefinition[] = [
     unit: '원',
     unitConfirmed: false,
     sourceColumn: { 2024: '당월_매출_금액', 2025: '당월_매출_금액' },
-    note: '출처 열 그대로의 금액입니다. 월 합계인지 분기 합계인지 확정되지 않아 월매출로 환산하지 않습니다.',
+    note: '출처 열 그대로의 금액입니다. 시간 단위가 공식 확정되지 않았습니다. 화면의 월매출(잠정)은 이 값을 분기 월평균으로 해석한 값입니다(ADR 0002).',
   },
   {
     key: 'salesCount',
@@ -102,10 +104,9 @@ export const INDICATOR_DEFINITIONS: readonly IndicatorDefinition[] = [
 // Shown verbatim in the API response and on the exploration screen.
 export const MARKET_LIMITATIONS: readonly string[] = [
   '공개 상권 지표이며 개인 점포의 예상매출이 아닙니다.',
-  '매출 원값의 월·분기 단위가 확정되지 않아 월매출로 환산하지 않습니다.',
-  '점포당 매출을 계산하지 않습니다.',
+  '매출 원값의 시간 단위와 점포당 분모가 공식 확정되지 않았습니다. 월매출·점포당 월매출은 ADR 0002의 잠정 해석이며 원값과 함께 표시합니다.',
   '자료가 없는 조합은 0으로 채우지 않고 자료 부족으로 표시합니다.',
-  '상권 원값을 재무계획의 월매출 가정에 자동으로 입력하지 않습니다.',
+  '상권 원값과 잠정 값을 재무계획의 월매출 가정에 자동으로 입력하지 않습니다.',
 ];
 
 export type QuarterIndicatorRow = {
@@ -204,6 +205,11 @@ export type MarketReport = MarketSummary & {
   sourceRelease: string;
   asOf: string | null;
   nullReason: string | null;
+  // ADR 0002 잠정 해석. 분기 순서는 quarters와 같다.
+  provisionalSales: {
+    basis: typeof PROVISIONAL_SALES_BASIS;
+    quarters: ProvisionalQuarterSales[];
+  };
 };
 
 export type MarketAreaList = {
