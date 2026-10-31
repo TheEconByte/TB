@@ -1645,3 +1645,257 @@ footer {
   font-size: 13px;
   font-weight: 400;
 }
+
+/* 상권 생존점수 (ADR 0008) */
+.score-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--green);
+  border-radius: 14px;
+  padding: 24px;
+  margin-top: 18px;
+}
+.score-heading h2 {
+  margin: 4px 0 0;
+}
+.score-header {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.score-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.score-value strong {
+  font-size: 56px;
+  line-height: 1;
+}
+.score-value span {
+  color: var(--muted);
+  font-weight: 700;
+}
+.grade-badge {
+  margin-left: 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--sage);
+  color: var(--green);
+  font-size: 22px;
+  align-self: center;
+}
+.grade-badge.grade-b,
+.grade-badge.grade-c,
+.grade-badge.grade-d {
+  background: #fff1ec;
+  color: #9a3e24;
+}
+.score-rank {
+  display: flex;
+  flex-direction: column;
+}
+.score-rank span,
+.score-explanation {
+  color: var(--muted);
+}
+.score-explanation {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+.score-factors,
+.score-distribution {
+  margin-top: 22px;
+}
+.score-factors h3,
+.score-distribution h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+.score-factors ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.score-factors li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.score-factors li p {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 8px;
+}
+.score-factors li p span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.factor-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: #eef1ec;
+}
+.factor-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--muted);
+}
+.factor-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.factor-bar.raises {
+  background: var(--green);
+  border-radius: 0 6px 6px 0;
+}
+.factor-bar.lowers {
+  background: var(--accent);
+  border-radius: 6px 0 0 6px;
+}
+.histogram {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  height: 170px;
+  padding-top: 26px;
+}
+.histogram-bin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+}
+.histogram-bin span {
+  width: 100%;
+  background: #c9d6cd;
+  border-radius: 4px 4px 0 0;
+}
+.histogram-bin.current span {
+  background: var(--green);
+}
+.histogram-bin em {
+  position: absolute;
+  top: -24px;
+  white-space: nowrap;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green);
+}
+.histogram-bin small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.histogram-bin b {
+  font-size: 11px;
+}
+.score-actions {
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.primary-link,
+.secondary-link {
+  display: inline-block;
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.primary-link {
+  background: #f6c66c;
+  color: #2a2a20;
+}
+.secondary-link {
+  background: white;
+  color: var(--ink);
+  border: 1px solid #b8c5bc;
+}
+.score-unavailable {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 10px;
+  background: var(--sage);
+}
+.score-unavailable strong {
+  font-size: 18px;
+}
+.score-unavailable p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.score-basis {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.score-basis summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+.score-basis h3 {
+  font-size: 15px;
+  margin: 16px 0 6px;
+}
+.market-source {
+  background: var(--sage);
+  border-left: 4px solid var(--green);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+}
+.market-source p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.market-source button {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--green);
+  border: 1px solid #b8c5bc;
+}
+.funding-grade {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-top: 18px;
+}
+.funding-grade p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .score-panel {
+    padding: 18px;
+  }
+  .score-value strong {
+    font-size: 44px;
+  }
+  .histogram {
+    gap: 3px;
+    height: 140px;
+  }
+  .histogram-bin b {
+    font-size: 10px;
+  }
+  .score-actions a {
+    width: 100%;
+    text-align: center;
+  }
+}

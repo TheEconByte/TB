@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { financeInputSchema } from '@/features/finance/schema';
 import { fundingCandidateRequestSchema } from '@/features/funding/candidates';
 import { businessProfileInputSchema } from '@/features/business-profile/schema';
+import { marketScoreReferenceSchema } from '@/features/plans/market-score';
 
 // 자금 후보 조건은 페이지 단위 조회와 같은 스키마(F4-2의 fundingCandidateRequestSchema)를
 // 그대로 재사용한다. 화면 입력과 계획에 저장한 조건이 서로 어긋나지 않게 하기 위해서다.
@@ -12,6 +13,11 @@ export const planWriteSchema = z.object({
   // 선택 항목이다. 값이 없으면 프로필 없는 계획으로 남고, null이면 저장된 조건을 지운다.
   fundingProfile: fundingCandidateRequestSchema.nullable().optional(),
   businessProfile: businessProfileInputSchema.nullable().optional(),
+});
+
+// 계획을 만들 때만 상권 점수 참조를 받는다. 수정 요청에는 없으므로 저장된 스냅샷은 바뀌지 않는다.
+export const planCreateSchema = planWriteSchema.extend({
+  marketScore: marketScoreReferenceSchema.optional(),
 });
 
 export const planUpdateSchema = planWriteSchema.extend({
