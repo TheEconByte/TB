@@ -874,8 +874,9 @@ export function readMarketSources(
   };
 }
 
-// API로 받을 때 시작 분기를 따로 주지 않으면 지금 파일 적재본과 같은 2024년 1분기부터 받는다.
-export const MARKET_API_DEFAULT_START_QUARTER = '20241';
+// API로 받을 때 시작 분기를 따로 주지 않으면 API가 제공하는 첫 분기인 2021년 1분기부터 받는다.
+// 상권 생존점수 학습에 1년 전·1년 뒤 분기가 필요해서다(ADR 0008). 파일 적재본은 2024년 1분기부터다.
+export const MARKET_API_DEFAULT_START_QUARTER = '20211';
 
 export type MarketApiReadOptions = {
   apiKey: string;

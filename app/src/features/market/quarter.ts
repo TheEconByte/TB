@@ -35,6 +35,14 @@ export function previousQuarter(input: string): string {
   return parsed.quarter === 1 ? `${parsed.year - 1}4` : `${parsed.year}${parsed.quarter - 1}`;
 }
 
+// Quarter that is `offset` quarters after (positive) or before (negative) the input.
+export function shiftQuarter(input: string, offset: number): string {
+  const parsed = parseQuarter(input);
+  if (!parsed || !Number.isInteger(offset)) throw new Error(`분기 형식이 아닙니다: ${input}`);
+  const index = parsed.year * 4 + (parsed.quarter - 1) + offset;
+  return `${Math.floor(index / 4)}${(index % 4) + 1}`;
+}
+
 // Inclusive list from start to end, oldest first. Empty when start is after end.
 export function quartersBetween(start: string, end: string): string[] {
   const quarters: string[] = [];

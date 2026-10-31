@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { financeInputSchema } from './schema';
 import type { FinanceInput, FinanceResult, ScenarioResult, ValueResult } from './types';
 
@@ -101,6 +101,11 @@ export function toInput(form: FormState): FinanceInput {
     },
     cashBalanceMonths: Number(form.cashBalanceMonths),
   };
+}
+
+// 새 계획의 기본 입력에서 일부만 바꾼 초기값. 상권에서 넘어온 월매출 기본값처럼 사용자가 고칠 수 있는 값에 쓴다.
+export function defaultInputWith(overrides: Readonly<Record<string, string>>): FinanceInput {
+  return toInput({ ...defaults, ...overrides });
 }
 
 function fromInput(input?: FinanceInput): FormState {
@@ -216,6 +221,8 @@ export type PlannerProps = {
   // 재무 입력에 저장하지 않은 변경이 있는지 상위 화면에 알린다. 상품 조건 적용은
   // 저장된 초안을 바꾸는 일이므로 저장되지 않은 편집이 있으면 막아야 한다.
   onDirtyChange?: (dirty: boolean) => void;
+  // 월 운영 가정 입력란 위에 보여 줄 출처(예: 상권 점수에서 넘어온 월매출 기본값).
+  revenueNotice?: ReactNode;
   onSave: (title: string, input: FinanceInput) => Promise<unknown>;
   onCalculate: (title: string, input: FinanceInput) => Promise<FinanceResult>;
 };
@@ -229,6 +236,7 @@ export default function FinancePlanner({
   busy = false,
   syncToken,
   onDirtyChange,
+  revenueNotice,
   onSave,
   onCalculate,
 }: PlannerProps) {
@@ -361,6 +369,7 @@ export default function FinancePlanner({
               <p>공공 상권 매출이 아닌 사용자 가정입니다.</p>
             </div>
           </div>
+          {revenueNotice}
           <div className="field-grid">
             <MoneyInput
               id="monthlyRevenue"

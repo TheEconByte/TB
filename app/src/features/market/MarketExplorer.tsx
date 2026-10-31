@@ -14,6 +14,9 @@ import {
   type SalesBreakdownPoint,
 } from './types.ts';
 import type { BusinessCategoryInfo, BusinessSummary } from '@/features/business-directory/types';
+import type { MarketScoreResponse } from './score/api.ts';
+import { scoreApiUrl } from './score/handoff.ts';
+import ScorePanel from './score/ScorePanel';
 
 type District = { districtCode: string; districtName: string; areaCount: number };
 
@@ -76,6 +79,9 @@ export default function MarketExplorer() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [areaError, setAreaError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  // 생존점수는 지표와 따로 불러온다. 점수 릴리스가 없거나 실패해도 지표는 그대로 보여 준다.
+  const [score, setScore] = useState<MarketScoreResponse | null>(null);
+  const [scoreError, setScoreError] = useState<string | null>(null);
   const latestAreaRequest = useRef(0);
   const latestSummaryRequest = useRef(0);
 
@@ -114,6 +120,8 @@ export default function MarketExplorer() {
   const loadSummary = useCallback(async (areaValue: string, nextIndustryCode: string) => {
     latestSummaryRequest.current += 1;
     const requestId = latestSummaryRequest.current;
+    setScore(null);
+    setScoreError(null);
     if (areaValue === '' || nextIndustryCode === '') {
       setSummary(null);
       setSummaryError(null);
@@ -123,13 +131,22 @@ export default function MarketExplorer() {
     const [areaType, areaCode] = areaValue.split(':');
     setSummaryLoading(true);
     setSummaryError(null);
+    const scoreRequest = request<MarketScoreResponse>(
+      scoreApiUrl({ areaType: areaType ?? '', areaCode: areaCode ?? '', industryCode: nextIndustryCode }),
+    ).then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error: describeError(error, '생존점수를 불러오지 못했습니다.') }),
+    );
     try {
       const data = await request<MarketReport>(
         `/api/markets/report?areaType=${encodeURIComponent(areaType ?? '')}&areaCode=${encodeURIComponent(areaCode ?? '')}&industryCode=${encodeURIComponent(nextIndustryCode)}`,
       );
+      const scored = await scoreRequest;
       if (requestId !== latestSummaryRequest.current) return;
       setSummary(data);
       setActiveRelease(data.release);
+      setScore(scored.data);
+      setScoreError(scored.error);
     } catch (error) {
       if (requestId !== latestSummaryRequest.current) return;
       setSummary(null);
@@ -152,6 +169,8 @@ export default function MarketExplorer() {
     setSummary(null);
     setSummaryError(null);
     setSummaryLoading(false);
+    setScore(null);
+    setScoreError(null);
     setAreaError(null);
     if (next === '') {
       setAreas([]);
@@ -224,8 +243,8 @@ export default function MarketExplorer() {
           상권에서 업종으로.
         </h1>
         <p>
-          서울시 상권분석서비스의 공개 원값을 그대로 보여줍니다. 로그인 없이 볼 수 있고, 개인 재무계획에는 값을 자동으로
-          넣지 않습니다.
+          서울시 상권분석서비스의 공개 원값을 그대로 보여줍니다. 로그인 없이 볼 수 있고, 개인 재무계획에는 [이 상권으로
+          재무 계획 시작]을 눌렀을 때만 값을 넘깁니다.
         </p>
       </section>
 
@@ -401,6 +420,13 @@ export default function MarketExplorer() {
                 자치구 → 상권 → 업종 순으로 선택하면 가용 분기와 분기별 원본 지표를 표시합니다.
               </p>
             )}
+            {!summaryLoading && summary && scoreError && (
+              <div className="error-box" role="alert">
+                <h2>상권 생존점수를 불러오지 못했습니다.</h2>
+                <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
+              </div>
+            )}
+            {!summaryLoading && summary && score && <ScorePanel score={score} />}
             {!summaryLoading && summary && <SummaryPanel summary={summary} selectedArea={selectedArea} />}
             {businessLoading && (
               <p className="loading-state" role="status">
