@@ -80,7 +80,7 @@ test('업종에 맞는 공정위 가맹정보를 검색하고 브랜드 현황�
 
   const panel = page.getByRole('region', { name: '프랜차이즈 참고' });
   await expect(panel.getByText('사업 조건에서 업종을 고르면')).toBeVisible();
-  await page.getByLabel('업종 대분류').selectOption('CS100010');
+  await page.getByRole('group', { name: '업종 대분류' }).getByRole('button', { name: '커피·음료' }).click();
 
   // 가맹점 수 순서로 목록이 나오고 첫 브랜드가 선택된다. 금액은 천원 원본을 원으로 바꿔 보여 준다.
   await expect(panel.getByText('커피·음료 브랜드 4개 중 가맹점이 있는 곳 3개, 평균매출을 공개한 곳 2개')).toBeVisible();

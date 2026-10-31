@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
 import { BUILDING_TYPE_CRITERIA, BUILDING_TYPE_LABELS, BUILDING_TYPES } from '@/features/rent-benchmark/types';
@@ -10,8 +10,20 @@ import {
   businessProfileSaveState,
   type BusinessProfileForm,
 } from './form';
+import { AreaIcon, BuildingTypeIcon, CoffeeIcon, FloorIcon, KoreanFoodIcon, SearchIcon, TipIcon } from './icons';
 
 const STEPS = ['위치·업종', '매장 크기', '매장 층', '상가 유형', '입력 확인'] as const;
+
+const INDUSTRIES = [
+  { code: 'CS100001', label: '한식음식점', Icon: KoreanFoodIcon },
+  { code: 'CS100010', label: '커피·음료', Icon: CoffeeIcon },
+] as const;
+
+const AREA_PRESETS = [
+  { value: '12', label: '소형', size: 'small' },
+  { value: '24', label: '중형', size: 'medium' },
+  { value: '40', label: '대형', size: 'large' },
+] as const;
 
 const FLOOR_LABELS: Readonly<Record<Exclude<BusinessProfileForm['floor'], ''>, string>> = {
   BASEMENT_1: '지하 1층',
@@ -72,21 +84,26 @@ export default function BusinessProfileWizard({
         : '미선택';
 
   return (
-    <section className="business-wizard" aria-labelledby="business-profile-title">
-      <div className="wizard-sidebar">
-        <p>
-          진행률{' '}
-          <strong>
+    <section className="business-wizard" aria-labelledby="business-wizard-title">
+      <div className="wizard-top">
+        <div className="wizard-title-row">
+          <strong id="business-wizard-title">창업 조건 입력</strong>
+          <span>
             {step + 1} / {STEPS.length}
-          </strong>
-        </p>
+          </span>
+        </div>
         <div className="wizard-progress">
           <span style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
         </div>
-        <ol>
+        <ol className="wizard-steps">
           {STEPS.map((label, index) => (
             <li key={label} className={index === step ? 'active' : index < step ? 'done' : ''}>
-              <button type="button" onClick={() => setStep(index)}>
+              <button
+                type="button"
+                className="step-button"
+                aria-current={index === step ? 'step' : undefined}
+                onClick={() => setStep(index)}
+              >
                 <span>{index < step ? '✓' : index + 1}</span>
                 {label}
               </button>
@@ -98,46 +115,55 @@ export default function BusinessProfileWizard({
         {step === 0 && (
           <>
             <WizardHeading
-              title="어디에서 어떤 가게를 열 계획인지 알려주세요."
+              title={
+                <>
+                  <em>어느 지역구</em>에서 <em>어떤 업종</em>으로
+                  <br />
+                  창업하시는지 알려주세요.
+                </>
+              }
               note="세부 업종 경쟁과 서울시 상위 업종 매출은 서로 다른 범위로 표시합니다."
             />
-            <div className="field-grid">
-              <label className="field">
-                <span>지역구</span>
+            <label className="field search-field">
+              <span>지역구</span>
+              <span className="search-select">
+                <SearchIcon />
                 <select
                   value={form.districtCode}
                   onChange={(event) => onChange({ ...form, districtCode: event.target.value })}
                 >
-                  <option value="">자치구를 선택하세요</option>
+                  <option value="">서울시 자치구 선택</option>
                   {SEOUL_DISTRICTS.map((item) => (
                     <option key={item.code} value={item.code}>
                       {item.name}
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="field">
-                <span>업종 대분류</span>
-                <select
-                  value={form.marketIndustryCode}
-                  onChange={(event) =>
-                    onChange({
-                      ...form,
-                      marketIndustryCode: event.target.value as BusinessProfileForm['marketIndustryCode'],
-                      detailedIndustryCode: '',
-                    })
-                  }
-                >
-                  <option value="">업종을 선택하세요</option>
-                  <option value="CS100001">한식음식점</option>
-                  <option value="CS100010">커피·음료</option>
-                </select>
-              </label>
-              <label className="field">
+              </span>
+            </label>
+            <div className="field" role="group" aria-labelledby="industry-group-label">
+              <span id="industry-group-label">업종 대분류</span>
+              <div className="choice-grid two">
+                {INDUSTRIES.map(({ code, label, Icon }) => (
+                  <button
+                    type="button"
+                    key={code}
+                    aria-pressed={form.marketIndustryCode === code}
+                    className={form.marketIndustryCode === code ? 'choice-card selected' : 'choice-card'}
+                    onClick={() => onChange({ ...form, marketIndustryCode: code, detailedIndustryCode: '' })}
+                  >
+                    <Icon />
+                    <strong>{label}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {form.marketIndustryCode && (
+              <label className="field detail-field">
                 <span>업종 소분류</span>
                 <select
                   value={form.detailedIndustryCode}
-                  disabled={!release || !form.marketIndustryCode}
+                  disabled={!release}
                   onChange={(event) => onChange({ ...form, detailedIndustryCode: event.target.value })}
                 >
                   <option value="">{!release ? '소진공 스냅샷 적재 전' : '선택하지 않음'}</option>
@@ -149,32 +175,38 @@ export default function BusinessProfileWizard({
                 </select>
                 <small>{categoryMessage}</small>
               </label>
-            </div>
+            )}
             {form.marketIndustryCode && <ScopeBanner detail={selectedDetail?.name ?? null} broad={broadName} />}
           </>
         )}
         {step === 1 && (
           <>
             <WizardHeading
-              title="매장 크기를 알려주세요."
-              note="지역 평균값을 만들지 않고 사용자가 계획한 정확한 면적을 저장합니다."
+              title={
+                <>
+                  <em>어떤 크기의 매장</em>을
+                  <br />
+                  생각하시는지 알려주세요.
+                </>
+              }
+              note="카드는 빠른 입력입니다. 지역 평균값을 만들지 않고, 아래에 입력한 정확한 면적을 저장합니다."
             />
             <div className="choice-grid three">
-              {[
-                ['12', '소형'],
-                ['24', '중형'],
-                ['40', '대형'],
-              ].map(([value, label]) => (
+              {AREA_PRESETS.map(({ value, label, size }) => (
                 <button
                   type="button"
                   key={value}
+                  aria-pressed={form.areaValue === value && form.areaUnit === 'PYEONG'}
                   className={
                     form.areaValue === value && form.areaUnit === 'PYEONG' ? 'choice-card selected' : 'choice-card'
                   }
                   onClick={() => onChange({ ...form, areaValue: value, areaUnit: 'PYEONG' })}
                 >
+                  <AreaIcon size={size} />
                   <strong>{label}</strong>
-                  <span>{value}평 빠른 입력</span>
+                  <span>
+                    {value}평 · 약 {pyeongToSquareMeters(value)}㎡
+                  </span>
                 </button>
               ))}
             </div>
@@ -208,7 +240,13 @@ export default function BusinessProfileWizard({
         {step === 2 && (
           <>
             <WizardHeading
-              title="매장이 어느 층에 있는지 알려주세요."
+              title={
+                <>
+                  <em>매장이 어떤 층</em>에 있는 걸
+                  <br />
+                  생각하시는지 알려주세요.
+                </>
+              }
               note="층에 맞는 부동산원 층별 임대료를 참고로 보여 드립니다. 재무계획에는 자동으로 넣지 않습니다."
             />
             <div className="choice-grid three">
@@ -216,10 +254,11 @@ export default function BusinessProfileWizard({
                 <button
                   type="button"
                   key={value}
+                  aria-pressed={form.floor === value}
                   className={form.floor === value ? 'choice-card selected' : 'choice-card'}
                   onClick={() => onChange({ ...form, floor: value })}
                 >
-                  <span className="floor-icon">{value === 'BASEMENT_1' ? '▤' : value === 'GROUND_1' ? '▥' : '▦'}</span>
+                  <FloorIcon floor={value} />
                   <strong>{label}</strong>
                 </button>
               ))}
@@ -229,7 +268,13 @@ export default function BusinessProfileWizard({
         {step === 3 && (
           <>
             <WizardHeading
-              title="매장이 어떤 건물에 있는지 알려주세요."
+              title={
+                <>
+                  <em>매장이 어떤 건물</em>에 있는 걸
+                  <br />
+                  생각하시는지 알려주세요.
+                </>
+              }
               note="한국부동산원 임대동향조사의 상가 구분입니다. 고른 유형의 조사 임대료를 참고로 보여 드립니다."
             />
             <div className="choice-grid three">
@@ -237,9 +282,11 @@ export default function BusinessProfileWizard({
                 <button
                   type="button"
                   key={value}
+                  aria-pressed={form.buildingType === value}
                   className={form.buildingType === value ? 'choice-card selected' : 'choice-card'}
                   onClick={() => onChange({ ...form, buildingType: value })}
                 >
+                  <BuildingTypeIcon type={value} />
                   <strong>{BUILDING_TYPE_LABELS[value]}</strong>
                   <span>{BUILDING_TYPE_CRITERIA[value]}</span>
                 </button>
@@ -250,7 +297,13 @@ export default function BusinessProfileWizard({
         {step === 4 && (
           <>
             <WizardHeading
-              title="입력 범위를 확인해 주세요."
+              title={
+                <>
+                  <em>입력한 창업 조건</em>을
+                  <br />
+                  확인해 주세요.
+                </>
+              }
               note={
                 complete
                   ? '화면 아래 "초안 저장"을 누르면 계획과 함께 저장됩니다. 재무 계산 입력과는 분리해 저장합니다.'
@@ -330,7 +383,7 @@ export default function BusinessProfileWizard({
   );
 }
 
-function WizardHeading({ title, note }: Readonly<{ title: string; note: string }>) {
+function WizardHeading({ title, note }: Readonly<{ title: ReactNode; note: string }>) {
   return (
     <div className="wizard-heading">
       <h2 id="business-profile-title">{title}</h2>
@@ -342,9 +395,21 @@ function WizardHeading({ title, note }: Readonly<{ title: string; note: string }
 function ScopeBanner({ detail, broad }: Readonly<{ detail: string | null; broad: string }>) {
   return (
     <div className="scope-banner">
-      <strong>데이터 범위</strong>
-      <span>경쟁 현황: {detail ? `${detail} 세부 업종 기준` : '세부 업종 미선택'}</span>
-      <span>매출·고객 분석: {broad} 전체 기준</span>
+      <strong>
+        <TipIcon />
+        데이터 범위
+      </strong>
+      <span>
+        경쟁 현황은 <em>{detail ? `${detail} 세부 업종` : '세부 업종 미선택'}</em> 기준이에요.
+      </span>
+      <span>
+        매출·고객 분석은 <em>{broad} 전체</em> 기준이에요.
+      </span>
     </div>
   );
+}
+
+// 1평 = 400/121㎡. 화면 표시용 근삿값이며 저장값은 사용자가 고른 평 단위 원값이다.
+function pyeongToSquareMeters(pyeong: string): string {
+  return ((Number(pyeong) * 400) / 121).toFixed(1);
 }
