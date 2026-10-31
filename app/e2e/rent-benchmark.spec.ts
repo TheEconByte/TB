@@ -110,7 +110,7 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
 
   await page.getByLabel('지역구').selectOption('11200');
-  await page.getByLabel('업종 대분류').selectOption('CS100010');
+  await page.getByRole('group', { name: '업종 대분류' }).getByRole('button', { name: '커피·음료' }).click();
   await page.getByRole('button', { name: '다음' }).click();
   await page.getByLabel('정확한 면적').fill('10');
   await page.getByRole('button', { name: '다음' }).click();
