@@ -12,12 +12,14 @@ function expectText(result: NoticeTextResult): string {
   return result.text;
 }
 
-// 표의 칸이 행 순서대로 이어져야 AI가 어느 자금의 한도인지 읽을 수 있다(ADR 0008 3절).
+// 문장과 표 칸이 읽는 순서대로, 서로 붙지 않고(공백이나 줄바꿈을 사이에 두고) 있어야 한다.
+// 행·칸 구분 표시까지는 요구하지 않는다: HWP 표는 칸마다 한 줄이 되고 행 경계가 남지 않는다(ADR 0008 Consequences).
 function expectInOrder(text: string, parts: readonly string[]) {
   let from = 0;
-  for (const part of parts) {
+  for (const [index, part] of parts.entries()) {
     const at = text.indexOf(part, from);
     expect(at, `"${part}"가 앞 문장 뒤에 있어야 한다`).toBeGreaterThanOrEqual(0);
+    if (index > 0) expect(text.slice(from, at), `"${part}"가 앞 문장과 붙어 있다`).toMatch(/\s/);
     from = at + part.length;
   }
 }
@@ -92,7 +94,7 @@ describe('extractNoticeText', () => {
   it.each(readable)('%s %s의 본문과 표 칸을 읽은 순서대로 돌려준다', async (type, name, parts) => {
     const text = expectText(await extractNoticeText(fixture(name), type));
     expectInOrder(text, parts);
-    // 형식마다 줄바꿈이 달라도 인용 대조(ADR 0008 3절)가 같은 기준으로 동작하도록 LF로 맞춘다.
+    // 저장하는 본문의 줄바꿈은 형식과 관계없이 LF다.
     expect(text).not.toContain('\r');
   });
 
@@ -116,20 +118,50 @@ describe('extractNoticeText', () => {
     }
   });
 
-  it('라이브러리를 불러오지 못하면 모든 공고를 읽지 못함으로 숨기지 않고 던진다', async () => {
-    // 설치 문제를 파일 문제로 돌리면 동기화가 성공한 채 모든 공고가 "읽지 못함"이 된다(AGENTS.md §3 2번).
-    vi.resetModules();
-    vi.doMock('@rhwp/core', () => ({
-      HwpDocument: class {},
-      initSync: () => {
-        throw new Error('WASM을 불러오지 못했습니다');
+  // 설치 문제를 파일 문제로 돌리면 동기화가 성공한 채 모든 공고가 "읽지 못함"이 된다(AGENTS.md §3 2번).
+  it.each([
+    {
+      label: 'HWP: rhwp WASM',
+      type: 'HWP' as const,
+      file: 'notice.hwp',
+      module: '@rhwp/core',
+      factory: () => ({
+        HwpDocument: class {},
+        initSync: () => {
+          throw new Error('WASM을 불러오지 못했습니다');
+        },
+      }),
+    },
+    {
+      label: 'PDF: pdf.js worker',
+      type: 'PDF' as const,
+      file: 'notice.pdf',
+      module: 'pdfjs-dist/legacy/build/pdf.worker.mjs',
+      factory: () => {
+        throw new Error('worker를 불러오지 못했습니다');
       },
-    }));
+    },
+    {
+      // CMap이 없으면 한글 CID 글꼴 PDF가 글자 없는 파일(NO_TEXT)로 보인다.
+      label: 'PDF: CMap 파일',
+      type: 'PDF' as const,
+      file: 'notice-cid.pdf',
+      module: 'node:fs/promises',
+      factory: async (importOriginal: () => Promise<object>) => ({
+        ...(await importOriginal()),
+        access: async () => {
+          throw new Error('CMap 파일이 없습니다');
+        },
+      }),
+    },
+  ])('$label: 불러오지 못하면 결과로 숨기지 않고 던진다', async ({ type, file, module, factory }) => {
+    vi.resetModules();
+    vi.doMock(module, factory);
     try {
       const fresh = await import('./notice-text.ts');
-      await expect(fresh.extractNoticeText(fixture('notice.hwp'), 'HWP')).rejects.toThrow('WASM을 불러오지 못했습니다');
+      await expect(fresh.extractNoticeText(fixture(file), type)).rejects.toThrow();
     } finally {
-      vi.doUnmock('@rhwp/core');
+      vi.doUnmock(module);
       vi.resetModules();
     }
   });

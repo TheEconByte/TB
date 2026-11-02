@@ -1,6 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // 공고 본문 파일(PDF·HWP·HWPX)을 텍스트로 바꾼다(ADR 0008 2절). 적재 명령에서만 쓴다.
 // 웹 요청 경로에서 import하지 않는다: 라이브러리가 크고, 외부에서 받은 파일을 다룬다.
@@ -26,39 +27,53 @@ export async function extractNoticeText(data: Uint8Array, type: NoticeFileType):
   } catch (error) {
     return { ok: false, reason: 'UNREADABLE', message: errorMessage(error) };
   }
+  // 줄바꿈만 LF로 맞춘다. 묶음 빈칸(U+00A0)·하이픈(U+00AD) 같은 문자와 PDF의 줄 바뀜 위치는 형식마다 다르게
+  // 남으므로, 인용 대조(ADR 0008 3절)는 양쪽을 같은 규칙으로 정규화하고 공백을 무시해 비교해야 한다.
   text = text.replace(/\r\n?/g, '\n');
   // 글자가 없는 파일을 빈 성공으로 돌려주지 않는다(AGENTS.md §3 2번).
   if (text.trim() === '') return { ok: false, reason: 'NO_TEXT', message: '파일에 읽을 수 있는 글자가 없습니다.' };
   return { ok: true, text };
 }
 
-async function loadPdfReader(): Promise<TextReader> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const root = dirname(require.resolve('pdfjs-dist/package.json'));
-  return async (data) => {
-    const task = pdfjs.getDocument({
-      // pdf.js가 버퍼를 넘겨받아 떼어 갈 수 있으므로 복사본을 준다.
-      data: new Uint8Array(data),
-      // 글꼴을 넣지 않은 한글 CID 글꼴은 CMap 파일이 있어야 글자로 바뀐다.
-      cMapUrl: join(root, 'cmaps') + '/',
-      cMapPacked: true,
-      standardFontDataUrl: join(root, 'standard_fonts') + '/',
-      useSystemFonts: false,
-      verbosity: pdfjs.VerbosityLevel.ERRORS,
-    });
-    try {
-      const pdf = await task.promise;
-      const pages: string[] = [];
-      for (let number = 1; number <= pdf.numPages; number++) {
-        const page = await pdf.getPage(number);
-        const content = await page.getTextContent();
-        pages.push(content.items.map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : '') : '')).join(''));
+let pdfReader: Promise<TextReader> | undefined;
+
+// pdf.js는 worker와 CMap을 문서를 열 때에야 불러온다. 그때 실패하면 모든 PDF가 UNREADABLE이나 NO_TEXT로 보이므로
+// 여기서 미리 불러 설치 문제를 던진다.
+function loadPdfReader(): Promise<TextReader> {
+  pdfReader ??= (async () => {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    // Node에는 Web Worker가 없어 pdf.js가 worker 코드를 같은 스레드에서 돌린다. 미리 불러 둔 것을 쓰게 한다.
+    const worker: unknown = await import(pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href);
+    (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = worker;
+    const root = dirname(require.resolve('pdfjs-dist/package.json'));
+    const cMapUrl = join(root, 'cmaps') + '/';
+    // 글꼴을 넣지 않은 한글 CID 글꼴은 CMap 파일이 있어야 글자로 바뀐다.
+    await access(join(cMapUrl, 'UniKS-UCS2-H.bcmap'));
+    return async (data: Uint8Array) => {
+      const task = pdfjs.getDocument({
+        // pdf.js가 버퍼를 넘겨받아 떼어 갈 수 있으므로 복사본을 준다.
+        data: new Uint8Array(data),
+        cMapUrl,
+        cMapPacked: true,
+        standardFontDataUrl: join(root, 'standard_fonts') + '/',
+        useSystemFonts: false,
+        verbosity: pdfjs.VerbosityLevel.ERRORS,
+      });
+      try {
+        const pdf = await task.promise;
+        const pages: string[] = [];
+        for (let number = 1; number <= pdf.numPages; number++) {
+          const page = await pdf.getPage(number);
+          const content = await page.getTextContent();
+          pages.push(content.items.map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : '') : '')).join(''));
+        }
+        return pages.join('\n');
+      } finally {
+        await task.destroy();
       }
-      return pages.join('\n');
-    } finally {
-      await task.destroy();
-    }
-  };
+    };
+  })();
+  return pdfReader;
 }
 
 let hwpReader: Promise<TextReader> | undefined;
@@ -71,7 +86,8 @@ function loadHwpReader(): Promise<TextReader> {
     return async (data: Uint8Array) => {
       const document = new HwpDocument(data);
       try {
-        // 한컴 GetTextFile("UNICODE")과 같은 문서 전체 글(표 칸 포함)이 JSON 문자열로 온다.
+        // 한컴 GetTextFile("UNICODE")처럼 본문·표 칸·글상자 글이 읽는 순서로, 표는 칸마다 한 줄씩 JSON 문자열로 온다.
+        // 행·칸 구분 표시는 없고 각주·머리말·꼬리말은 빠진다.
         const text: unknown = JSON.parse(document.getTextFileUnicode());
         if (typeof text !== 'string') throw new Error('rhwp가 문자열이 아닌 텍스트를 돌려주었습니다.');
         return text;
