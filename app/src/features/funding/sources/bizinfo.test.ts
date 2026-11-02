@@ -84,14 +84,6 @@ describe('기업마당 신청기간·지역 해석', () => {
 
   it('공고명 [지역] 표시와 소관기관으로 서울·자치구·다른 시·도를 가린다', () => {
     expect(bizinfoRegion('[서울] 소상공인 지원', '중소벤처기업부')).toMatchObject({ scope: 'SEOUL' });
-    expect(bizinfoRegion('[서울] 소상공인 지원', '서울특별시 중구')).toMatchObject({
-      scope: 'DISTRICTS',
-      districtCodes: ['11140'],
-    });
-    expect(bizinfoRegion('소상공인 지원', '서울특별시 동대문구')).toMatchObject({
-      scope: 'DISTRICTS',
-      districtCodes: ['11230'],
-    });
     expect(bizinfoRegion('소상공인 지원', '서울경제진흥원')).toMatchObject({ scope: 'SEOUL' });
     expect(bizinfoRegion('[경기] 소상공인 지원', '경기도')).toEqual({ scope: 'OTHER' });
     expect(bizinfoRegion('[충북 청주시] 소상공인 지원', '중소벤처기업부')).toEqual({ scope: 'OTHER' });
@@ -228,6 +220,75 @@ describe('기업마당 신청기간·지역 해석', () => {
       expect(bizinfoRegion(name, institution), name).toEqual({ scope: 'UNKNOWN' });
     }
   });
+
+  // 2026-11-02 리뷰: 자치구청이 올린 공고를 그 자치구 공고(DISTRICTS)로 정하면 다른 자치구 사용자는
+  // 지역 조건 FAIL이 된다(eligibility.ts). 구청은 서울 전역·전국 공고도 옮겨 올리므로 소관기관은 서울이라는
+  // 것만 알려 준다. 자치구는 공고명 표시가 서울 자치구 목록일 때만 정한다.
+  it('자치구 소관기관은 서울만 알려 주고, 공고가 그 자치구만 대상인지는 정하지 않는다', () => {
+    expect(bizinfoRegion('[서울] 지원', '서울특별시 마포구')).toEqual({
+      scope: 'SEOUL',
+      districtCodes: [],
+      basis: "공고명 지역 표시 '[서울]'",
+    });
+    expect(bizinfoRegion('소상공인 지원', '서울특별시 동대문구')).toEqual({
+      scope: 'SEOUL',
+      districtCodes: [],
+      basis: "소관기관 '서울특별시 동대문구'",
+    });
+    // 읽을 수 없는 표시에 지역 이름이 없으면 소관기관의 서울만 남는다.
+    expect(bizinfoRegion('[전역] 지원', '서울특별시 마포구')).toMatchObject({ scope: 'SEOUL', districtCodes: [] });
+    // 표시가 서울 자치구 목록이면 소관기관이 다른 자치구여도 표시를 따른다.
+    expect(bizinfoRegion('[서울 강남구] 지원', '서울특별시 서초구')).toMatchObject({
+      scope: 'DISTRICTS',
+      districtCodes: ['11680'],
+    });
+  });
+
+  // 서울 자치구 이름이 든 표시는 대상이 서울 전역보다 좁을 수 있어 서울로 넓히지도 않는다. 시·도 없는
+  // '[마포구]'는 다른 시의 같은 이름 구('중구'·'서구' 등)와 가릴 수 없어 자치구로도 정하지 않는다.
+  it('목록이 아닌 표시에 서울 자치구 이름이 있으면 소관기관과 상관없이 미확인이다', () => {
+    const unknown: Array<[string, string]> = [
+      ['[강남구 일대] 지원', '서울특별시 서초구'],
+      ['[마포구] 지원', '서울특별시 마포구'],
+      ['[성동구ㆍ광진구] 지원', '서울특별시'],
+      ['[강서구 소재 기업] 지원', '중소벤처기업부'],
+    ];
+    for (const [name, institution] of unknown) {
+      expect(bizinfoRegion(name, institution), name).toEqual({ scope: 'UNKNOWN' });
+    }
+    // 다른 시·도 소관기관이면 다른 시·도 이름이 있을 때처럼 뺀다. 다른 시에도 같은 이름의 구가 있다.
+    expect(bizinfoRegion('[대구 중구 일대] 지원', '대구광역시')).toEqual({ scope: 'OTHER' });
+    expect(bizinfoRegion('[중구 일대] 지원', '부산광역시 중구')).toEqual({ scope: 'OTHER' });
+  });
+
+  // 2026-11-02 리뷰: '[서울] 은평구 …'처럼 공고명이 자치구를 적은 공고를 서울로 정하면 다른 자치구 사용자도
+  // 지역 조건이 통과로 보인다. 2026-10-31 실제 수집에서 은평구·종로구·서대문구 공고 3건이 그랬다. 자치구는
+  // '[서울 ○○구]' 표시로만 정하므로, 그 밖에 공고명이 서울 자치구를 적으면 서울로 정하지 않고 미확인으로 둔다.
+  it('공고명이 서울 자치구를 적으면 서울로 확정하지 않는다', () => {
+    const unknown: Array<[string, string]> = [
+      ['[서울] 은평구 2026년 소규모 자영업자 LED간판 설치 지원사업 공고', '서울특별시'],
+      ['[서울] 2025년 하반기 강남구 중소기업육성기금 융자 지원 공고', '서울특별시 강남구'],
+      ['[서울시] 종로구 소상공인 라이브커머스 지원', '서울특별시'],
+      ['2026년 마포구 소상공인 경영안정자금 지원', '서울특별시 마포구'],
+      ['[소상공인] 마포구청 지원', '서울특별시 마포구'],
+      ['서대문구(청년창업) 전문상담 모집', '서울특별시'],
+    ];
+    for (const [name, institution] of unknown) {
+      expect(bizinfoRegion(name, institution), name).toEqual({ scope: 'UNKNOWN' });
+    }
+    // '[서울 ○○구]' 표시는 공고명에 그 자치구가 다시 적혀도 자치구다.
+    expect(bizinfoRegion('[서울 강남구] 강남구 소상공인 지원', '서울특별시 강남구')).toMatchObject({
+      scope: 'DISTRICTS',
+      districtCodes: ['11680'],
+    });
+  });
+
+  // 자치구 이름이 낱말 안에 있을 뿐이면('집중구매'의 '중구') 자치구를 적은 것이 아니다.
+  it('낱말 안의 자치구 이름은 자치구로 보지 않는다', () => {
+    expect(bizinfoRegion('[집중구매] 지원', '서울특별시')).toMatchObject({ scope: 'SEOUL' });
+    expect(bizinfoRegion('[서울] 집중구매 소상공인 지원', '중소벤처기업부')).toMatchObject({ scope: 'SEOUL' });
+    expect(bizinfoRegion('신중구상 소상공인 지원', '서울특별시')).toMatchObject({ scope: 'SEOUL' });
+  });
 });
 
 describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
@@ -330,7 +391,8 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
 
     expect(byId.get('PBLN_F')).toMatchObject({
       organization: '서울특별시 중구',
-      region: { scope: 'DISTRICTS', districtCodes: ['11140'], note: null },
+      // 자치구 소관기관은 서울만 알려 준다.
+      region: { scope: 'SEOUL', districtCodes: [], note: null },
     });
     const nationwide = byId.get('PBLN_G');
     expect(nationwide?.region).toMatchObject({ scope: 'UNKNOWN', districtCodes: [] });
