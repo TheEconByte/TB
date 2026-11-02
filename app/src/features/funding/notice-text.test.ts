@@ -13,7 +13,7 @@ function expectText(result: NoticeTextResult): string {
 }
 
 // 문장과 표 칸이 읽는 순서대로, 서로 붙지 않고(공백이나 줄바꿈을 사이에 두고) 있어야 한다.
-// 행·칸 구분 표시까지는 요구하지 않는다: HWP 표는 칸마다 한 줄이 되고 행 경계가 남지 않는다(ADR 0008 Consequences).
+// 행·칸 구분 표시까지는 요구하지 않는다: HWP 표는 칸마다 한 줄이 되고 행 경계가 남지 않는다(ADR 0009 Consequences).
 function expectInOrder(text: string, parts: readonly string[]) {
   let from = 0;
   for (const [index, part] of parts.entries()) {
@@ -105,7 +105,7 @@ describe('extractNoticeText', () => {
   });
 
   it('호출자의 파일 바이트를 바꾸거나 떼어 가지 않는다', async () => {
-    // 수집 단계는 추출 뒤에도 원 파일 바이트로 checksum을 남긴다(ADR 0008 2절).
+    // 수집 단계는 추출한 뒤에도 같은 바이트를 쓴다(예: checksum, ADR 0009 2절).
     for (const [type, name] of [
       ['PDF', 'notice.pdf'],
       ['HWP', 'notice.hwp'],

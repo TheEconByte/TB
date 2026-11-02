@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// 공고 본문 파일(PDF·HWP·HWPX)을 텍스트로 바꾼다(ADR 0008 2절). 적재 명령에서만 쓴다.
+// 공고 본문 파일(PDF·HWP·HWPX)을 텍스트로 바꾼다(ADR 0009 2절). 적재 명령에서만 쓴다.
 // 웹 요청 경로에서 import하지 않는다: 라이브러리가 크고, 외부에서 받은 파일을 다룬다.
 
 export type NoticeFileType = 'PDF' | 'HWP' | 'HWPX';
@@ -28,7 +28,7 @@ export async function extractNoticeText(data: Uint8Array, type: NoticeFileType):
     return { ok: false, reason: 'UNREADABLE', message: errorMessage(error) };
   }
   // 줄바꿈만 LF로 맞춘다. 묶음 빈칸(U+00A0)·하이픈(U+00AD) 같은 문자와 PDF의 줄 바뀜 위치는 형식마다 다르게
-  // 남으므로, 인용 대조(ADR 0008 3절)는 양쪽을 같은 규칙으로 정규화하고 공백을 무시해 비교해야 한다.
+  // 남으므로, 인용 대조(ADR 0009 3절)는 양쪽을 같은 규칙으로 정규화하고 공백을 무시해 비교해야 한다.
   text = text.replace(/\r\n?/g, '\n');
   // 글자가 없는 파일을 빈 성공으로 돌려주지 않는다(AGENTS.md §3 2번).
   if (text.trim() === '') return { ok: false, reason: 'NO_TEXT', message: '파일에 읽을 수 있는 글자가 없습니다.' };
