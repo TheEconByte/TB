@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { MarketScoreResponse, ScoreContribution } from './api.ts';
-import { handoffSearch, storeHandoff, type MarketScoreHandoff } from './handoff.ts';
+import { handoffSearch, type MarketScoreHandoff } from './handoff.ts';
 
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
@@ -69,7 +69,7 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
           {score.distribution && <DistributionChart distribution={score.distribution} value={score.score.value} />}
 
           <div className="button-row score-actions">
-            <Link href={`/${handoffSearch(handoff)}`} onClick={() => storeHandoff(handoff)} className="primary-link">
+            <Link href={`/${handoffSearch(handoff)}`} className="primary-link">
               이 상권으로 재무 계획 시작
             </Link>
             <Link href={`/funding${handoffSearch(handoff)}`} className="secondary-link">

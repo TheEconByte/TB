@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
 import FinancePlanner, { defaultInputWith } from '@/features/finance/FinancePlanner';
 import { quarterLabel } from '@/features/market/quarter';
 import type { MarketScoreResponse } from '@/features/market/score/api';
-import { clearHandoff, readHandoff, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
+import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
 import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
 import { parsePlanMarketScore } from '@/features/plans/market-score';
 import type { FinanceInput, FinanceResult } from '@/features/finance/types';
@@ -269,20 +270,26 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   // 상품 확정 조건을 적용하면 저장된 입력이 바뀌므로 폼을 그 입력으로 다시 채우는 신호.
   const [formSyncToken, setFormSyncToken] = useState(0);
-  // /markets에서 [이 상권으로 재무 계획 시작]으로 넘어온 상권. 새 계획을 저장하면 비운다.
+  // /markets의 [이 상권으로 재무 계획 시작]이 URL로 넘긴 상권 참조. 화면을 열 때 한 번만 읽는다.
+  // next/link로 넘어오면 렌더링 중의 window.location은 아직 이전 화면 주소라 라우터의 검색 파라미터를 읽는다.
+  const searchParams = useSearchParams();
+  const [handoff] = useState(() => handoffFromSearch(searchParams.toString()));
+  // 넘어온 상권. 새 계획을 저장하면 비운다.
   const [marketSource, setMarketSource] = useState<MarketSource | null>(null);
+  // 점수를 읽는 동안에는 새 계획 재무 입력을 열지 않는다. 늦은 응답이 그사이 입력한 값을 덮지 않게 한다.
+  const [marketLoading, setMarketLoading] = useState(handoff !== null);
 
   // 넘겨받은 참조로 점수 API를 다시 읽는다. URL 값을 그대로 믿지 않고, 저장할 때도 서버가 다시 확인한다.
+  // 읽은 참조는 바로 URL에서 지운다. 버튼을 누른 그 한 번만 쓰고, 실패·새로고침·로그아웃 뒤에 다시 쓰지 않는다(ADR 0008 §5).
   useEffect(() => {
-    const handoff = readHandoff();
     if (!handoff) return;
+    clearHandoff();
     let cancelled = false;
     void (async () => {
       try {
         const score = await api<MarketScoreResponse>(scoreApiUrl(handoff));
         if (cancelled) return;
         if (score.status !== 'OK' || !score.score || !score.financeDefault) {
-          clearHandoff();
           setMessage(score.message ?? '이 상권 점수는 재무 계획에 연결할 수 없습니다.');
           return;
         }
@@ -297,15 +304,16 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
         );
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : '상권 점수를 불러오지 못했습니다.');
+      } finally {
+        if (!cancelled) setMarketLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [handoff]);
 
   function disconnectMarketSource() {
-    clearHandoff();
     setMarketSource(null);
     setMessage('상권 연결을 해제했습니다. 미리 채운 값은 직접 고칠 수 있습니다.');
   }
@@ -380,10 +388,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
               ...(marketSource ? { marketScore: marketSource.handoff } : {}),
             }),
           });
-      if (!plan && marketSource) {
-        clearHandoff();
-        setMarketSource(null);
-      }
+      if (!plan && marketSource) setMarketSource(null);
       setPlan({ ...data.plan, inputJson: input, results: plan?.results ?? [] });
       // revision이 올라가면 이전 판정은 다른 조건의 결과이므로 지운다.
       setMatches(null);
@@ -633,37 +638,43 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             industryCode={businessForm.marketIndustryCode}
             savedMonthlyRevenue={plan?.inputJson.monthlyRevenue ?? null}
           />
-          <FinancePlanner
-            // 상권 기본값이 늦게 도착해도 새 계획 폼이 그 값으로 다시 채워지도록 key에 상권을 넣는다.
-            key={plan?.id ?? (pendingMarket ? `new-${pendingMarket.handoff.areaCode}` : 'new')}
-            initialTitle={
-              plan?.title ??
-              (pendingMarket
-                ? `${pendingMarket.score.area.displayName} ${pendingMarket.score.industry.displayName} 계획`
-                : undefined)
-            }
-            initialInput={
-              plan?.inputJson ??
-              (pendingMarket?.score.financeDefault
-                ? defaultInputWith({ monthlyRevenue: pendingMarket.score.financeDefault.monthlyRevenue })
-                : undefined)
-            }
-            initialResult={storedResult?.resultJson}
-            revision={plan?.revision ?? null}
-            resultRevision={storedResult?.inputRevision ?? null}
-            busy={busy}
-            syncToken={formSyncToken}
-            onDirtyChange={setFinanceDirty}
-            revenueNotice={
-              <MarketSourceNotice
-                pending={pendingMarket}
-                stored={storedMarketScore}
-                onDisconnect={disconnectMarketSource}
-              />
-            }
-            onSave={saveDraft}
-            onCalculate={calculate}
-          />
+          {plan === null && marketLoading ? (
+            <p className="loading-state" role="status">
+              상권 점수를 불러오고 있습니다.
+            </p>
+          ) : (
+            <FinancePlanner
+              // 상권 연결 여부는 key에 넣지 않는다. 연결을 해제할 때 폼을 다시 만들면 저장하지 않은 입력이 사라진다.
+              key={plan?.id ?? 'new'}
+              initialTitle={
+                plan?.title ??
+                (pendingMarket
+                  ? `${pendingMarket.score.area.displayName} ${pendingMarket.score.industry.displayName} 계획`
+                  : undefined)
+              }
+              initialInput={
+                plan?.inputJson ??
+                (pendingMarket?.score.financeDefault
+                  ? defaultInputWith({ monthlyRevenue: pendingMarket.score.financeDefault.monthlyRevenue })
+                  : undefined)
+              }
+              initialResult={storedResult?.resultJson}
+              revision={plan?.revision ?? null}
+              resultRevision={storedResult?.inputRevision ?? null}
+              busy={busy}
+              syncToken={formSyncToken}
+              onDirtyChange={setFinanceDirty}
+              revenueNotice={
+                <MarketSourceNotice
+                  pending={pendingMarket}
+                  stored={storedMarketScore}
+                  onDisconnect={disconnectMarketSource}
+                />
+              }
+              onSave={saveDraft}
+              onCalculate={calculate}
+            />
+          )}
           <PlanFundingPanel
             plan={plan}
             principalKrw={plan?.inputJson.newLoan.principal ?? null}
@@ -910,10 +921,6 @@ function PlanFundingPanel({
 
 export default function TrendBenchApp() {
   const { data: session, isPending } = authClient.useSession();
-  // 로그인 화면을 거쳐도 상권 참조가 남도록 URL 값을 세션 저장소에도 둔다.
-  useEffect(() => {
-    readHandoff();
-  }, []);
   if (isPending)
     return (
       <main>
@@ -921,5 +928,10 @@ export default function TrendBenchApp() {
       </main>
     );
   if (!session) return <AuthScreen />;
-  return <AuthenticatedWorkspace key={session.user.id} email={session.user.email} />;
+  // 계획 화면은 useSearchParams를 쓰므로 Suspense 경계 안에 둔다.
+  return (
+    <Suspense>
+      <AuthenticatedWorkspace key={session.user.id} email={session.user.email} />
+    </Suspense>
+  );
 }

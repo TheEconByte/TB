@@ -196,7 +196,27 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호').fill(password);
   await page.getByRole('button', { name: '회원가입', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+  // 재무 입력은 상권 점수를 받은 뒤에 나오므로 계획 목록으로 로그인 완료를 확인한다.
+  await expect(page.getByRole('heading', { name: '내 계획', exact: true })).toBeVisible();
+}
+
+// [이 상권으로 재무 계획 시작]이 여는 주소. 화면은 참조만 넘긴다(ADR 0008 §5).
+function startUrl(releaseKey: string): string {
+  return `/?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=CS100001&scoreRelease=${releaseKey}`;
+}
+
+const SCORE_API = /\/api\/markets\/score\?/;
+
+function uniqueSuffix(projectName: string): string {
+  return `${projectName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function storedPlan(page: Page) {
+  return page.evaluate(async () => {
+    const list = (await (await fetch('/api/plans')).json()) as { plans: Array<{ id: string }> };
+    const detail = await (await fetch(`/api/plans/${list.plans[0].id}`)).json();
+    return detail.plan as { marketScoreJson: Record<string, unknown> | null; inputJson: { monthlyRevenue: string } };
+  });
 }
 
 test.afterEach(async () => {
@@ -279,4 +299,152 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await page.goto(`/funding?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=CS100001&scoreRelease=${releaseKey}`);
   await expect(page.getByTestId('funding-grade')).toContainText('상권 생존점수 등급 A (72점)');
   await expect(page.getByTestId('funding-grade')).toContainText('자금 후보 판정 조건에 쓰지 않으며');
+});
+
+// 해제는 상권 출처만 떼어 낸다. 해제 문구('미리 채운 값은 직접 고칠 수 있습니다')대로
+// 사용자가 고친 값과 미리 채운 값이 모두 폼에 남아야 한다.
+test('상권 연결을 해제해도 재무 입력이 그대로 남는다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  const releaseKey = await seedScore(suffix);
+  await page.goto(startUrl(releaseKey));
+  await signUp(page, `market-unlink-${suffix}@example.test`);
+
+  const source = page.getByTestId('market-source');
+  await expect(source).toContainText('등급 A');
+  await page.getByLabel('계획 제목').fill('내가 고친 제목');
+  await page.locator('#rent').fill('1500000');
+  await source.getByRole('button', { name: '상권 연결 해제' }).click();
+
+  await expect(page.locator('.status-message')).toContainText('상권 연결을 해제했습니다.');
+  await expect(source).toHaveCount(0);
+  await expect(page.getByLabel('계획 제목')).toHaveValue('내가 고친 제목');
+  await expect(page.locator('#rent')).toHaveValue('1,500,000');
+  await expect(page.locator('#monthlyRevenue')).toHaveValue('3,000,000');
+
+  // 해제한 뒤 저장하면 상권 스냅샷 없이 폼에 남은 값만 저장한다.
+  await page.getByRole('button', { name: '초안 저장' }).click();
+  await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
+  const stored = await storedPlan(page);
+  expect(stored.marketScoreJson).toBeNull();
+  expect(stored.inputJson.monthlyRevenue).toBe('3000000');
+});
+
+// 점수 응답이 늦게 와도 사용자가 그동안 입력한 값을 덮으면 안 된다.
+// 응답 전에는 재무 입력을 받지 않으므로 덮을 입력이 생기지 않는다.
+test('상권 점수가 늦게 와도 재무 입력을 덮지 않는다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  const releaseKey = await seedScore(suffix);
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(SCORE_API, async (route) => {
+    await released;
+    await route.continue();
+  });
+  await page.goto(startUrl(releaseKey));
+  await signUp(page, `market-late-${suffix}@example.test`);
+
+  await expect(page.getByText('상권 점수를 불러오고 있습니다.')).toBeVisible();
+  await expect(page.getByLabel('계획 제목')).toHaveCount(0);
+  // 참조는 응답을 기다리지 않고 읽자마자 지운다. 그래야 로딩 중 새로고침·로그아웃 뒤에 다시 쓰지 않는다.
+  await expect(page).not.toHaveURL(/scoreArea=/);
+  release();
+  await expect(page.getByTestId('market-source')).toContainText('등급 A');
+  await expect(page.getByLabel('계획 제목')).toHaveValue('E2E 상권 한식 계획');
+});
+
+// 버튼을 누른 그 한 번만 채운다(ADR 0008 §5, AGENTS.md §3-3). 저장하지 않고 새로고침하거나,
+// 떠났다가 일반 링크로 돌아오면 새 계획 기본값으로 시작해야 한다.
+test('저장하지 않고 떠났다 돌아오면 상권 값을 다시 채우지 않는다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  const releaseKey = await seedScore(suffix);
+  await page.goto(startUrl(releaseKey));
+  await signUp(page, `market-once-${suffix}@example.test`);
+  await expect(page.getByTestId('market-source')).toContainText('등급 A');
+  await expect(page).not.toHaveURL(/scoreArea=/);
+
+  // 새 계획 기본값은 FinancePlanner의 defaults(월매출 20,000,000원)와 빈 제목·빈 자치구다.
+  const expectBlankNewPlan = async () => {
+    await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+    await expect(page.getByTestId('market-source')).toHaveCount(0);
+    await expect(page.getByLabel('계획 제목')).toHaveValue('');
+    await expect(page.locator('#monthlyRevenue')).toHaveValue('20,000,000');
+    await expect(page.getByLabel('2. 사업장·거주 자치구')).toHaveValue('');
+  };
+
+  await page.reload();
+  await expectBlankNewPlan();
+
+  await page.goto(startUrl(releaseKey));
+  await expect(page.getByTestId('market-source')).toContainText('등급 A');
+  await page.getByRole('link', { name: '상권 탐색' }).click();
+  await expect(page).toHaveURL(/\/markets/);
+  await page.getByRole('link', { name: '내 창업 계획' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expectBlankNewPlan();
+});
+
+// /funding을 거쳐 next/link로 오가면 로그인 상태가 메모리에 남아, 계획 화면이 이동과 같은 렌더링에서 그려진다.
+// 그때도 버튼이 넘긴 참조로만 채우고, 다른 화면 주소에 있던 참조로는 채우지 않아야 한다.
+async function openFundingSignedIn(page: Page, path: string): Promise<void> {
+  await page.goto(path);
+  await expect(page.getByRole('heading', { name: '이 결과가 무엇이고 무엇이 아닌지' })).toBeVisible();
+}
+
+test('화면 안에서 이동해 버튼을 눌러도 상권 값을 채운다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  await seedScore(suffix);
+  await page.goto('/');
+  await signUp(page, `market-softnav-${suffix}@example.test`);
+  await openFundingSignedIn(page, '/funding');
+
+  await page.locator('header').getByRole('link', { name: '상권 탐색' }).click();
+  await page.getByLabel('1. 자치구').selectOption('11200');
+  await page.getByLabel('2. 상권').selectOption(`A:${AREA_CODE}`);
+  await page.getByLabel('3. 업종').selectOption('CS100001');
+  await page.locator('.score-panel').getByRole('link', { name: '이 상권으로 재무 계획 시작' }).click();
+
+  await expect(page.getByTestId('market-source')).toContainText('E2E 상권 한식 점포당 평균 기준 · 등급 A');
+  await expect(page.locator('#monthlyRevenue')).toHaveValue('3,000,000');
+  await expect(page).not.toHaveURL(/scoreArea=/);
+});
+
+test('다른 화면 주소의 상권 참조로는 채우지 않는다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  const releaseKey = await seedScore(suffix);
+  await page.goto('/');
+  await signUp(page, `market-funding-link-${suffix}@example.test`);
+  // [자금 후보 보기]가 여는 주소. 등급을 표시할 뿐 재무 계획을 시작하는 버튼이 아니다.
+  await openFundingSignedIn(page, `/funding${startUrl(releaseKey).slice(1)}`);
+  await expect(page.getByTestId('funding-grade')).toContainText('등급 A');
+
+  await page.locator('header').getByRole('link', { name: '내 창업 계획' }).click();
+  await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+  await expect(page.getByTestId('market-source')).toHaveCount(0);
+  await expect(page.getByLabel('계획 제목')).toHaveValue('');
+  await expect(page.locator('#monthlyRevenue')).toHaveValue('20,000,000');
+});
+
+// 점수 API가 4xx·5xx를 내도 참조를 지운다. 남기면 /를 다시 열 때마다 같은 오류가 뜬다.
+test('상권 점수 오류는 한 번만 알리고 참조를 지운다', async ({ page }, testInfo) => {
+  const suffix = uniqueSuffix(testInfo.project.name);
+  const releaseKey = await seedScore(suffix);
+  await page.route(SCORE_API, (route) =>
+    route.fulfill({
+      status: 503,
+      json: { error: { code: 'SCORE_UNAVAILABLE', message: 'E2E 점수 오류입니다.' } },
+    }),
+  );
+  await page.goto(startUrl(releaseKey));
+  await signUp(page, `market-error-${suffix}@example.test`);
+  await expect(page.locator('.status-message')).toContainText('E2E 점수 오류입니다.');
+  await expect(page).not.toHaveURL(/scoreArea=/);
+
+  // 점수 API가 정상으로 돌아와도 지운 참조로 다시 채우지 않는다.
+  await page.unroute(SCORE_API);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+  await expect(page.getByText('E2E 점수 오류입니다.')).toHaveCount(0);
+  await expect(page.getByTestId('market-source')).toHaveCount(0);
 });

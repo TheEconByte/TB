@@ -1,6 +1,7 @@
 // /markets의 [이 상권으로 재무 계획 시작]에서 /로 넘기는 상권 참조(ADR 0008). 점수·금액은 넘기지 않고,
 // 받는 쪽이 점수 API에서 다시 읽고 저장할 때는 서버가 점수 릴리스에서 다시 확인한다.
-// 로그인 화면을 거쳐도 남도록 URL과 sessionStorage에 함께 둔다.
+// 참조는 URL에만 둔다. 이메일 로그인은 페이지를 옮기지 않아 로그인 화면을 거쳐도 URL이 남는다.
+// 받는 쪽은 한 번 읽으면 지운다. 브라우저 저장소에 두면 떠났다가 일반 링크로 돌아와도 다시 채워진다.
 
 export type MarketScoreHandoff = {
   areaType: string;
@@ -9,7 +10,6 @@ export type MarketScoreHandoff = {
   releaseKey: string;
 };
 
-const STORAGE_KEY = 'trendbench.marketScoreHandoff';
 const PARAMS = {
   areaType: 'scoreAreaType',
   areaCode: 'scoreArea',
@@ -54,35 +54,8 @@ export function scoreApiUrl(handoff: Pick<MarketScoreHandoff, 'areaType' | 'area
   return `/api/markets/score?areaType=${encodeURIComponent(handoff.areaType)}&areaCode=${encodeURIComponent(handoff.areaCode)}&industryCode=${encodeURIComponent(handoff.industryCode)}`;
 }
 
-// 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 URL만으로 동작한다.
-export function storeHandoff(handoff: MarketScoreHandoff): void {
-  try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(handoff));
-  } catch {
-    /* URL에 남아 있다. */
-  }
-}
-
-export function readHandoff(): MarketScoreHandoff | null {
-  const fromUrl = handoffFromSearch(window.location.search);
-  if (fromUrl) {
-    storeHandoff(fromUrl);
-    return fromUrl;
-  }
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    return raw ? parseHandoff(JSON.parse(raw) as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
+// 받은 참조를 URL에서 지운다. 다른 쿼리와 해시는 그대로 둔다.
 export function clearHandoff(): void {
-  try {
-    window.sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* 저장소가 없으면 지울 것도 없다. */
-  }
   const url = new URL(window.location.href);
   let changed = false;
   for (const name of Object.values(PARAMS)) {
