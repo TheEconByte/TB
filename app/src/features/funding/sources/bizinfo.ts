@@ -151,6 +151,12 @@ function seoulDistrictCode(value: string): string | null {
 // 지역을 빼는 말이 들어 있으면 서울이 대상인지 알 수 없다. 서울이 적혀 있으면 미확인이고, 아니면 다른
 // 시·도 소관기관일 때만 서울 밖으로 본다. 표기를 하나씩 막으면 새 표기가 계속 빠져서 목록인지로 가린다.
 // 서울 소관기관으로 정하면 '[서울 강남구 일대]'(서초구청)처럼 표시의 나머지를 무시하게 되어 정하지 않는다.
+// 목록이 아닌 표시에 서울 자치구 이름('[강남구 일대]')을 낱말로 적어도 대상이 서울 전역보다 좁을 수 있어, 다른 시·도
+// 이름과 같이 다른 시·도 소관기관일 때만 서울 밖이고 아니면 미확인이다('중구'는 다른 시에도 있다).
+//
+// 자치구는 표시에서만 정한다. 구청은 서울 전역·전국 공고도 옮겨 올리므로 '서울특별시 마포구' 소관기관은
+// 서울이라는 것만 알려 준다. 그 자치구로 정하면 다른 자치구 사용자가 지역 조건 미충족이 된다.
+// 반대로 '[서울] 은평구 …'처럼 공고명이 자치구를 적으면 그 자치구만 대상일 수 있어 서울로도 정하지 않는다.
 export function bizinfoRegion(name: string, institution: string): BizinfoRegion {
   const tag = /^\s*\[([^\]]+)\]/.exec(name)?.[1].trim() ?? null;
   if (tag !== null) {
@@ -163,10 +169,7 @@ export function bizinfoRegion(name: string, institution: string): BizinfoRegion 
       const districtCode = seoulDistrictCode(seoulParts[0]);
       if (districtCode !== null)
         return { scope: 'DISTRICTS', districtCodes: [districtCode], basis: `공고명 지역 표시 '[${tag}]'` };
-      const institutionDistrict = seoulDistrictCode(institution);
-      if (institutionDistrict !== null) {
-        return { scope: 'DISTRICTS', districtCodes: [institutionDistrict], basis: `소관기관 '${institution}'` };
-      }
+      if (namesSeoulDistrict(name)) return { scope: 'UNKNOWN' };
       return { scope: 'SEOUL', districtCodes: [], basis: `공고명 지역 표시 '[${tag}]'` };
     }
     if (listed) return { scope: 'OTHER' };
@@ -175,17 +178,21 @@ export function bizinfoRegion(name: string, institution: string): BizinfoRegion 
       tag.includes(region),
     );
     if (tag.includes('서울')) return { scope: 'UNKNOWN' };
-    if (namesOtherRegion || excludesRegion) {
+    if (namesOtherRegion || excludesRegion || namesSeoulDistrict(tag)) {
       return isOtherRegionInstitution(institution) ? { scope: 'OTHER' } : { scope: 'UNKNOWN' };
     }
   }
-  const institutionDistrict = seoulDistrictCode(institution);
-  if (institutionDistrict !== null) {
-    return { scope: 'DISTRICTS', districtCodes: [institutionDistrict], basis: `소관기관 '${institution}'` };
+  if (institution.startsWith('서울')) {
+    if (namesSeoulDistrict(name)) return { scope: 'UNKNOWN' };
+    return { scope: 'SEOUL', districtCodes: [], basis: `소관기관 '${institution}'` };
   }
-  if (institution.startsWith('서울')) return { scope: 'SEOUL', districtCodes: [], basis: `소관기관 '${institution}'` };
   if (isOtherRegionInstitution(institution)) return { scope: 'OTHER' };
   return { scope: 'UNKNOWN' };
+}
+
+// 서울 자치구 이름이 낱말로 적혀 있는지. 앞이 한글이면 낱말 안이다('집중구매'의 '중구'). '서울중구'는 적은 것이다.
+function namesSeoulDistrict(text: string): boolean {
+  return SEOUL_DISTRICTS.some((district) => new RegExp(`(?:^|[^가-힣]|서울(?:특별시|시)?)${district.name}`).test(text));
 }
 
 // '서울', '서울특별시', '서울시', '서울 강남구', '서울강남구'.
