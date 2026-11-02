@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { marketSummaryQuerySchema } from '@/features/market/schema';
+import { PROVISIONAL_SALES_BASIS, provisionalQuarterSales } from '@/features/market/provisional';
 import { getMarketSummary } from '@/features/market/read';
 import type { MarketReport } from '@/features/market/types';
 import { apiError, internalError, invalidZod } from '@/lib/api';
@@ -44,6 +45,10 @@ export async function GET(request: Request) {
       sourceRelease: outcome.payload.release.releaseKey,
       asOf: latestQuarter,
       nullReason: outcome.payload.dataStatus === 'NOT_PROVIDED' ? outcome.payload.dataStatusMessage : null,
+      provisionalSales: {
+        basis: PROVISIONAL_SALES_BASIS,
+        quarters: outcome.payload.quarters.map(provisionalQuarterSales),
+      },
     };
     return NextResponse.json(report);
   } catch (error) {

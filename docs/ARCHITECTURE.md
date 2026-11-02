@@ -41,6 +41,7 @@ Operator load commands (*:load)
 | 책임 | 위치 |
 |---|---|
 | 페이지·Route Handler | `app/src/app` |
+| 여러 화면이 함께 쓰는 UI(보고서 상단 탭) | `app/src/components` |
 | DB schema·migration | `app/prisma` |
 | 운영 적재·검증·하네스 명령 | `app/scripts` |
 | 브라우저 종단 흐름 (desktop·mobile) | `app/e2e/`: `core-flow.spec.ts`(가입 → 저장·계산 → 재조회 → 소유권 차단), `rent-benchmark.spec.ts`, `franchise.spec.ts` |
