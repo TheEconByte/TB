@@ -24,8 +24,9 @@ function highlightKey(points: readonly ChartDatum[], highlight: Highlight): stri
   return observed.reduce((best, point) => (point.value > best.value ? point : best)).key;
 }
 
+// 축 이름과 값을 쌍점으로 나눈다. 요일 '월'과 값이 붙어 '월매출'처럼 읽히지 않게 한다.
 function tip(point: ChartDatum, format: (value: number) => string): string {
-  return `${point.label} ${point.value === null ? emptyText(point) : format(point.value)}`;
+  return `${point.label}: ${point.value === null ? emptyText(point) : format(point.value)}`;
 }
 
 export function ColumnChart({

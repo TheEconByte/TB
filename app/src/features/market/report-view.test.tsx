@@ -84,8 +84,8 @@ function report(quarters: QuarterIndicatorRow[]): MarketReport {
 
 const COMPETITION_MARKER = '경쟁 점포 표시 확인용 문장';
 
-function renderText(summary: MarketReport): string {
-  const html = renderToStaticMarkup(
+function renderHtml(summary: MarketReport): string {
+  return renderToStaticMarkup(
     <MarketReportView
       summary={summary}
       selectedArea={null}
@@ -93,7 +93,10 @@ function renderText(summary: MarketReport): string {
       competition={<p>{COMPETITION_MARKER}</p>}
     />,
   );
-  return html.replace(/<[^>]+>/g, '');
+}
+
+function renderText(summary: MarketReport): string {
+  return renderHtml(summary).replace(/<[^>]+>/g, '');
 }
 
 function occurrences(text: string, part: string): number {
@@ -171,6 +174,80 @@ describe('market report keeps an observed zero apart from missing data', () => {
     const baseline = occurrences(renderText(report([row('20251')])), '자료 부족');
     const missing = row('20251', { similarIndustryStoreCount: null, salesCount: null });
     expect(occurrences(renderText(report([missing])), '자료 부족')).toBeGreaterThan(baseline);
+  });
+
+  // 전분기 비교 문장도 같은 규칙이다. 전분기 분모가 0이라 값이 없으면 전분기 값이 없다고 쓰지 않는다.
+  // 기본 행의 점포당 월매출은 30,000,000 ÷ 10 = 300만 원, 평균 금액은 30,000,000 ÷ 1,500 = 20,000원이다.
+  const PER_STORE = '점포당 월매출(잠정)은 300만 원이에요.';
+  const AVERAGE = '결제 1건당 평균 금액은 20,000원이에요.';
+  const zeroDenominators = { storeCount: 0, franchiseStoreCount: 0, similarIndustryStoreCount: 0, salesCount: '0' };
+
+  it('says the previous quarter had a zero denominator instead of no value', () => {
+    const text = renderText(report([row('20244', zeroDenominators), row('20251')]));
+    expect(text).toContain(`${PER_STORE} 전분기는 유사 업종 점포 수가 0개라 비교하지 않았어요`);
+    expect(text).toContain(`${AVERAGE} 전분기는 매출 건수가 0건이라 비교하지 않았어요`);
+  });
+
+  it('still says a missing previous value is missing in the ratio sentences', () => {
+    const previous = row('20244', { similarIndustryStoreCount: null, salesCount: null });
+    const text = renderText(report([previous, row('20251')]));
+    expect(text).toContain(`${PER_STORE} 전분기 값이 없어`);
+    expect(text).toContain(`${AVERAGE} 전분기 값이 없어`);
+  });
+
+  it('calls the previous value missing when its sales value is missing, even with a zero denominator', () => {
+    const previous = row('20244', { ...zeroDenominators, salesAmount: null, salesStatus: 'NOT_PROVIDED' });
+    const text = renderText(report([previous, row('20251')]));
+    expect(text).toContain(`${PER_STORE} 전분기 값이 없어`);
+    expect(text).toContain(`${AVERAGE} 전분기 값이 없어`);
+  });
+
+  // '전분기'는 바로 앞 분기다. 적재기는 자료가 있는 분기에만 행을 만들므로 행이 빠진 분기를 건너뛰어 비교하지 않는다.
+  it('does not compare with an older row when the previous quarter has no row', () => {
+    const ratios = renderText(report([row('20243', zeroDenominators), row('20251')]));
+    expect(ratios).toContain(`${PER_STORE} 전분기 값이 없어`);
+    expect(ratios).toContain(`${AVERAGE} 전분기 값이 없어`);
+
+    const stores = renderText(report([row('20243'), row('20251', { similarIndustryStoreCount: 12 })]));
+    expect(stores).toContain('는 12개예요. 전분기 값이 없어');
+  });
+
+  it('still compares with the previous quarter when it has a row', () => {
+    // 12 − 10 = 2개, 2 ÷ 10 = 20.0%
+    const text = renderText(report([row('20244'), row('20251', { similarIndustryStoreCount: 12 })]));
+    expect(text).toContain('는 12개예요. 전분기 대비 2개(+20.0%) 늘었어요');
+  });
+
+  // 원값이 없을 때는 원값이 없다고만 쓴다. 관측된 분모 0까지 '없을 수 있다'고 읽히게 쓰지 않는다.
+  it('names the missing sales value alone when the denominator is an observed zero', () => {
+    const text = renderText(
+      report([
+        row('20251', {
+          salesAmount: null,
+          salesStatus: 'NOT_PROVIDED',
+          salesCount: '0',
+          storeCount: 0,
+          franchiseStoreCount: 0,
+          similarIndustryStoreCount: 0,
+        }),
+      ]),
+    );
+    expect(text).toContain('매출 원값이 없어');
+    expect(text).not.toContain('점포 수가 없어');
+    expect(text).not.toContain('건수가 없어');
+  });
+
+  it('writes a missing store count without a unit suffix', () => {
+    const text = renderText(report([row('20251', { openedStoreCount: null, closedStoreCount: null })]));
+    expect(text).not.toContain('자료 부족개');
+  });
+
+  // 말풍선·스크린 리더 문구에서 요일 '월'과 값이 이어져 '월매출'로 읽히지 않아야 한다.
+  // 스크린 리더는 쌍점을 읽지 않을 수 있어 요일을 온전히 쓴다.
+  it('keeps a zero-total share tooltip from reading as monthly sales', () => {
+    const html = renderHtml(report([row('20251', { salesAmount: '0', salesBreakdown: breakdown('0') })]));
+    expect(html).toContain('aria-label="월요일: 매출 0원"');
+    expect(html).not.toMatch(/aria-label="월\s*매출/);
   });
 });
 

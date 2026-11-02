@@ -6,6 +6,7 @@ import ReportNav from '@/components/ReportNav';
 import { formatManWon, formatWonExact } from '@/lib/format-won';
 import { ColumnChart, LineChart, ShareBars, ZERO_TOTAL_SHARE_LABEL, shares, type ChartDatum } from './ReportCharts';
 import type { ProvisionalQuarterSales } from './provisional';
+import { previousQuarter } from './quarter.ts';
 import {
   MARKET_LIMITATIONS,
   type AreaInfo,
@@ -38,6 +39,11 @@ function formatDate(value: string): string {
 
 function formatCount(value: number | null): string {
   return value === null ? '자료 부족' : numberFormat.format(value);
+}
+
+// 문장에 쓰는 점포 수. 없는 값에는 단위를 붙이지 않는다.
+function formatStoreCount(value: number | null): string {
+  return value === null ? '자료 부족' : `${numberFormat.format(value)}개`;
 }
 
 function shortQuarter(quarter: string): string {
@@ -529,6 +535,12 @@ function sameQuarterLastYear(quarters: readonly QuarterIndicatorRow[], row: Quar
   return quarters.find((quarter) => quarter.quarter === code) ?? null;
 }
 
+// 바로 앞 분기의 행. 적재기는 자료가 있는 분기에만 행을 만들므로 배열의 앞 행이 전분기라는 보장이 없다.
+function previousQuarterRow(quarters: readonly QuarterIndicatorRow[], row: QuarterIndicatorRow) {
+  const code = previousQuarter(row.quarter);
+  return quarters.find((quarter) => quarter.quarter === code) ?? null;
+}
+
 type ProvisionalRatio = 'perStoreMonthlySalesAmount' | 'averagePaymentAmount';
 
 // 잠정 비율 값이 null인 이유가 분모 0인지. ADR 0002는 분모가 없을 때와 0일 때 모두 null을 주지만,
@@ -539,13 +551,51 @@ function zeroDenominator(quarter: QuarterIndicatorRow, field: ProvisionalRatio):
   return quarter.salesCount !== null && new Decimal(quarter.salesCount).isZero();
 }
 
-const ZERO_DENOMINATOR_LABELS: Record<ProvisionalRatio, string> = {
-  perStoreMonthlySalesAmount: '점포 0개',
-  averagePaymentAmount: '건수 0건',
+// 잠정 비율 값이 없을 때 쓰는 말을 한곳에 둔다. zeroLabel은 차트·원본 표의 짧은 표시이고,
+// 문장 조각은 조사가 앞 낱말에 따라 달라서(0개라·0건이라) 통째로 둔다.
+const RATIO_WORDING: Record<ProvisionalRatio, { target: string; zeroLabel: string; zero: string; missing: string }> = {
+  perStoreMonthlySalesAmount: {
+    target: '점포당 월매출',
+    zeroLabel: '점포 0개',
+    zero: '유사 업종 점포 수가 0개라',
+    missing: '유사 업종 점포 수가 없어',
+  },
+  averagePaymentAmount: {
+    target: '결제 1건당 평균 금액',
+    zeroLabel: '건수 0건',
+    zero: '매출 건수가 0건이라',
+    missing: '매출 건수가 없어',
+  },
 };
 
 function emptyRatioLabel(quarter: QuarterIndicatorRow, field: ProvisionalRatio): string {
-  return zeroDenominator(quarter, field) ? ZERO_DENOMINATOR_LABELS[field] : '자료 부족';
+  return zeroDenominator(quarter, field) ? RATIO_WORDING[field].zeroLabel : '자료 부족';
+}
+
+// 잠정 비율 값을 계산하지 않은 이유를 한 가지만 쓴다. 원값이 없을 때 관측된 분모까지 없을 수 있다고 읽히게 쓰지 않는다.
+function ratioGapSentence(quarter: QuarterIndicatorRow, field: ProvisionalRatio): string {
+  const wording = RATIO_WORDING[field];
+  const reason =
+    quarter.salesAmount === null
+      ? '매출 원값이 없어'
+      : zeroDenominator(quarter, field)
+        ? wording.zero
+        : wording.missing;
+  return `${quarter.label} ${reason} ${wording.target}을 계산하지 않았어요.`;
+}
+
+// 전분기 잠정 비율과 비교하는 문장. 전분기 분모가 실제 0이라 값이 없으면 전분기 값이 없다고 쓰지 않는다.
+function describeRatioChange(
+  current: string,
+  previous: QuarterIndicatorRow | null,
+  previousValue: string | null,
+  field: ProvisionalRatio,
+  format: (abs: string) => string,
+): string {
+  if (previous && previousValue === null && zeroDenominator(previous, field)) {
+    return `전분기는 ${RATIO_WORDING[field].zero} 비교하지 않았어요.`;
+  }
+  return describeChange(compareValues(current, previousValue), '전분기', format);
 }
 
 function ReportSection({
@@ -595,7 +645,7 @@ export function MarketReportView({
   const { quarters } = summary;
   const industry = summary.industry.displayName;
   const latest = quarters.at(-1) ?? null;
-  const previous = quarters.length > 1 ? quarters[quarters.length - 2] : null;
+  const previous = latest ? previousQuarterRow(quarters, latest) : null;
   const lastYear = latest ? sameQuarterLastYear(quarters, latest) : null;
   const provisional = new Map<string, ProvisionalQuarterSales>(
     summary.provisionalSales.quarters.map((row) => [row.quarter, row]),
@@ -728,7 +778,7 @@ export function MarketReportView({
                 ) : (
                   <p className="report-sentence">
                     {latest.label} 기준 {industry} 점포(유사 업종 점포 수)는{' '}
-                    <strong>{formatCount(latest.similarIndustryStoreCount)}개</strong>예요.{' '}
+                    <strong>{formatStoreCount(latest.similarIndustryStoreCount)}</strong>예요.{' '}
                     {describeChange(
                       compareValues(latest.similarIndustryStoreCount, previous?.similarIndustryStoreCount ?? null),
                       '전분기',
@@ -746,11 +796,11 @@ export function MarketReportView({
                 <dl className="mini-stats">
                   <div>
                     <dt>{latest.label} 개업</dt>
-                    <dd>{formatCount(latest.openedStoreCount)}개</dd>
+                    <dd>{formatStoreCount(latest.openedStoreCount)}</dd>
                   </div>
                   <div>
                     <dt>{latest.label} 폐업</dt>
-                    <dd>{formatCount(latest.closedStoreCount)}개</dd>
+                    <dd>{formatStoreCount(latest.closedStoreCount)}</dd>
                   </div>
                 </dl>
               </div>
@@ -831,28 +881,23 @@ export function MarketReportView({
                     <p className="report-sentence">
                       {latest.label} 점포당 월매출(잠정)은{' '}
                       <strong>{formatManWon(latestProvisional.perStoreMonthlySalesAmount)}</strong>이에요.{' '}
-                      {describeChange(
-                        compareValues(
-                          latestProvisional.perStoreMonthlySalesAmount,
-                          previousProvisional?.perStoreMonthlySalesAmount ?? null,
-                        ),
-                        '전분기',
+                      {describeRatioChange(
+                        latestProvisional.perStoreMonthlySalesAmount,
+                        previous,
+                        previousProvisional?.perStoreMonthlySalesAmount ?? null,
+                        'perStoreMonthlySalesAmount',
                         manWonText,
                       )}
                     </p>
                     <p className="raw-value">
                       원값 {formatWonExact(latest.salesAmount!)} ÷ 유사 업종 점포{' '}
-                      {formatCount(latest.similarIndustryStoreCount)}개 ={' '}
+                      {formatStoreCount(latest.similarIndustryStoreCount)} ={' '}
                       {formatWonExact(latestProvisional.perStoreMonthlySalesAmount)}. 상권 평균이며 개인 예상매출이
                       아니에요.
                     </p>
                   </>
                 ) : (
-                  <p className="report-sentence">
-                    {zeroDenominator(latest, 'perStoreMonthlySalesAmount')
-                      ? `${latest.label} 유사 업종 점포 수가 0개라 점포당 월매출을 계산하지 않았어요.`
-                      : `매출 원값이나 유사 업종 점포 수가 없어 ${latest.label} 점포당 월매출을 계산하지 않았어요.`}
-                  </p>
+                  <p className="report-sentence">{ratioGapSentence(latest, 'perStoreMonthlySalesAmount')}</p>
                 )}
                 <p className="chart-unit">단위: 원 · 분기별 점포당 월매출(잠정)</p>
                 <ColumnChart
@@ -888,12 +933,11 @@ export function MarketReportView({
                     <p className="report-sentence">
                       {latest.label} 결제 1건당 평균 금액은{' '}
                       <strong>{formatWonExact(latestProvisional.averagePaymentAmount)}</strong>이에요.{' '}
-                      {describeChange(
-                        compareValues(
-                          latestProvisional.averagePaymentAmount,
-                          previousProvisional?.averagePaymentAmount ?? null,
-                        ),
-                        '전분기',
+                      {describeRatioChange(
+                        latestProvisional.averagePaymentAmount,
+                        previous,
+                        previousProvisional?.averagePaymentAmount ?? null,
+                        'averagePaymentAmount',
                         formatWonExact,
                       )}
                     </p>
@@ -902,11 +946,7 @@ export function MarketReportView({
                     </p>
                   </>
                 ) : (
-                  <p className="report-sentence">
-                    {zeroDenominator(latest, 'averagePaymentAmount')
-                      ? `${latest.label} 매출 건수가 0건이라 결제 1건당 평균 금액을 계산하지 않았어요.`
-                      : '매출 원값이나 건수가 없어 평균 금액을 계산하지 않았어요.'}
-                  </p>
+                  <p className="report-sentence">{ratioGapSentence(latest, 'averagePaymentAmount')}</p>
                 )}
                 <p className="chart-unit">단위: 원</p>
                 <LineChart
@@ -1045,10 +1085,10 @@ function CustomerBreakdown({ quarter }: { readonly quarter: QuarterIndicatorRow 
   const breakdown = quarter.salesBreakdown!;
   const toShare = (points: typeof breakdown.dayOfWeek) =>
     points.map((point) => ({ key: point.key, label: point.label, amount: point.salesAmount }));
-  const toColumns = (points: typeof breakdown.dayOfWeek): ChartDatum[] =>
+  const toColumns = (points: typeof breakdown.dayOfWeek, label = (text: string) => text): ChartDatum[] =>
     shares(toShare(points)).map((row) => ({
       key: row.key,
-      label: row.label,
+      label: label(row.label),
       value: row.percent,
       emptyLabel: ZERO_TOTAL_SHARE_LABEL,
     }));
@@ -1077,7 +1117,8 @@ function CustomerBreakdown({ quarter }: { readonly quarter: QuarterIndicatorRow 
           <p className="chart-unit">단위: % · 매출 금액 비중</p>
           <ColumnChart
             title="요일별 매출 비중"
-            points={toColumns(breakdown.dayOfWeek)}
+            // 요일은 온전히 쓴다. '월'만 쓰면 말풍선·스크린 리더에서 뒤의 값과 붙어 '월매출'처럼 들린다.
+            points={toColumns(breakdown.dayOfWeek, (day) => `${day}요일`)}
             format={percent}
             highlight="max"
           />
