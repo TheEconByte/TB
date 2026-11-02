@@ -4,7 +4,7 @@ import Decimal from 'decimal.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReportNav from '@/components/ReportNav';
 import { formatManWon, formatWonExact } from '@/lib/format-won';
-import { ColumnChart, LineChart, ShareBars, shares, type ChartDatum } from './ReportCharts';
+import { ColumnChart, LineChart, ShareBars, ZERO_TOTAL_SHARE_LABEL, shares, type ChartDatum } from './ReportCharts';
 import type { ProvisionalQuarterSales } from './provisional';
 import {
   MARKET_LIMITATIONS,
@@ -529,6 +529,25 @@ function sameQuarterLastYear(quarters: readonly QuarterIndicatorRow[], row: Quar
   return quarters.find((quarter) => quarter.quarter === code) ?? null;
 }
 
+type ProvisionalRatio = 'perStoreMonthlySalesAmount' | 'averagePaymentAmount';
+
+// 잠정 비율 값이 null인 이유가 분모 0인지. ADR 0002는 분모가 없을 때와 0일 때 모두 null을 주지만,
+// 화면은 관측된 0을 자료 부족으로 쓰지 않는다(AGENTS.md §3-2).
+function zeroDenominator(quarter: QuarterIndicatorRow, field: ProvisionalRatio): boolean {
+  if (quarter.salesAmount === null) return false;
+  if (field === 'perStoreMonthlySalesAmount') return quarter.similarIndustryStoreCount === 0;
+  return quarter.salesCount !== null && new Decimal(quarter.salesCount).isZero();
+}
+
+const ZERO_DENOMINATOR_LABELS: Record<ProvisionalRatio, string> = {
+  perStoreMonthlySalesAmount: '점포 0개',
+  averagePaymentAmount: '건수 0건',
+};
+
+function emptyRatioLabel(quarter: QuarterIndicatorRow, field: ProvisionalRatio): string {
+  return zeroDenominator(quarter, field) ? ZERO_DENOMINATOR_LABELS[field] : '자료 부족';
+}
+
 function ReportSection({
   index,
   title,
@@ -546,11 +565,23 @@ function ReportSection({
   );
 }
 
+function CompetitionSection({ index, competition }: Readonly<{ index: number; competition: React.ReactNode }>) {
+  return (
+    <ReportSection
+      index={index}
+      title="세부 업종 경쟁 점포"
+      lead="소진공 상가(상권)정보 스냅샷의 자치구 점포 수와 목록이에요. 상권이 아니라 자치구 범위이고 매출 자료가 아니에요."
+    >
+      {competition}
+    </ReportSection>
+  );
+}
+
 function ProvisionalTag() {
   return <span className="provisional-tag">잠정</span>;
 }
 
-function MarketReportView({
+export function MarketReportView({
   summary,
   selectedArea,
   detailedCategoryName,
@@ -579,13 +610,24 @@ function MarketReportView({
         ? `가용 분기 ${quarters.length}개 중 매출 원값이 있는 분기 ${observedQuarters}개입니다.`
         : '이 상권·업종 조합의 관측 자료가 없습니다.';
 
-  const series = (value: (quarter: QuarterIndicatorRow) => number | null): ChartDatum[] =>
-    quarters.map((quarter) => ({ key: quarter.quarter, label: shortQuarter(quarter.quarter), value: value(quarter) }));
+  const series = (
+    value: (quarter: QuarterIndicatorRow) => number | null,
+    emptyLabel?: (quarter: QuarterIndicatorRow) => string,
+  ): ChartDatum[] =>
+    quarters.map((quarter) => ({
+      key: quarter.quarter,
+      label: shortQuarter(quarter.quarter),
+      value: value(quarter),
+      emptyLabel: emptyLabel?.(quarter),
+    }));
   const provisionalSeries = (field: keyof Omit<ProvisionalQuarterSales, 'quarter'>) =>
-    series((quarter) => {
-      const value = provisional.get(quarter.quarter)?.[field] ?? null;
-      return value === null ? null : Number(value);
-    });
+    series(
+      (quarter) => {
+        const value = provisional.get(quarter.quarter)?.[field] ?? null;
+        return value === null ? null : Number(value);
+      },
+      field === 'monthlySalesAmount' ? undefined : (quarter) => emptyRatioLabel(quarter, field),
+    );
   const manWon = (value: number) => formatManWon(String(Math.round(value)));
   const manWonText = (value: string) => formatManWon(value);
   const countText = (value: string) => `${numberFormat.format(BigInt(value))}개`;
@@ -660,13 +702,17 @@ function MarketReportView({
       </ReportSection>
 
       {!latest ? (
-        <div className="empty-panel" role="status">
-          <h2>자료 부족</h2>
-          <p>
-            {summary.area.displayName} · {industry} 조합에는 적재된 분기 지표가 없습니다. 값을 0으로 만들지 않고 자료
-            부족으로 표시합니다. 다른 상권이나 업종을 선택해 주세요.
-          </p>
-        </div>
+        <>
+          <div className="empty-panel" role="status">
+            <h2>자료 부족</h2>
+            <p>
+              {summary.area.displayName} · {industry} 조합에는 적재된 분기 지표가 없습니다. 값을 0으로 만들지 않고 자료
+              부족으로 표시합니다. 다른 상권이나 업종을 선택해 주세요.
+            </p>
+          </div>
+          {/* 경쟁 점포는 자치구 스냅샷이라 이 상권·업종의 분기 자료와 상관없이 보여 준다. */}
+          <CompetitionSection index={2} competition={competition} />
+        </>
       ) : (
         <>
           <ReportSection
@@ -803,7 +849,9 @@ function MarketReportView({
                   </>
                 ) : (
                   <p className="report-sentence">
-                    매출 원값이나 유사 업종 점포 수가 없어 {latest.label} 점포당 월매출을 계산하지 않았어요.
+                    {zeroDenominator(latest, 'perStoreMonthlySalesAmount')
+                      ? `${latest.label} 유사 업종 점포 수가 0개라 점포당 월매출을 계산하지 않았어요.`
+                      : `매출 원값이나 유사 업종 점포 수가 없어 ${latest.label} 점포당 월매출을 계산하지 않았어요.`}
                   </p>
                 )}
                 <p className="chart-unit">단위: 원 · 분기별 점포당 월매출(잠정)</p>
@@ -854,7 +902,11 @@ function MarketReportView({
                     </p>
                   </>
                 ) : (
-                  <p className="report-sentence">매출 원값이나 건수가 없어 평균 금액을 계산하지 않았어요.</p>
+                  <p className="report-sentence">
+                    {zeroDenominator(latest, 'averagePaymentAmount')
+                      ? `${latest.label} 매출 건수가 0건이라 결제 1건당 평균 금액을 계산하지 않았어요.`
+                      : '매출 원값이나 건수가 없어 평균 금액을 계산하지 않았어요.'}
+                  </p>
                 )}
                 <p className="chart-unit">단위: 원</p>
                 <LineChart
@@ -878,13 +930,7 @@ function MarketReportView({
             )}
           </ReportSection>
 
-          <ReportSection
-            index={5}
-            title="세부 업종 경쟁 점포"
-            lead="소진공 상가(상권)정보 스냅샷의 자치구 점포 수와 목록이에요. 상권이 아니라 자치구 범위이고 매출 자료가 아니에요."
-          >
-            {competition}
-          </ReportSection>
+          <CompetitionSection index={5} competition={competition} />
 
           <ReportSection index={6} title="분기별 원본 지표">
             <div className="table-scroll">
@@ -955,12 +1001,15 @@ function MarketReportView({
   );
 }
 
-// 일반 점포와 프랜차이즈 점포의 구성. 두 값 중 하나라도 없으면 비율을 만들지 않는다.
+// 일반 점포와 프랜차이즈 점포의 구성. 두 값 중 하나라도 없거나 둘 다 0이면 비율을 만들지 않는다.
 function StoreMix({ quarter }: { readonly quarter: QuarterIndicatorRow }) {
   const general = quarter.storeCount;
   const franchise = quarter.franchiseStoreCount;
-  if (general === null || franchise === null || general + franchise === 0) {
+  if (general === null || franchise === null) {
     return <p className="table-note">일반·프랜차이즈 점포 구성 자료가 없어 비율을 표시하지 않아요.</p>;
+  }
+  if (general + franchise === 0) {
+    return <p className="table-note">일반·프랜차이즈 점포가 모두 0개라 비율을 표시하지 않아요.</p>;
   }
   const generalPercent = Math.round((general / (general + franchise)) * 1000) / 10;
   return (
@@ -997,7 +1046,12 @@ function CustomerBreakdown({ quarter }: { readonly quarter: QuarterIndicatorRow 
   const toShare = (points: typeof breakdown.dayOfWeek) =>
     points.map((point) => ({ key: point.key, label: point.label, amount: point.salesAmount }));
   const toColumns = (points: typeof breakdown.dayOfWeek): ChartDatum[] =>
-    shares(toShare(points)).map((row) => ({ key: row.key, label: row.label, value: row.percent }));
+    shares(toShare(points)).map((row) => ({
+      key: row.key,
+      label: row.label,
+      value: row.percent,
+      emptyLabel: ZERO_TOTAL_SHARE_LABEL,
+    }));
   const topAge = topShareLabel(breakdown.age);
   const topGender = topShareLabel(breakdown.gender);
   const topDay = topShareLabel(breakdown.dayOfWeek);
@@ -1085,9 +1139,9 @@ function QuarterRow({
   readonly quarter: QuarterIndicatorRow;
   readonly provisional: ProvisionalQuarterSales | undefined;
 }) {
-  const won = (value: string | null | undefined) =>
+  const won = (value: string | null | undefined, emptyLabel = '자료 부족') =>
     value === null || value === undefined ? (
-      <span className="missing-value">자료 부족</span>
+      <span className="missing-value">{emptyLabel}</span>
     ) : (
       numberFormat.format(BigInt(value))
     );
@@ -1096,7 +1150,7 @@ function QuarterRow({
       <th scope="row">{quarter.label}</th>
       <td>{won(quarter.salesAmount)}</td>
       <td>{won(provisional?.monthlySalesAmount)}</td>
-      <td>{won(provisional?.perStoreMonthlySalesAmount)}</td>
+      <td>{won(provisional?.perStoreMonthlySalesAmount, emptyRatioLabel(quarter, 'perStoreMonthlySalesAmount'))}</td>
       <td>{won(quarter.salesCount)}</td>
       <td>{formatCount(quarter.storeCount)}</td>
       <td>{formatCount(quarter.similarIndustryStoreCount)}</td>

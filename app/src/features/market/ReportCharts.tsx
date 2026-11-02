@@ -4,9 +4,18 @@
 // 추세의 모양과 자료가 없는 칸만 보여 주고, 값은 강조한 칸과 마우스·키보드 초점의
 // 말풍선에만 적는다.
 
-export type ChartDatum = { key: string; label: string; value: number | null };
+// value가 null인 칸은 기본으로 '자료 부족'이라고 쓴다. 원값은 있지만 분모가 0이라 값을 만들지 않은
+// 칸은 emptyLabel로 이유를 적는다(관측된 0을 자료 부족으로 쓰지 않는다, AGENTS.md §3-2).
+export type ChartDatum = { key: string; label: string; value: number | null; emptyLabel?: string };
+
+// 한 분류의 금액 합계가 0이라 비중을 만들지 않은 칸의 표시.
+export const ZERO_TOTAL_SHARE_LABEL = '매출 0원';
 
 type Highlight = 'last' | 'max' | 'none';
+
+function emptyText(point: ChartDatum): string {
+  return point.emptyLabel ?? '자료 부족';
+}
 
 function highlightKey(points: readonly ChartDatum[], highlight: Highlight): string | null {
   const observed = points.filter((point): point is ChartDatum & { value: number } => point.value !== null);
@@ -16,7 +25,7 @@ function highlightKey(points: readonly ChartDatum[], highlight: Highlight): stri
 }
 
 function tip(point: ChartDatum, format: (value: number) => string): string {
-  return `${point.label} ${point.value === null ? '자료 부족' : format(point.value)}`;
+  return `${point.label} ${point.value === null ? emptyText(point) : format(point.value)}`;
 }
 
 export function ColumnChart({
@@ -42,7 +51,7 @@ export function ColumnChart({
           return (
             <div key={point.key} className="column-slot" tabIndex={0} aria-label={text} data-tip={text}>
               {point.value === null ? (
-                <span className="column-missing">자료 부족</span>
+                <span className="column-missing">{emptyText(point)}</span>
               ) : (
                 <span
                   className={`column-bar${point.key === strong ? ' strong' : ''}`}
@@ -118,7 +127,7 @@ export function LineChart({
                 aria-label={text}
                 data-tip={text}
               >
-                자료 부족
+                {emptyText(point)}
               </span>
             );
           }
@@ -172,7 +181,7 @@ export function ShareBars({ title, points }: Readonly<{ title: string; points: r
           <div className="share-track">
             <span style={{ width: `${row.percent ?? 0}%` }} />
           </div>
-          <strong>{row.percent === null ? '자료 부족' : `${row.percent.toFixed(1)}%`}</strong>
+          <strong>{row.percent === null ? ZERO_TOTAL_SHARE_LABEL : `${row.percent.toFixed(1)}%`}</strong>
         </div>
       ))}
     </div>

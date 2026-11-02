@@ -826,6 +826,9 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+.funding-hero {
+  padding-bottom: 30px;
+}
 .status-counts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
