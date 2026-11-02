@@ -1531,9 +1531,6 @@ footer {
   display: grid;
   gap: 12px;
 }
-.choice-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
 .choice-grid.three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1792,9 +1789,6 @@ footer {
   .choice-grid.three .choice-card span {
     text-align: left;
     margin-left: auto;
-  }
-  .choice-grid.two .choice-card {
-    min-height: 128px;
   }
   .profile-summary-grid > div {
     grid-template-columns: 104px minmax(0, 1fr);
