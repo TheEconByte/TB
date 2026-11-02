@@ -2,19 +2,71 @@
 // stored as-is in the JSON catalog and mirrored by the Prisma enums, so a name
 // change here is a catalog schema change too.
 
-export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.0.0';
+export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.2.0';
+
+// 이미 적재된 릴리스를 읽을 수 있는 스키마 버전. v1.1.0은 v1.0.0에 출처 식별자와
+// 자동화 설정을, v1.2.0은 지원 유형 UNKNOWN과 사업 단계 미확인(빈 배열)을 더했을
+// 뿐이라 이전 릴리스도 그대로 읽는다.
+export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
+  'funding-catalog-v1.0.0',
+  'funding-catalog-v1.1.0',
+  FUNDING_CATALOG_SCHEMA_VERSION,
+];
 
 // A product whose reviewer is still unassigned is kept in the catalog but the
 // operator commands warn: a real person must own the next review before the
 // catalog drives anything user-facing.
 export const REVIEWER_UNASSIGNED = 'UNASSIGNED';
 
-export const SUPPORT_TYPES = ['GRANT', 'GUARANTEE', 'LOAN', 'SPACE', 'PROGRAM'] as const;
+// funding:sync가 공식 출처에서 모은 상품의 검수자. 사람 대신 자동 규칙 버전을 적고,
+// 규칙을 바꾸면 버전을 올린다(ADR 0006).
+export const AUTO_REVIEWER_PREFIX = 'AUTO:';
+export const FUNDING_AUTOMATION_RULES_VERSION = 'funding-auto-v1';
+export const AUTO_REVIEWER = `${AUTO_REVIEWER_PREFIX}${FUNDING_AUTOMATION_RULES_VERSION}`;
+
+export function isAutoReviewer(reviewer: string): boolean {
+  return reviewer.startsWith(AUTO_REVIEWER_PREFIX);
+}
+
+// funding:sync가 상품을 모으는 공식 출처.
+export const FUNDING_SOURCES = ['SEMAS_OLS', 'BIZINFO'] as const;
+export type FundingSource = (typeof FUNDING_SOURCES)[number];
+
+export const FUNDING_SOURCE_LABELS: Record<FundingSource, string> = {
+  SEMAS_OLS: '소상공인시장진흥공단 정책자금 사이트',
+  BIZINFO: '기업마당 지원사업정보',
+};
+
+// 새 공고를 찾는 데만 쓰는 출처. 사업 단계·지원 유형을 알 수 없어, 이 출처만으로 확인된
+// 상품은 사람이 확인하기 전에는 현재 후보가 되지 않는다(ADR 0006 2절).
+export const DISCOVERY_ONLY_SOURCES: readonly FundingSource[] = ['BIZINFO'];
+
+// 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 현재 후보에서 빠진다.
+export const SOURCE_FRESHNESS_DAYS = 3;
+
+// UNKNOWN은 원문이 지원 유형을 알려 주지 않는 공고(예: 기업마당 공고)다. 지원금이나
+// 대출로 추측해 표시하지 않고, 원 공고에서 확인해야 하는 값으로 남긴다.
+export const SUPPORT_TYPES = ['GRANT', 'GUARANTEE', 'LOAN', 'SPACE', 'PROGRAM', 'UNKNOWN'] as const;
 export type SupportType = (typeof SUPPORT_TYPES)[number];
 
 // GRANT is a non-repayable subsidy. GUARANTEE, LOAN, SPACE and PROGRAM do not
 // repay the same way, so only LOAN products can ever reach repayment math.
+// UNKNOWN은 대출인지 알 수 없으므로 상환 계산 대상이 아니다.
 export const REPAYABLE_SUPPORT_TYPES: readonly SupportType[] = ['LOAN'];
+
+// 정책자금 갈래(대출·보증). ADR 0006에 따라 자동 승격은 이 갈래에만 쓴다. 지원금·공간·
+// 프로그램(지원사업)은 자동으로 모아도 사람이 확인해야 현재 후보가 된다.
+export const POLICY_LOAN_SUPPORT_TYPES: readonly SupportType[] = ['LOAN', 'GUARANTEE'];
+
+// 후보 API와 화면의 갈래(ADR 0006 1절). 저장하지 않고 지원 유형에서 정하므로 카탈로그에는 없다.
+// 지원 유형을 모르는 공고는 정책자금·지원사업 어느 쪽으로도 추측하지 않고 따로 둔다.
+export const FUNDING_BRANCHES = ['POLICY_FUND', 'SUPPORT_PROGRAM', 'UNCLASSIFIED'] as const;
+export type FundingBranch = (typeof FUNDING_BRANCHES)[number];
+
+export function fundingBranch(supportType: SupportType): FundingBranch {
+  if (POLICY_LOAN_SUPPORT_TYPES.includes(supportType)) return 'POLICY_FUND';
+  return supportType === 'UNKNOWN' ? 'UNCLASSIFIED' : 'SUPPORT_PROGRAM';
+}
 
 export const BUSINESS_STAGES = ['PRE_REGISTRATION', 'POST_REGISTRATION'] as const;
 export type BusinessStage = (typeof BUSINESS_STAGES)[number];
@@ -80,11 +132,17 @@ export const EVIDENCE_SUBJECTS = [
 ] as const;
 export type EvidenceSubject = (typeof EVIDENCE_SUBJECTS)[number];
 
-export const REQUIRED_EVIDENCE_SUBJECTS: readonly EvidenceSubject[] = [
-  'IDENTITY',
-  'APPLICATION_PERIOD',
-  'BUSINESS_STAGE',
-];
+// 상품마다 공식 원문 근거가 있어야 하는 조건. 사업 단계는 원문에서 확인해 기록했을 때만,
+// 금융 조건은 대출·보증일 때만 요구한다. 사업 단계를 빈 배열(미확인)로 두면 근거도 없다.
+export function requiredEvidenceSubjects(product: {
+  supportType: SupportType;
+  eligibleBusinessStages: readonly BusinessStage[];
+}): EvidenceSubject[] {
+  const subjects: EvidenceSubject[] = ['IDENTITY', 'APPLICATION_PERIOD'];
+  if (product.eligibleBusinessStages.length > 0) subjects.push('BUSINESS_STAGE');
+  if (POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType)) subjects.push('FINANCIAL_CONDITION');
+  return subjects;
+}
 
 export const RETRIEVAL_METHODS = [
   'OFFICIAL_WEB_PAGE',
@@ -154,14 +212,44 @@ export function compareIsoDates(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+export function addDaysToIsoDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map((part) => Number(part));
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
 export type ReviewState = 'CURRENT' | 'UNREVIEWED' | 'REVIEW_OVERDUE';
 
-// A product with no review date at all is treated as overdue: it can never be
-// presented as currently applicable.
-export function reviewState(
-  product: { reviewer: string; reviewedAt: string | null; nextReviewAt: string | null },
+// 출처별 마지막 성공 동기화일. 자동 상품의 최신성은 사람이 정한 다음 검토일 대신 이 날짜로 판단한다.
+export type SourceFreshness = { source: FundingSource; lastSucceededOn: string | null };
+
+// 자동 상품은 출처의 마지막 성공 동기화가 SOURCE_FRESHNESS_DAYS 안이어야 최신이다.
+// 동기화 기록이 없거나 성공한 적이 없으면 최신이 아니다.
+export function isSourceFresh(
+  source: FundingSource,
+  sourceSyncs: readonly SourceFreshness[],
   asOfDate: string,
+): boolean {
+  const sync = sourceSyncs.find((entry) => entry.source === source);
+  if (!sync || sync.lastSucceededOn === null) return false;
+  return compareIsoDates(addDaysToIsoDate(sync.lastSucceededOn, SOURCE_FRESHNESS_DAYS), asOfDate) >= 0;
+}
+
+// A product with no review date at all is treated as overdue: it can never be
+// presented as currently applicable. 자동 상품은 다음 검토일 대신 출처 최신성으로 판단한다.
+export function reviewState(
+  product: {
+    reviewer: string;
+    reviewedAt: string | null;
+    nextReviewAt: string | null;
+    sourceRef?: { source: FundingSource } | undefined;
+  },
+  asOfDate: string,
+  sourceSyncs: readonly SourceFreshness[] = [],
 ): ReviewState {
+  if (isAutoReviewer(product.reviewer)) {
+    if (product.reviewedAt === null || product.sourceRef === undefined) return 'REVIEW_OVERDUE';
+    return isSourceFresh(product.sourceRef.source, sourceSyncs, asOfDate) ? 'CURRENT' : 'REVIEW_OVERDUE';
+  }
   if (product.reviewedAt === null || product.nextReviewAt === null) return 'REVIEW_OVERDUE';
   if (compareIsoDates(product.nextReviewAt, asOfDate) < 0) return 'REVIEW_OVERDUE';
   return product.reviewer === REVIEWER_UNASSIGNED ? 'UNREVIEWED' : 'CURRENT';

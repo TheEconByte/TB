@@ -29,7 +29,8 @@
     "rent:load": "node --env-file-if-exists=.env.local scripts/load-rent-benchmarks.ts",
     "franchise:load": "node --env-file-if-exists=.env.local scripts/load-franchises.ts",
     "funding:validate": "node --env-file-if-exists=.env.local scripts/validate-funding-catalog.ts",
-    "funding:load": "node --env-file-if-exists=.env.local scripts/load-funding-catalog.ts"
+    "funding:load": "node --env-file-if-exists=.env.local scripts/load-funding-catalog.ts",
+    "funding:sync": "node --env-file-if-exists=.env.local scripts/sync-funding.ts"
   },
   "packageManager": "npm@11.13.0",
   "engines": {
@@ -44,6 +45,7 @@
     "decimal.js": "10.6.0",
     "next": "16.3.5",
     "pg": "8.23.0",
+    "pretendard": "1.3.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.1.11"

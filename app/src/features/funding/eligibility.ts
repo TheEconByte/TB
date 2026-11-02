@@ -1,14 +1,30 @@
-import type { FundingCatalog, FundingProduct } from './schema.ts';
 import {
+  defaultFundingAutomation,
+  sourceRefKey,
+  type FundingAutomation,
+  type FundingCatalog,
+  type FundingProduct,
+} from './schema.ts';
+import {
+  DISCOVERY_ONLY_SOURCES,
+  FUNDING_BRANCHES,
+  FUNDING_SOURCE_LABELS,
+  POLICY_LOAN_SUPPORT_TYPES,
   REPAYABLE_SUPPORT_TYPES,
+  SOURCE_FRESHNESS_DAYS,
   combineVerdicts,
+  compareIsoDates,
+  fundingBranch,
   INDUSTRY_CODE_PATTERN,
+  isAutoReviewer,
   isPrimaryRetrievalMethod,
   isSupportedRepaymentMethod,
-  REQUIRED_EVIDENCE_SUBJECTS,
+  requiredEvidenceSubjects,
   reviewState,
   type BusinessStage,
   type EvidenceSubject,
+  type FundingBranch,
+  type FundingSource,
   type ObservedApplicationStatus,
   type Purpose,
   type ReviewState,
@@ -33,6 +49,9 @@ export const UNKNOWN_FUNDING_PROFILE: FundingProfile = {
 };
 
 export type FundingConditionKey = 'BUSINESS_STAGE' | 'REGION' | 'PURPOSE' | 'INDUSTRY';
+
+// 공식 출처가 구조화해 주지 않는 조건. UNKNOWN이면 현재 후보를 막지 않고 신청 전 확인 항목이 된다.
+const PRE_APPLICATION_CHECK_KEYS: ReadonlySet<FundingConditionKey> = new Set(['PURPOSE', 'INDUSTRY']);
 
 export type FundingConditionResult = {
   key: FundingConditionKey;
@@ -69,12 +88,24 @@ export type ProductLoanTerms = {
   repaymentMethod: 'EQUAL_INSTALLMENT' | 'EQUAL_PRINCIPAL';
 };
 
+// 자동으로 모은 상품의 출처 표시. 화면은 "자동 확인"과 함께 출처와 마지막 성공 확인일을 보여 준다.
+export type FundingEvaluationAutomation = {
+  source: FundingSource;
+  sourceLabel: string;
+  // 출처의 마지막 성공 동기화일(한국 시간). 한 번도 성공하지 못했으면 null이다.
+  lastSucceededOn: string | null;
+};
+
 export type FundingCandidateEvaluation = {
   productKey: string;
   version: string;
   name: string;
   organization: string;
   supportType: SupportType;
+  // 정책자금·지원사업·유형 미확인 갈래. 지원 유형에서 정한다(ADR 0006 1절).
+  branch: FundingBranch;
+  // 자동으로 모은 상품이면 출처 정보, 사람이 기록한 상품이면 null이다.
+  automation: FundingEvaluationAutomation | null;
   observedApplicationStatus: ObservedApplicationStatus;
   observedAt: string;
   reviewedAt: string | null;
@@ -104,6 +135,8 @@ export type FundingCandidateList = {
   profile: FundingProfile;
   evaluations: FundingCandidateEvaluation[];
   summary: FundingCandidateSummary;
+  // 갈래별 상태 개수. 모든 갈래의 합이 summary다.
+  summaryByBranch: Record<FundingBranch, FundingCandidateSummary>;
 };
 
 const STAGE_LABELS: Record<BusinessStage, string> = {
@@ -167,6 +200,13 @@ function stageCondition(product: FundingProduct, profile: FundingProfile): Fundi
   };
   if (profile.businessStage === 'UNKNOWN') {
     return { ...base, verdict: 'UNKNOWN', detail: '사업 단계가 입력되지 않아 대상 여부를 판정하지 않았습니다.' };
+  }
+  if (product.eligibleBusinessStages.length === 0) {
+    return {
+      ...base,
+      verdict: 'UNKNOWN',
+      detail: '원문에서 신청 가능한 사업 단계를 확인하지 못했습니다. 원 공고에서 대상 여부를 확인해야 합니다.',
+    };
   }
   const unverified = unverifiedCondition(product, 'BUSINESS_STAGE', base);
   if (unverified) return unverified;
@@ -269,6 +309,16 @@ function industryCondition(product: FundingProduct, profile: FundingProfile): Fu
 
 export function assessProductRepayment(product: FundingProduct): ProductRepaymentAvailability {
   const reasons = [...product.unsupportedCalculationReasons];
+  if (product.supportType === 'UNKNOWN') {
+    if (reasons.length === 0) reasons.push('지원 유형이 확인되지 않았습니다.');
+    return {
+      supported: false,
+      publicLimitKrw: null,
+      terms: null,
+      reasons: [...new Set(reasons)],
+      note: '지원 유형이 확인되지 않은 공고는 조달액으로 자동 반영하지 않으며 상환 계산 대상이 아닙니다.',
+    };
+  }
   if (!REPAYABLE_SUPPORT_TYPES.includes(product.supportType)) {
     if (reasons.length === 0) {
       reasons.push(`지원 유형 ${product.supportType}은(는) 대출 원금·상환 일정으로 변환하지 않습니다.`);
@@ -319,18 +369,51 @@ export function productAudience(product: FundingProduct): ProductAudience {
 }
 
 export function hasPrimaryEvidence(product: FundingProduct): boolean {
-  const subjects: EvidenceSubject[] = [...REQUIRED_EVIDENCE_SUBJECTS];
-  if (product.supportType === 'LOAN' || product.supportType === 'GUARANTEE') subjects.push('FINANCIAL_CONDITION');
-  return subjects.every((subject) =>
+  return requiredEvidenceSubjects(product).every((subject) =>
     product.evidence.some((entry) => entry.subject === subject && isPrimaryRetrievalMethod(entry.retrievalMethod)),
   );
+}
+
+// 자동 수집 상품을 현재 후보로 올리지 못하게 막는 사유. 사람이 기록한 상품이면 null이다.
+function automationHold(product: FundingProduct, automation: FundingAutomation): string | null {
+  if (!isAutoReviewer(product.reviewer) || product.sourceRef === undefined) return null;
+  const refKey = sourceRefKey(product.sourceRef);
+  const blocked = automation.blockedSources.find((entry) => sourceRefKey(entry) === refKey);
+  if (blocked) return `운영자가 이 공고의 자동 승격을 막았습니다: ${blocked.reason}`;
+  if (DISCOVERY_ONLY_SOURCES.includes(product.sourceRef.source)) {
+    return `${FUNDING_SOURCE_LABELS[product.sourceRef.source]}에서 찾은 공고는 사업 단계·지원 유형을 알 수 없어 사람이 확인해야 현재 후보가 됩니다.`;
+  }
+  if (product.supportType === 'UNKNOWN') {
+    return '지원 유형이 확인되지 않은 공고는 자동으로 모아도 사람이 확인해야 현재 후보가 됩니다.';
+  }
+  if (!POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType)) {
+    return '지원사업은 자동으로 모아도 사람이 확인해야 현재 후보가 됩니다.';
+  }
+  if (!automation.policyLoanPromotion) {
+    return '정책자금 자동 승격이 꺼져 있어 자동으로 모은 상품을 현재 후보로 표시하지 않습니다.';
+  }
+  return null;
+}
+
+// 상환 계산 자동 승격이 꺼져 있으면 자동 수집 상품의 조건으로 상환액을 계산하지 않는다.
+function repaymentFor(product: FundingProduct, automation: FundingAutomation): ProductRepaymentAvailability {
+  const repayment = assessProductRepayment(product);
+  if (!repayment.supported || !isAutoReviewer(product.reviewer) || automation.repaymentPromotion) return repayment;
+  return {
+    supported: false,
+    publicLimitKrw: null,
+    terms: null,
+    reasons: ['상환 계산 자동 승격이 꺼져 있어 자동으로 모은 조건으로 상환액을 계산하지 않습니다.'],
+    note: '자동으로 모은 금리·기간·상환방식은 운영자가 상환 계산 자동 승격을 켠 뒤에만 계산에 씁니다.',
+  };
 }
 
 export function evaluateProduct(
   product: FundingProduct,
   profile: FundingProfile,
-  options: { asOfDate: string },
+  options: { asOfDate: string; automation?: FundingAutomation },
 ): FundingCandidateEvaluation {
+  const automation = options.automation ?? defaultFundingAutomation();
   const conditions = [
     stageCondition(product, profile),
     regionCondition(product, profile),
@@ -339,18 +422,45 @@ export function evaluateProduct(
   ];
   const eligibilityVerdict = combineVerdicts(conditions.map((condition) => condition.verdict));
   const audience = productAudience(product);
-  const state = reviewState(product, options.asOfDate);
-  const repayment = assessProductRepayment(product);
+  const state = reviewState(product, options.asOfDate, automation.sourceSyncs);
+  const automated = isAutoReviewer(product.reviewer);
+  const source = automated ? product.sourceRef?.source : undefined;
+  const lastSucceededOn =
+    source === undefined
+      ? null
+      : (automation.sourceSyncs.find((entry) => entry.source === source)?.lastSucceededOn ?? null);
+  const hold = automationHold(product, automation);
+  const repayment = repaymentFor(product, automation);
   const primaryEvidenceVerified = hasPrimaryEvidence(product);
+  // 관측 접수 상태가 OPEN·UNKNOWN이어도 신청 종료일이 지나면 접수가 끝난 것이다. 종료일 당일까지는 접수 중으로 본다.
+  const periodEnd = product.applicationPeriod.end;
+  const periodEnded = periodEnd !== null && compareIsoDates(periodEnd, options.asOfDate) < 0;
+  // 업종·용도가 확인되지 않은 것은 현재 후보를 막지 않고 신청 전 확인 항목으로 남긴다(ADR 0006).
+  // 사업 단계·지역이 확인되지 않으면 지금처럼 추가 확인으로 둔다.
+  const blockingUnknown = conditions.find(
+    (condition) => condition.verdict === 'UNKNOWN' && !PRE_APPLICATION_CHECK_KEYS.has(condition.key),
+  );
+  const manualChecks = [
+    ...product.additionalChecks,
+    ...conditions
+      .filter((condition) => condition.verdict === 'UNKNOWN' && PRE_APPLICATION_CHECK_KEYS.has(condition.key))
+      .map((condition) => `${condition.label}: ${condition.detail}`),
+  ];
 
   let candidateStatus: FundingCandidateStatus;
   let candidateReason: string;
-  if (state === 'REVIEW_OVERDUE') {
+  if (state === 'REVIEW_OVERDUE' && automated) {
+    candidateStatus = 'REVIEW_OVERDUE';
+    candidateReason = `자동으로 모은 출처(${source ? FUNDING_SOURCE_LABELS[source] : '없음'})의 마지막 성공 확인일 ${lastSucceededOn ?? '없음'}이(가) 기준일 ${options.asOfDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없어 재확인 전에는 현재 후보로 표시하지 않습니다.`;
+  } else if (state === 'REVIEW_OVERDUE') {
     candidateStatus = 'REVIEW_OVERDUE';
     candidateReason = `다음 검토일 ${product.nextReviewAt ?? '없음'}이(가) 기준일 ${options.asOfDate} 이전이라 재확인 전에는 현재 후보로 표시하지 않습니다.`;
   } else if (product.observedApplicationStatus === 'CLOSED') {
     candidateStatus = 'CLOSED';
     candidateReason = `${product.observedAt} 기준 접수 상태가 CLOSED입니다.`;
+  } else if (periodEnded) {
+    candidateStatus = 'CLOSED';
+    candidateReason = `신청 종료일 ${periodEnd}이(가) 기준일 ${options.asOfDate} 이전이라 접수가 끝난 것으로 판정합니다.`;
   } else if (state === 'UNREVIEWED') {
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason =
@@ -366,16 +476,18 @@ export function evaluateProduct(
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason =
       '검색 결과 요약으로만 확인되어 공식 원문 페이지·첨부를 직접 확인한 근거가 없습니다. 재검수 전에는 현재 후보로 확정하지 않습니다.';
-  } else if (eligibilityVerdict === 'UNKNOWN') {
+  } else if (blockingUnknown) {
     candidateStatus = 'NEEDS_CONFIRMATION';
-    candidateReason =
-      conditions.find((condition) => condition.verdict === 'UNKNOWN')?.detail ?? '확인되지 않은 조건이 있습니다.';
+    candidateReason = blockingUnknown.detail;
+  } else if (hold !== null) {
+    candidateStatus = 'NEEDS_CONFIRMATION';
+    candidateReason = hold;
   } else if (product.observedApplicationStatus === 'OPEN') {
     candidateStatus = 'CURRENT_CANDIDATE';
     candidateReason =
-      product.additionalChecks.length === 0
+      manualChecks.length === 0
         ? '확인된 조건이 모두 충족되고 접수 상태가 OPEN입니다. 승인 확정은 아닙니다.'
-        : `확인된 조건은 충족하지만 신청 전 ${product.additionalChecks.length}건을 더 확인해야 합니다. 승인 확정은 아닙니다.`;
+        : `확인된 조건은 충족하지만 신청 전 ${manualChecks.length}건을 더 확인해야 합니다. 승인 확정은 아닙니다.`;
   } else {
     candidateStatus = 'NEEDS_CONFIRMATION';
     candidateReason = '접수 상태가 OPEN으로 확인되지 않아 현재 신청 가능 후보로 확정하지 않습니다.';
@@ -387,6 +499,8 @@ export function evaluateProduct(
     name: product.name,
     organization: product.organization,
     supportType: product.supportType,
+    branch: fundingBranch(product.supportType),
+    automation: source === undefined ? null : { source, sourceLabel: FUNDING_SOURCE_LABELS[source], lastSucceededOn },
     observedApplicationStatus: product.observedApplicationStatus,
     observedAt: product.observedAt,
     reviewedAt: product.reviewedAt,
@@ -399,7 +513,7 @@ export function evaluateProduct(
     eligibilityVerdict,
     candidateStatus,
     candidateReason,
-    manualChecks: [...product.additionalChecks],
+    manualChecks,
     unsupportedCalculationReasons: [...product.unsupportedCalculationReasons],
     repayment,
   };
@@ -410,17 +524,20 @@ export function evaluateCandidates(
   profile: FundingProfile,
   options: { asOfDate: string },
 ): FundingCandidateList {
-  const evaluations = catalog.products.map((product) => evaluateProduct(product, profile, options));
-  const summary = {
-    total: evaluations.length,
-    CURRENT_CANDIDATE: 0,
-    NEEDS_CONFIRMATION: 0,
-    NOT_ELIGIBLE: 0,
-    POST_REGISTRATION: 0,
-    CLOSED: 0,
-    REVIEW_OVERDUE: 0,
-  } satisfies FundingCandidateSummary;
-  for (const evaluation of evaluations) summary[evaluation.candidateStatus] += 1;
+  const evaluations = catalog.products.map((product) =>
+    evaluateProduct(product, profile, { asOfDate: options.asOfDate, automation: catalog.automation }),
+  );
+  const summary = emptySummary();
+  const summaryByBranch = Object.fromEntries(FUNDING_BRANCHES.map((branch) => [branch, emptySummary()])) as Record<
+    FundingBranch,
+    FundingCandidateSummary
+  >;
+  for (const evaluation of evaluations) {
+    for (const target of [summary, summaryByBranch[evaluation.branch]]) {
+      target.total += 1;
+      target[evaluation.candidateStatus] += 1;
+    }
+  }
   return {
     asOfDate: options.asOfDate,
     basisDate: catalog.basisDate,
@@ -429,5 +546,18 @@ export function evaluateCandidates(
     profile,
     evaluations,
     summary,
+    summaryByBranch,
+  };
+}
+
+function emptySummary(): FundingCandidateSummary {
+  return {
+    total: 0,
+    CURRENT_CANDIDATE: 0,
+    NEEDS_CONFIRMATION: 0,
+    NOT_ELIGIBLE: 0,
+    POST_REGISTRATION: 0,
+    CLOSED: 0,
+    REVIEW_OVERDUE: 0,
   };
 }

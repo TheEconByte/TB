@@ -47,6 +47,16 @@ export function businessProfileFormFromStored(value: unknown): BusinessProfileFo
   };
 }
 
+const marketIndustryCodes: readonly string[] = businessProfileInputSchema.shape.marketIndustryCode.options;
+
+// 업종 드롭다운의 값을 폼에 넣는다. 빈 값이나 서버가 받지 않는 코드는 해제로 다룬다.
+// 상위 업종이 바뀌거나 해제되면 그 업종에 속한 세부 업종도 지운다.
+export function selectMarketIndustry(form: BusinessProfileForm, value: string): BusinessProfileForm {
+  const code = marketIndustryCodes.includes(value) ? (value as BusinessProfileForm['marketIndustryCode']) : '';
+  if (code === form.marketIndustryCode) return form;
+  return { ...form, marketIndustryCode: code, detailedIndustryCode: '' };
+}
+
 const areaValueSchema = businessProfileInputSchema.shape.area.shape.value;
 
 // 빠졌거나 서버가 받지 않을 항목과, 그 항목을 입력하는 단계(0부터).

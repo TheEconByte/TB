@@ -13,13 +13,14 @@ npm --prefix app run funding:load
 ```
 
 - `funding:validate`는 DB 없이 검사 결과만 출력한다. `funding:load`는 같은 검사를 통과한 카탈로그만 적재한다.
+- 자동 수집 출처가 있으면 `funding:load` 대신 `npm --prefix app run funding:sync`로 이 카탈로그와 자동 상품을 합쳐 적재한다. `funding:load`로 이 파일만 적재하면 자동 상품이 빠진 릴리스가 ACTIVE가 된다.
 - 검사 항목, 오류·주의 구분, 적재·활성화 규칙은 [funding.md](../../../docs/domains/funding.md#카탈로그)에 있다.
 
 ## 갱신 절차
 
 1. 공식 기관 원문(기업마당, 중소벤처기업부, 서울시, 서울신보, K-Startup 등)에서 공고명·기관·접수기간·접수 상태·대상 사업단계·지역·용도·업종·금리·한도·상환 조건을 확인한다.
 2. 확인한 날짜를 `observedAt`, 사람이 검수한 날짜를 `reviewedAt`, 다음 재확인 날짜를 `nextReviewAt`에 기록한다.
-3. 원문에서 확정하지 못한 값은 0이나 추정값으로 채우지 않고 `null` 또는 `UNKNOWN`으로 남기고, 왜 확정할 수 없는지 `unsupportedCalculationReasons`·`additionalChecks`·`note`에 적는다.
+3. 원문에서 확정하지 못한 값은 0이나 추정값으로 채우지 않고 `null` 또는 `UNKNOWN`으로 남기고, 왜 확정할 수 없는지 `unsupportedCalculationReasons`·`additionalChecks`·`note`에 적는다. 지원 유형을 확인하지 못했으면 `supportType`을 `UNKNOWN`, 신청 가능한 사업 단계를 확인하지 못했으면 `eligibleBusinessStages`를 빈 배열로 둔다.
 4. 조건별로 `evidence`에 공식 URL·문서명·확인일·확인 방법을 남긴다. 지역·용도·업종을 PASS 또는 FAIL로 판정하려면 각각 REGION·PURPOSE·INDUSTRY의 공식 원문 근거가 필요하다. 검색 결과 요약만 확인한 경우 `retrievalMethod`를 `SEARCH_RESULT_SUMMARY`로 기록하며 해당 조건은 UNKNOWN으로 남는다.
 5. 내용이 바뀌면 기존 항목을 덮어쓰지 않고 `version`을 올려 새 항목으로 추가하고, 카탈로그 `catalogVersion`도 올린다.
 6. `npm --prefix app run funding:validate`로 확인한 뒤 `funding:load`를 실행한다.
@@ -38,7 +39,7 @@ npm --prefix app run funding:load
 
 ## 2026-09-20 검수 범위
 
-현재 카탈로그 `2026-09-23.1`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다.
+현재 카탈로그 `2026-09-28.2`(상품 버전 `1.0.1`)에 적용되는 검수 내용이다. `2026-09-28.1`은 `2026-09-23.1`에서 스키마를 v1.1.0으로 올리고 자동화 설정을 더한 것이고, `2026-09-28.2`는 스키마를 v1.2.0으로 올린 것이다. 상품 내용과 검수 내용은 같다.
 
 - 접수 상태가 CLOSED로 확인된 상품 1건(예비창업패키지 2차), 접수 상태를 확정할 수 없어 UNKNOWN으로 남긴 상품 4건을 기록했다.
 - 같은 날 접수 상태가 OPEN으로 확인된 상품은 없어 현재 신청 가능 후보로 확정되는 상품은 0건이다.
@@ -46,3 +47,12 @@ npm --prefix app run funding:load
 - 2026-09-09에 확인했던 강북창업지원센터 입주 모집은 다시 확인하지 않아 검수 기한 경과 상태로 남겼고, 현재 후보에서 제외된다.
 - 서울여성 창업아이디어 공모전 등 2026-09-09 검토 항목은 이번 검수에서 다시 확인하지 않아 카탈로그에 넣지 않았다.
 - 검수자(`reviewer`)는 아직 지정되지 않아 `UNASSIGNED`다(#13). 근거 일부는 공식 원문이 아니라 검색 결과 요약이다.
+
+## 자동화 설정
+
+`catalog.json`의 `automation`은 funding:sync가 모은 자동 상품에만 적용된다. 규칙은 [funding.md](../../../docs/domains/funding.md#동기화)와 [ADR 0006](../../../docs/decisions/0006-funding-discovery-automation.md)에 있다.
+
+- `policyLoanPromotion`, `repaymentPromotion`: 정책자금 자동 승격과 상환 계산 자동 승격 스위치다. 기본으로 꺼져 있고, 켜고 끄는 일은 ADR 0006의 Owner가 정한다. 바꾼 뒤 funding:sync를 실행하면 새 릴리스에 반영된다.
+- `blockedSources`: 자동 승격을 막을 공고. `{ "source": "SEMAS_OLS", "externalId": "…", "reason": "…" }`처럼 출처·식별자·사유를 적는다.
+- `sourceSyncs`: funding:sync가 채운다. 이 파일에는 비워 둔다.
+- 자동 상품(검수자 `AUTO:…`)은 이 파일에 넣지 않는다. 같은 공고를 사람이 기록하려면 그 상품에 `sourceRef`를 적는다. 그러면 사람 기록이 자동 상품보다 우선한다.
