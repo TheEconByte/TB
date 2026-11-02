@@ -27,8 +27,8 @@ export async function extractNoticeText(data: Uint8Array, type: NoticeFileType):
   } catch (error) {
     return { ok: false, reason: 'UNREADABLE', message: errorMessage(error) };
   }
-  // 줄바꿈만 LF로 맞춘다. 묶음 빈칸(U+00A0)·하이픈(U+00AD) 같은 문자와 PDF의 줄 바뀜 위치는 형식마다 다르게
-  // 남으므로, 인용 대조(ADR 0009 3절)는 양쪽을 같은 규칙으로 정규화하고 공백을 무시해 비교해야 한다.
+  // 줄바꿈만 LF로 맞춘다. HWP의 묶음 빈칸·고정폭 빈칸·하이픈은 U+00A0·U+2007·U+00AD로 남고, PDF는 줄 끝에서
+  // 낱말 중간에도 줄바꿈이 들어간다. 인용 대조(ADR 0009 3절)에서 이 차이를 어떻게 다룰지는 4단계에서 정한다.
   text = text.replace(/\r\n?/g, '\n');
   // 글자가 없는 파일을 빈 성공으로 돌려주지 않는다(AGENTS.md §3 2번).
   if (text.trim() === '') return { ok: false, reason: 'NO_TEXT', message: '파일에 읽을 수 있는 글자가 없습니다.' };
@@ -37,8 +37,8 @@ export async function extractNoticeText(data: Uint8Array, type: NoticeFileType):
 
 let pdfReader: Promise<TextReader> | undefined;
 
-// pdf.js는 worker와 CMap을 문서를 열 때에야 불러온다. 그때 실패하면 모든 PDF가 UNREADABLE이나 NO_TEXT로 보이므로
-// 여기서 미리 불러 설치 문제를 던진다.
+// pdf.js는 worker를 문서를 열 때, CMap을 글자를 뽑을 때에야 불러온다. 그때 실패하면 모든 PDF가 UNREADABLE이나
+// NO_TEXT로 보이므로, 여기서 worker를 미리 불러 두고 CMap 파일이 있는지 확인해 설치 문제를 던진다.
 function loadPdfReader(): Promise<TextReader> {
   pdfReader ??= (async () => {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -86,8 +86,8 @@ function loadHwpReader(): Promise<TextReader> {
     return async (data: Uint8Array) => {
       const document = new HwpDocument(data);
       try {
-        // 한컴 GetTextFile("UNICODE")처럼 본문·표 칸·글상자 글이 읽는 순서로, 표는 칸마다 한 줄씩 JSON 문자열로 온다.
-        // 행·칸 구분 표시는 없고 각주·머리말·꼬리말은 빠진다.
+        // 한컴 GetTextFile("UNICODE")처럼 본문·표 칸·글상자 글이 읽는 순서로 JSON 문자열로 온다. 표는 칸 안의
+        // 문단마다 한 줄이고(빈 칸은 빈 줄) 행·칸 구분 표시가 없다. 각주·미주·머리말·꼬리말은 빠진다.
         const text: unknown = JSON.parse(document.getTextFileUnicode());
         if (typeof text !== 'string') throw new Error('rhwp가 문자열이 아닌 텍스트를 돌려주었습니다.');
         return text;

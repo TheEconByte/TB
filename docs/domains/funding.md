@@ -8,6 +8,7 @@
   - 카탈로그 Zod 스키마(`schema.ts`), 규칙 검사(`validation.ts`), 고정 조건 판정(`eligibility.ts`)
   - 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`), 요청 스키마·응답 조립(`candidates.ts`)
   - 출처별 수집 결과를 사람이 관리하는 카탈로그와 합쳐 적재하는 동기화(`sync.ts`), 출처별 수집기(`sources/`)
+  - 공고 파일(PDF·HWP·HWPX)을 텍스트로 바꾸는 `notice-text.ts`. 적재 명령에서만 쓰며 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절). HWP·HWPX 표는 칸 안의 문단마다 한 줄이고(빈 칸은 빈 줄) 행·칸 구분 표시가 없다. 각주·미주·머리말·꼬리말은 빠진다. PDF 표는 행마다 한 줄이고 칸 사이가 공백이다.
   - 페이지 단위 후보 화면(`FundingMatcher.tsx`), 두 화면이 함께 쓰는 결과 표시(`FundingCandidatesPanel.tsx`)
 - `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서.
 

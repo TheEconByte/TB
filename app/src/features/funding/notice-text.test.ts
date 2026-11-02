@@ -12,8 +12,15 @@ function expectText(result: NoticeTextResult): string {
   return result.text;
 }
 
+// Vitest는 mock factory가 던진 오류를 자기 오류로 감싸므로 cause까지 이어 본다.
+function errorMessages(error: unknown): string {
+  const messages: string[] = [];
+  for (let current = error; current instanceof Error; current = current.cause) messages.push(current.message);
+  return messages.join(' / ');
+}
+
 // 문장과 표 칸이 읽는 순서대로, 서로 붙지 않고(공백이나 줄바꿈을 사이에 두고) 있어야 한다.
-// 행·칸 구분 표시까지는 요구하지 않는다: HWP 표는 칸마다 한 줄이 되고 행 경계가 남지 않는다(ADR 0009 Consequences).
+// 행·칸 구분 표시까지는 요구하지 않는다: HWP 표는 칸 안의 문단마다 한 줄이 되고 행 경계가 남지 않는다.
 function expectInOrder(text: string, parts: readonly string[]) {
   let from = 0;
   for (const [index, part] of parts.entries()) {
@@ -119,12 +126,14 @@ describe('extractNoticeText', () => {
   });
 
   // 설치 문제를 파일 문제로 돌리면 동기화가 성공한 채 모든 공고가 "읽지 못함"이 된다(AGENTS.md §3 2번).
+  // 다른 이유로 던져도 통과하지 않도록, 흉내 낸 설치 문제의 문장이 오류에 있는지 본다.
   it.each([
     {
       label: 'HWP: rhwp WASM',
       type: 'HWP' as const,
       file: 'notice.hwp',
       module: '@rhwp/core',
+      message: 'WASM을 불러오지 못했습니다',
       factory: () => ({
         HwpDocument: class {},
         initSync: () => {
@@ -137,29 +146,45 @@ describe('extractNoticeText', () => {
       type: 'PDF' as const,
       file: 'notice.pdf',
       module: 'pdfjs-dist/legacy/build/pdf.worker.mjs',
+      message: 'worker를 불러오지 못했습니다',
       factory: () => {
         throw new Error('worker를 불러오지 못했습니다');
       },
     },
     {
       // CMap이 없으면 한글 CID 글꼴 PDF가 글자 없는 파일(NO_TEXT)로 보인다.
+      // pdf.js가 한글 CID 글꼴에 쓰는 CMap 파일만 없는 것으로 하고, 다른 파일은 그대로 둔다.
       label: 'PDF: CMap 파일',
       type: 'PDF' as const,
       file: 'notice-cid.pdf',
       module: 'node:fs/promises',
-      factory: async (importOriginal: () => Promise<object>) => ({
-        ...(await importOriginal()),
-        access: async () => {
-          throw new Error('CMap 파일이 없습니다');
-        },
-      }),
+      message: 'CMap 파일이 없습니다',
+      factory: async (importOriginal: () => Promise<typeof import('node:fs/promises')>) => {
+        const original = await importOriginal();
+        return {
+          ...original,
+          access: async (path: Parameters<typeof original.access>[0], mode?: number) => {
+            if (String(path).replaceAll('\\', '/').endsWith('pdfjs-dist/cmaps/UniKS-UCS2-H.bcmap')) {
+              throw new Error('CMap 파일이 없습니다');
+            }
+            return original.access(path, mode);
+          },
+        };
+      },
     },
-  ])('$label: 불러오지 못하면 결과로 숨기지 않고 던진다', async ({ type, file, module, factory }) => {
+  ])('$label: 불러오지 못하면 결과로 숨기지 않고 던진다', async ({ type, file, module, message, factory }) => {
     vi.resetModules();
     vi.doMock(module, factory);
     try {
       const fresh = await import('./notice-text.ts');
-      await expect(fresh.extractNoticeText(fixture(file), type)).rejects.toThrow();
+      let thrown: unknown;
+      try {
+        await fresh.extractNoticeText(fixture(file), type);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown, '결과를 돌려주지 않고 던져야 한다').toBeInstanceOf(Error);
+      expect(errorMessages(thrown)).toContain(message);
     } finally {
       vi.doUnmock(module);
       vi.resetModules();
