@@ -8,15 +8,16 @@ import {
   EMPTY_BUSINESS_PROFILE_FORM,
   businessProfileMissingFields,
   businessProfileSaveState,
+  selectMarketIndustry,
   type BusinessProfileForm,
 } from './form';
-import { AreaIcon, BuildingTypeIcon, CoffeeIcon, FloorIcon, KoreanFoodIcon, SearchIcon, TipIcon } from './icons';
+import { AreaIcon, BuildingTypeIcon, FloorIcon, SearchIcon, TipIcon } from './icons';
 
 const STEPS = ['위치·업종', '매장 크기', '매장 층', '상가 유형', '입력 확인'] as const;
 
 const INDUSTRIES = [
-  { code: 'CS100001', label: '한식음식점', Icon: KoreanFoodIcon },
-  { code: 'CS100010', label: '커피·음료', Icon: CoffeeIcon },
+  { code: 'CS100001', label: '한식음식점' },
+  { code: 'CS100010', label: '커피·음료' },
 ] as const;
 
 const AREA_PRESETS = [
@@ -141,23 +142,20 @@ export default function BusinessProfileWizard({
                 </select>
               </span>
             </label>
-            <div className="field" role="group" aria-labelledby="industry-group-label">
-              <span id="industry-group-label">업종 대분류</span>
-              <div className="choice-grid two">
-                {INDUSTRIES.map(({ code, label, Icon }) => (
-                  <button
-                    type="button"
-                    key={code}
-                    aria-pressed={form.marketIndustryCode === code}
-                    className={form.marketIndustryCode === code ? 'choice-card selected' : 'choice-card'}
-                    onClick={() => onChange({ ...form, marketIndustryCode: code, detailedIndustryCode: '' })}
-                  >
-                    <Icon />
-                    <strong>{label}</strong>
-                  </button>
+            <label className="field">
+              <span>업종 대분류</span>
+              <select
+                value={form.marketIndustryCode}
+                onChange={(event) => onChange(selectMarketIndustry(form, event.target.value))}
+              >
+                <option value="">업종을 선택하세요</option>
+                {INDUSTRIES.map(({ code, label }) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
                 ))}
-              </div>
-            </div>
+              </select>
+            </label>
             {form.marketIndustryCode && (
               <label className="field detail-field">
                 <span>업종 소분류</span>
