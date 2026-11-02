@@ -23,31 +23,6 @@ function Icon({ children, size = 56 }: Readonly<{ children: ReactNode; size?: nu
   );
 }
 
-export function KoreanFoodIcon() {
-  return (
-    <Icon>
-      <path d="M22 9c-2 2 2 3 0 5M28 8c-2 2 2 3 0 5M34 9c-2 2 2 3 0 5" />
-      <path d="M17 24c2-5 7-7 11-7s9 2 11 7" fill="#fff" />
-      <path d="M10 25h36c0 10-8 17-18 17s-18-7-18-17Z" fill={FILL} />
-      <path d="M21 42h14l-2 5H23l-2-5Z" fill="#fff" />
-      <path d="M38 14 46 6M41 16l7-7" />
-    </Icon>
-  );
-}
-
-export function CoffeeIcon() {
-  return (
-    <Icon>
-      <path d="M17 13h22l-1 5H18l-1-5Z" fill="#fff" />
-      <path d="M15 18h26" />
-      <path d="M18 18h20l-3 30H21l-3-30Z" fill={FILL} />
-      <path d="M19.5 28h17l-1 10h-15l-1-10Z" fill="#fff" />
-      <circle cx="28" cy="33" r="2.6" />
-      <path d="M22 9h12l1 4H21l1-4Z" fill="#fff" />
-    </Icon>
-  );
-}
-
 const AREA_FILL = { small: 15, medium: 24, large: 34 } as const;
 
 export function AreaIcon({ size }: Readonly<{ size: keyof typeof AREA_FILL }>) {
