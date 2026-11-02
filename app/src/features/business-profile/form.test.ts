@@ -4,6 +4,7 @@ import {
   businessProfileFormFromStored,
   businessProfileMissingFields,
   businessProfileSaveState,
+  selectMarketIndustry,
   type BusinessProfileForm,
 } from './form.ts';
 import { businessProfileInputSchema } from './schema.ts';
@@ -84,5 +85,47 @@ describe('사업 조건 서버 스키마', () => {
     expect(
       businessProfileInputSchema.safeParse({ ...base, area: { value: '33.5', unit: 'SQUARE_METERS' } }).success,
     ).toBe(true);
+  });
+});
+
+describe('상위 업종 드롭다운 선택', () => {
+  const withDetail: BusinessProfileForm = { ...complete, detailedIndustryCode: 'I21201' };
+
+  it('다른 업종을 고르면 이전 업종의 세부 업종을 지운다', () => {
+    // 세부 업종은 상위 업종에 속해야 한다. 남겨 두면 다른 업종의 세부 업종으로 경쟁 범위를 보여 준다.
+    expect(selectMarketIndustry(withDetail, 'CS100001')).toEqual({
+      ...withDetail,
+      marketIndustryCode: 'CS100001',
+      detailedIndustryCode: '',
+    });
+  });
+
+  it('같은 업종을 다시 고르면 세부 업종을 그대로 둔다', () => {
+    // 상위 업종이 그대로면 세부 업종은 여전히 그 업종에 속한다. 사용자가 고른 값을 잃지 않게 한다.
+    expect(selectMarketIndustry(withDetail, 'CS100010')).toEqual(withDetail);
+  });
+
+  it('"업종을 선택하세요"를 고르면 업종과 세부 업종을 지우고 나머지 입력은 둔다', () => {
+    // 해제한 업종의 세부 업종은 남길 수 없다.
+    expect(selectMarketIndustry(withDetail, '')).toEqual({
+      ...withDetail,
+      marketIndustryCode: '',
+      detailedIndustryCode: '',
+    });
+  });
+
+  it('업종만 골랐다가 해제하면 조건 없는 계획으로 저장할 수 있다', () => {
+    // 일부만 입력한 상태는 저장이 막히므로, 업종 하나 때문에 다른 조건까지 비우지 않게 한다.
+    const picked = selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100010');
+    expect(businessProfileSaveState(selectMarketIndustry(picked, ''))).toEqual({ kind: 'EMPTY' });
+  });
+
+  it('목록에 없는 값은 업종 해제로 다룬다', () => {
+    // select 값은 문자열이다. 서버가 받지 않는 업종 코드를 폼에 넣지 않는다.
+    expect(selectMarketIndustry(withDetail, 'CS999999')).toEqual({
+      ...withDetail,
+      marketIndustryCode: '',
+      detailedIndustryCode: '',
+    });
   });
 });

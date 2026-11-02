@@ -33,6 +33,7 @@ const OTHER_REGION_TAGS: readonly string[] = [
   '충남',
   '전북',
   '전남',
+  '전남광주',
   '경북',
   '경남',
   '제주',
@@ -53,6 +54,7 @@ const OTHER_REGION_INSTITUTION_PREFIXES: readonly string[] = [
   '전북특별자치도',
   '전라북도',
   '전라남도',
+  '전남광주통합특별시',
   '경상북도',
   '경상남도',
   '제주특별자치도',
@@ -135,41 +137,85 @@ export type BizinfoRegion =
   | { scope: 'OTHER' };
 
 function seoulDistrictCode(value: string): string | null {
-  const match = /^서울(?:특별시)?\s*(\S+?구)/.exec(value);
+  const match = /^서울(?:특별시|시)?\s*(\S+?구)/.exec(value);
   if (!match) return null;
   return SEOUL_DISTRICTS.find((district) => district.name === match[1])?.code ?? null;
 }
 
 // 공고명 앞 [지역] 표시가 있으면 그것으로, 없으면 소관기관 이름으로 지역을 정한다. 서울도 다른
 // 시·도도 아니면 전국으로 추측하지 않고 미확인으로 둔다.
+//
+// [지역] 표시는 지역 이름만 'ㆍ'·'·'·'∙'·'・'·'‧'·'•'·','·'/'로 이은 목록일 때만 읽는다(예: '[전남광주ㆍ제주]',
+// '[서울 강서구]', '[충북 청주시]'). 서울이 있으면 서울 공고, 모두 다른 시·도면 서울 밖이다.
+// '[서울 이외 지역]', '[수도권(서울ㆍ경기)]', '[경기회복]', '[수도권 제외]'처럼 목록이 아닌데 지역 이름이나
+// 지역을 빼는 말이 들어 있으면 서울이 대상인지 알 수 없다. 서울이 적혀 있으면 미확인이고, 아니면 다른
+// 시·도 소관기관일 때만 서울 밖으로 본다. 표기를 하나씩 막으면 새 표기가 계속 빠져서 목록인지로 가린다.
+// 서울 소관기관으로 정하면 '[서울 강남구 일대]'(서초구청)처럼 표시의 나머지를 무시하게 되어 정하지 않는다.
+// 목록이 아닌 표시에 서울 자치구 이름('[강남구 일대]')을 낱말로 적어도 대상이 서울 전역보다 좁을 수 있어, 다른 시·도
+// 이름과 같이 다른 시·도 소관기관일 때만 서울 밖이고 아니면 미확인이다('중구'는 다른 시에도 있다).
+//
+// 자치구는 표시에서만 정한다. 구청은 서울 전역·전국 공고도 옮겨 올리므로 '서울특별시 마포구' 소관기관은
+// 서울이라는 것만 알려 준다. 그 자치구로 정하면 다른 자치구 사용자가 지역 조건 미충족이 된다.
+// 반대로 '[서울] 은평구 …'처럼 공고명이 자치구를 적으면 그 자치구만 대상일 수 있어 서울로도 정하지 않는다.
 export function bizinfoRegion(name: string, institution: string): BizinfoRegion {
   const tag = /^\s*\[([^\]]+)\]/.exec(name)?.[1].trim() ?? null;
   if (tag !== null) {
-    const districtCode = seoulDistrictCode(tag);
-    if (districtCode !== null)
-      return { scope: 'DISTRICTS', districtCodes: [districtCode], basis: `공고명 지역 표시 '[${tag}]'` };
-    if (tag.startsWith('서울')) {
-      const institutionDistrict = seoulDistrictCode(institution);
-      if (institutionDistrict !== null) {
-        return { scope: 'DISTRICTS', districtCodes: [institutionDistrict], basis: `소관기관 '${institution}'` };
-      }
+    const parts = tag.split(/[·ㆍ∙・‧•,/]/).map((part) => part.trim());
+    const seoulParts = parts.filter((part) => part.startsWith('서울'));
+    const listed =
+      seoulParts.length <= 1 &&
+      parts.every((part) => (part.startsWith('서울') ? isSeoulRegionName(part) : isOtherRegionName(part)));
+    if (listed && seoulParts.length === 1) {
+      const districtCode = seoulDistrictCode(seoulParts[0]);
+      if (districtCode !== null)
+        return { scope: 'DISTRICTS', districtCodes: [districtCode], basis: `공고명 지역 표시 '[${tag}]'` };
+      if (namesSeoulDistrict(name)) return { scope: 'UNKNOWN' };
       return { scope: 'SEOUL', districtCodes: [], basis: `공고명 지역 표시 '[${tag}]'` };
     }
-    const firstWord = tag.split(/[\s·,]/)[0];
-    if (
-      OTHER_REGION_TAGS.includes(firstWord) ||
-      OTHER_REGION_INSTITUTION_PREFIXES.some((prefix) => tag.startsWith(prefix))
-    ) {
-      return { scope: 'OTHER' };
+    if (listed) return { scope: 'OTHER' };
+    const excludesRegion = /제외|이외|\s외|수도권\s*외|비수도권/.test(tag);
+    const namesOtherRegion = [...OTHER_REGION_TAGS, ...OTHER_REGION_INSTITUTION_PREFIXES].some((region) =>
+      tag.includes(region),
+    );
+    if (tag.includes('서울')) return { scope: 'UNKNOWN' };
+    if (namesOtherRegion || excludesRegion || namesSeoulDistrict(tag)) {
+      return isOtherRegionInstitution(institution) ? { scope: 'OTHER' } : { scope: 'UNKNOWN' };
     }
   }
-  const institutionDistrict = seoulDistrictCode(institution);
-  if (institutionDistrict !== null) {
-    return { scope: 'DISTRICTS', districtCodes: [institutionDistrict], basis: `소관기관 '${institution}'` };
+  if (institution.startsWith('서울')) {
+    if (namesSeoulDistrict(name)) return { scope: 'UNKNOWN' };
+    return { scope: 'SEOUL', districtCodes: [], basis: `소관기관 '${institution}'` };
   }
-  if (institution.startsWith('서울')) return { scope: 'SEOUL', districtCodes: [], basis: `소관기관 '${institution}'` };
-  if (OTHER_REGION_INSTITUTION_PREFIXES.some((prefix) => institution.startsWith(prefix))) return { scope: 'OTHER' };
+  if (isOtherRegionInstitution(institution)) return { scope: 'OTHER' };
   return { scope: 'UNKNOWN' };
+}
+
+// 서울 자치구 이름이 낱말로 적혀 있는지. 앞이 한글이면 낱말 안이다('집중구매'의 '중구'). '서울중구'는 적은 것이다.
+function namesSeoulDistrict(text: string): boolean {
+  return SEOUL_DISTRICTS.some((district) => new RegExp(`(?:^|[^가-힣]|서울(?:특별시|시)?)${district.name}`).test(text));
+}
+
+// '서울', '서울특별시', '서울시', '서울 강남구', '서울강남구'.
+function isSeoulRegionName(part: string): boolean {
+  const match = /^서울(?:특별시|시)?\s*(\S+)?$/.exec(part);
+  if (!match) return false;
+  return match[1] === undefined || SEOUL_DISTRICTS.some((district) => district.name === match[1]);
+}
+
+// '경기', '경기도', '부산시', '충북 청주시', '경기도 시흥시'. 뒤의 하위 지역은 시·군·구로 끝나야 한다('[경기 회복]').
+function isOtherRegionName(part: string): boolean {
+  const [province, area, ...rest] = part.split(/\s+/);
+  if (rest.length > 0) return false;
+  const provinceName =
+    OTHER_REGION_TAGS.includes(province) ||
+    OTHER_REGION_INSTITUTION_PREFIXES.includes(province) ||
+    (/[시도]$/.test(province) && OTHER_REGION_TAGS.includes(province.slice(0, -1)));
+  if (!provinceName) return false;
+  return area === undefined || /^\S+[시군구]$/.test(area);
+}
+
+function isOtherRegionInstitution(institution: string): boolean {
+  return OTHER_REGION_INSTITUTION_PREFIXES.some((prefix) => institution.startsWith(prefix));
 }
 
 // 공고 주소는 기업마당 기준 상대 경로일 수 있다. 같은 호스트의 http 주소는 https로 읽는다.
