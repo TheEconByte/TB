@@ -102,10 +102,9 @@ export const INDICATOR_DEFINITIONS: readonly IndicatorDefinition[] = [
 // Shown verbatim in the API response and on the exploration screen.
 export const MARKET_LIMITATIONS: readonly string[] = [
   '공개 상권 지표이며 개인 점포의 예상매출이 아닙니다.',
-  '매출 원값의 월·분기 단위가 확정되지 않아 월매출로 환산하지 않습니다.',
-  '점포당 매출을 계산하지 않습니다.',
+  '지표 표의 매출 원값은 월·분기 단위가 확정되지 않아 월매출로 환산하지 않습니다. 생존점수의 점포당 월매출만 잠정 해석(ADR 0002)으로 계산합니다.',
   '자료가 없는 조합은 0으로 채우지 않고 자료 부족으로 표시합니다.',
-  '상권 원값을 재무계획의 월매출 가정에 자동으로 입력하지 않습니다.',
+  '상권 원값을 재무계획에 자동으로 입력하지 않습니다. 생존점수의 [이 상권으로 재무 계획 시작]을 누른 경우에만 점포당 월매출(잠정)을 고칠 수 있는 기본값으로 채웁니다.',
 ];
 
 export type QuarterIndicatorRow = {

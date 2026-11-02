@@ -1,7 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import FinancePlanner from '@/features/finance/FinancePlanner';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
+import FinancePlanner, { defaultInputWith } from '@/features/finance/FinancePlanner';
+import { quarterLabel } from '@/features/market/quarter';
+import type { MarketScoreResponse } from '@/features/market/score/api';
+import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
+import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
+import { parsePlanMarketScore } from '@/features/plans/market-score';
 import type { FinanceInput, FinanceResult } from '@/features/finance/types';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import {
@@ -46,8 +52,14 @@ type PlanDetail = {
   fundingProfileJson: unknown;
   businessProfileJson: unknown;
   loanAssumptionJson?: unknown;
+  marketScoreJson?: unknown;
   results: ResultSummary[];
 };
+// 상권 탐색에서 넘어와 아직 저장하지 않은 새 계획의 출처.
+type MarketSource = { handoff: MarketScoreHandoff; score: MarketScoreResponse };
+
+const wonFormat = new Intl.NumberFormat('ko-KR');
+const formatWon = (value: string) => `${wonFormat.format(BigInt(value))}원`;
 type StoredResult = { id: string; inputRevision: number; resultJson: FinanceResult; loanAssumptionJson?: unknown };
 
 // 자금 후보 조건은 재무 입력과 별도로 저장한다. 화면에서는 빈 선택값을 문자열로
@@ -258,6 +270,53 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   // 상품 확정 조건을 적용하면 저장된 입력이 바뀌므로 폼을 그 입력으로 다시 채우는 신호.
   const [formSyncToken, setFormSyncToken] = useState(0);
+  // /markets의 [이 상권으로 재무 계획 시작]이 URL로 넘긴 상권 참조. 화면을 열 때 한 번만 읽는다.
+  // next/link로 넘어오면 렌더링 중의 window.location은 아직 이전 화면 주소라 라우터의 검색 파라미터를 읽는다.
+  const searchParams = useSearchParams();
+  const [handoff] = useState(() => handoffFromSearch(searchParams.toString()));
+  // 넘어온 상권. 새 계획을 저장하면 비운다.
+  const [marketSource, setMarketSource] = useState<MarketSource | null>(null);
+  // 점수를 읽는 동안에는 새 계획 재무 입력을 열지 않는다. 늦은 응답이 그사이 입력한 값을 덮지 않게 한다.
+  const [marketLoading, setMarketLoading] = useState(handoff !== null);
+
+  // 넘겨받은 참조로 점수 API를 다시 읽는다. URL 값을 그대로 믿지 않고, 저장할 때도 서버가 다시 확인한다.
+  // 읽은 참조는 바로 URL에서 지운다. 버튼을 누른 그 한 번만 쓰고, 실패·새로고침·로그아웃 뒤에 다시 쓰지 않는다(ADR 0008 §5).
+  useEffect(() => {
+    if (!handoff) return;
+    clearHandoff();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const score = await api<MarketScoreResponse>(scoreApiUrl(handoff));
+        if (cancelled) return;
+        if (score.status !== 'OK' || !score.score || !score.financeDefault) {
+          setMessage(score.message ?? '이 상권 점수는 재무 계획에 연결할 수 없습니다.');
+          return;
+        }
+        setMarketSource({ handoff: { ...handoff, releaseKey: score.release.releaseKey }, score });
+        setFundingForm((current) =>
+          isEmptyFundingForm(current)
+            ? { ...current, districtCode: score.area.districtCode, industryCode: score.industry.code }
+            : current,
+        );
+        setMessage(
+          `${score.area.displayName} ${score.industry.displayName} 상권 점수에서 시작합니다. 자치구·업종·월매출을 미리 채웠습니다.`,
+        );
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : '상권 점수를 불러오지 못했습니다.');
+      } finally {
+        if (!cancelled) setMarketLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [handoff]);
+
+  function disconnectMarketSource() {
+    setMarketSource(null);
+    setMessage('상권 연결을 해제했습니다. 미리 채운 값은 직접 고칠 수 있습니다.');
+  }
 
   const refreshPlans = useCallback(async () => {
     const data = await api<{ plans: PlanSummary[] }>('/api/plans');
@@ -320,8 +379,16 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           })
         : await api<{ plan: PlanDetail }>('/api/plans', {
             method: 'POST',
-            body: JSON.stringify({ title, input, fundingProfile, businessProfile }),
+            body: JSON.stringify({
+              title,
+              input,
+              fundingProfile,
+              businessProfile,
+              // 상권에서 시작한 새 계획만 참조를 보낸다. 등급·기본값은 서버가 점수 릴리스에서 다시 읽는다.
+              ...(marketSource ? { marketScore: marketSource.handoff } : {}),
+            }),
           });
+      if (!plan && marketSource) setMarketSource(null);
       setPlan({ ...data.plan, inputJson: input, results: plan?.results ?? [] });
       // revision이 올라가면 이전 판정은 다른 조건의 결과이므로 지운다.
       setMatches(null);
@@ -449,6 +516,8 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const storedFundingSummary =
     storedHasProfile && storedFundingForm ? fundingProfileSummary(fundingPayload(storedFundingForm)) : null;
   const storedAssumption = plan ? parseLoanAssumption(plan.loanAssumptionJson) : null;
+  const pendingMarket = plan === null ? marketSource : null;
+  const storedMarketScore = plan ? parsePlanMarketScore(plan.marketScoreJson) : null;
   const resultAssumption = parseLoanAssumption(storedResult?.loanAssumptionJson);
   const canApplyLoanAssumption = plan !== null && !financeDirty && !fundingDirty && !busy;
   const applyDisabledReason =
@@ -487,7 +556,16 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
               onClick={() => {
                 setPlan(null);
                 setStoredResult(null);
-                setFundingForm(EMPTY_FUNDING_FORM);
+                // 상권에서 넘어온 연결이 남아 있으면 새 계획에 다시 미리 채운다.
+                setFundingForm(
+                  marketSource
+                    ? {
+                        ...EMPTY_FUNDING_FORM,
+                        districtCode: marketSource.score.area.districtCode,
+                        industryCode: marketSource.score.industry.code,
+                      }
+                    : EMPTY_FUNDING_FORM,
+                );
                 setBusinessForm(EMPTY_BUSINESS_PROFILE_FORM);
                 setMatches(null);
                 setMatchesError(null);
@@ -560,19 +638,43 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             industryCode={businessForm.marketIndustryCode}
             savedMonthlyRevenue={plan?.inputJson.monthlyRevenue ?? null}
           />
-          <FinancePlanner
-            key={plan?.id ?? 'new'}
-            initialTitle={plan?.title}
-            initialInput={plan?.inputJson}
-            initialResult={storedResult?.resultJson}
-            revision={plan?.revision ?? null}
-            resultRevision={storedResult?.inputRevision ?? null}
-            busy={busy}
-            syncToken={formSyncToken}
-            onDirtyChange={setFinanceDirty}
-            onSave={saveDraft}
-            onCalculate={calculate}
-          />
+          {plan === null && marketLoading ? (
+            <p className="loading-state" role="status">
+              상권 점수를 불러오고 있습니다.
+            </p>
+          ) : (
+            <FinancePlanner
+              // 상권 연결 여부는 key에 넣지 않는다. 연결을 해제할 때 폼을 다시 만들면 저장하지 않은 입력이 사라진다.
+              key={plan?.id ?? 'new'}
+              initialTitle={
+                plan?.title ??
+                (pendingMarket
+                  ? `${pendingMarket.score.area.displayName} ${pendingMarket.score.industry.displayName} 계획`
+                  : undefined)
+              }
+              initialInput={
+                plan?.inputJson ??
+                (pendingMarket?.score.financeDefault
+                  ? defaultInputWith({ monthlyRevenue: pendingMarket.score.financeDefault.monthlyRevenue })
+                  : undefined)
+              }
+              initialResult={storedResult?.resultJson}
+              revision={plan?.revision ?? null}
+              resultRevision={storedResult?.inputRevision ?? null}
+              busy={busy}
+              syncToken={formSyncToken}
+              onDirtyChange={setFinanceDirty}
+              revenueNotice={
+                <MarketSourceNotice
+                  pending={pendingMarket}
+                  stored={storedMarketScore}
+                  onDisconnect={disconnectMarketSource}
+                />
+              }
+              onSave={saveDraft}
+              onCalculate={calculate}
+            />
+          )}
           <PlanFundingPanel
             plan={plan}
             principalKrw={plan?.inputJson.newLoan.principal ?? null}
@@ -597,6 +699,58 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
       <footer>TrendBench · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
+}
+
+// 월매출 입력란 위의 출처. 새 계획이면 넘어온 상권 점수, 저장된 계획이면 저장 당시 스냅샷을 보여 준다.
+function MarketSourceNotice({
+  pending,
+  stored,
+  onDisconnect,
+}: {
+  readonly pending: MarketSource | null;
+  readonly stored: ReturnType<typeof parsePlanMarketScore>;
+  readonly onDisconnect: () => void;
+}) {
+  if (pending?.score.score && pending.score.financeDefault) {
+    const { score } = pending;
+    return (
+      <div className="market-source" role="note" data-testid="market-source">
+        <strong>
+          {score.area.displayName} {score.industry.displayName} 점포당 평균 기준 · 등급 {score.score!.grade}
+        </strong>
+        <p>
+          월매출 기본값 {formatWon(score.financeDefault!.monthlyRevenue)}은 {score.baseQuarterLabel}까지 최근 4분기
+          서울시 매출 원값을 점포당 월평균으로 본 잠정값입니다(원값 합 {formatWon(score.financeDefault!.salesSum)} ÷
+          점포 수 합 {wonFormat.format(score.financeDefault!.storeCountSum)}). 개인 예상매출이 아니며 고쳐서 쓸 수
+          있습니다. 저장하면 상권 코드·등급·모델 버전을 함께 보존합니다.
+        </p>
+        {score.financeDefault!.unusual && <UnusualRevenueWarning score={score} />}
+        <button type="button" onClick={onDisconnect}>
+          상권 연결 해제
+        </button>
+      </div>
+    );
+  }
+  if (stored) {
+    return (
+      <div className="market-source" role="note" data-testid="market-source">
+        <strong>
+          {stored.areaName} {stored.industryName} 점포당 평균 기준 · 등급 {stored.grade}
+        </strong>
+        <p>
+          계획을 만들 때 저장한 값입니다. 다시 계산하지 않습니다. 기준분기 {quarterLabel(stored.baseQuarter)} · 점수{' '}
+          {stored.score}점 · 모델 {stored.modelVersion} · 월매출 기본값 {formatWon(stored.monthlyRevenueDefault)}(잠정)
+        </p>
+        {stored.monthlyRevenueUnusual && (
+          <p className="inline-error" role="note">
+            저장 당시 기본값이 같은 업종 상권의 하위·상위 1% 범위를 벗어났습니다. 개인 점포 매출과 크게 다를 수
+            있습니다.
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
 }
 
 function PlanFundingPanel({
@@ -774,5 +928,10 @@ export default function TrendBenchApp() {
       </main>
     );
   if (!session) return <AuthScreen />;
-  return <AuthenticatedWorkspace key={session.user.id} email={session.user.email} />;
+  // 계획 화면은 useSearchParams를 쓰므로 Suspense 경계 안에 둔다.
+  return (
+    <Suspense>
+      <AuthenticatedWorkspace key={session.user.id} email={session.user.email} />
+    </Suspense>
+  );
 }

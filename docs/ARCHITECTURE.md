@@ -29,6 +29,7 @@ Operator load commands (*:load)
 | 재무 계산 | `app/src/features/finance` | `/`의 계획 입력·결과 | `finance.test.ts` | [finance.md](domains/finance.md) |
 | 계획·불변 결과 | `app/src/features/plans` | `/api/plans/**`, `/` | `plans.test.ts`, `loan-assumption.test.ts`, `funding-matches.test.ts` | [plans.md](domains/plans.md) |
 | 서울시 상권 | `app/src/features/market` | `/markets`, industries·areas·summary·report API | `market.test.ts`, `seoul-api.test.ts` | [market.md](domains/market.md) |
+| 상권 생존점수 | `app/src/features/market/score`, `app/models/market-score` | `/markets`의 점수 패널, score API, `/funding`의 등급 표시, `score:train`·`score:build` | `score.test.ts`, `build.test.ts`, `score-db.test.ts`, `market-score.spec.ts` | [market.md](domains/market.md#상권-생존점수) |
 | 소진공 점포 | `app/src/features/business-directory` | business-categories·businesses/summary API | `business-directory.test.ts` | [business-directory.md](domains/business-directory.md) |
 | 임대료 참고 | `app/src/features/rent-benchmark` | rent-benchmarks API, `/`의 임대료 참고 패널 | `rent-benchmark.test.ts`, `rent-benchmark.spec.ts` | [rent-benchmark.md](domains/rent-benchmark.md) |
 | 프랜차이즈 참고 | `app/src/features/franchise` | franchises API, `/`의 프랜차이즈 참고 패널 | `franchise.test.ts`, `franchise.spec.ts` | [franchise.md](domains/franchise.md) |
@@ -43,6 +44,7 @@ Operator load commands (*:load)
 | 페이지·Route Handler | `app/src/app` |
 | DB schema·migration | `app/prisma` |
 | 운영 적재·검증·하네스 명령 | `app/scripts` |
-| 브라우저 종단 흐름 (desktop·mobile) | `app/e2e/`: `core-flow.spec.ts`(가입 → 저장·계산 → 재조회 → 소유권 차단), `rent-benchmark.spec.ts`, `franchise.spec.ts` |
+| 학습된 계수 파일·학습 리포트 | `app/models/market-score` |
+| 브라우저 종단 흐름 (desktop·mobile) | `app/e2e/`: `core-flow.spec.ts`(가입 → 저장·계산 → 재조회 → 소유권 차단), `rent-benchmark.spec.ts`, `franchise.spec.ts`, `market-score.spec.ts`(상권 점수 → 재무 계획 시작 → 저장 → 등급 유지) |
 | 로컬 PostgreSQL | `infra` |
 | 공공 원본 재현 검증 | [docs/verification](verification/README.md) |

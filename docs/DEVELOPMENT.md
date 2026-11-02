@@ -37,7 +37,8 @@ npm --prefix app run dev
 
 | 데이터 | 준비 | 적재 |
 |---|---|---|
-| 서울시 상권 | 서울 열린데이터광장 인증키를 `SEOUL_OPEN_API_KEY`에 넣는다. 약 2분 걸린다 | `npm --prefix app run market:load` |
+| 서울시 상권 | 서울 열린데이터광장 인증키를 `SEOUL_OPEN_API_KEY`에 넣는다. 2021년 1분기부터 받아 약 5분 걸린다 | `npm --prefix app run market:load` |
+| 상권 생존점수 | 상권 적재 후. 저장소의 계수 파일(`app/models/market-score`)로 계산한다. 모델을 다시 학습할 때만 `score:train`을 먼저 실행한다 | `npm --prefix app run score:build` |
 | 소진공 점포 | 공공데이터포털에서 [상가(상권)정보](https://www.data.go.kr/data/15012005/openapi.do)를 활용신청하고, 인증키(Decoding)를 `SEMAS_SERVICE_KEY`에 넣는다 | `npm --prefix app run business:load` |
 | 부동산원 임대료 | 부동산통계정보시스템(R-ONE) Open API 인증키를 `REB_API_KEY`에 넣는다. 약 30초 걸린다 | `npm --prefix app run rent:load` |
 | 공정위 프랜차이즈 | `SEMAS_SERVICE_KEY`(공공데이터포털 인증키)로 [가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)·[창업 금액](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청한다. 약 20~30초 걸린다 | `npm --prefix app run franchise:load` |

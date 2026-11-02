@@ -1,0 +1,184 @@
+{
+  "version": "market-score-v3-20262",
+  "definitionVersion": "market-score-def-v3",
+  "createdAt": "2026-10-31T13:44:40.280Z",
+  "marketReleaseKey": "seoul-market-2021q1-2026q2-f4b9948ab5d9",
+  "dataPeriod": { "start": "20211", "end": "20262" },
+  "minStoreCount": 5,
+  "gradeBoundaries": [
+    { "grade": "AAA", "minScore": 90 },
+    { "grade": "AA", "minScore": 80 },
+    { "grade": "A", "minScore": 70 },
+    { "grade": "BBB", "minScore": 60 },
+    { "grade": "BB", "minScore": 50 },
+    { "grade": "B", "minScore": 40 },
+    { "grade": "C", "minScore": 30 },
+    { "grade": "D", "minScore": 0 }
+  ],
+  "industries": [
+    {
+      "industryCode": "CS100001",
+      "industryName": "한식",
+      "intercept": -0.027608747682164328,
+      "features": [
+        {
+          "key": "salesGrowth",
+          "label": "매출 증감률",
+          "definition": "log(t 매출) − log(t−4 매출)",
+          "expectedScoreDirection": 1,
+          "beta": -0.18025573988447208,
+          "standardError": 0.022753158195355047,
+          "pValue": 2.220446049250313e-15,
+          "mean": 0.10799118882245543,
+          "std": 0.3025731841421835
+        },
+        {
+          "key": "salesPerStore",
+          "label": "점포당 매출",
+          "definition": "log(t−3~t 매출 합 ÷ t−3~t 평균 점포 수)",
+          "expectedScoreDirection": 1,
+          "beta": -0.2892147477002317,
+          "standardError": 0.021159864868225808,
+          "pValue": 0,
+          "mean": 18.945297934975777,
+          "std": 0.7997193283422602
+        },
+        {
+          "key": "storeCount",
+          "label": "동일 업종 점포 수",
+          "definition": "log(t 점포 수)",
+          "expectedScoreDirection": 0,
+          "beta": 0.17550745938720644,
+          "standardError": 0.019697965125183573,
+          "pValue": 0,
+          "mean": 3.1125472261741876,
+          "std": 0.9441380155915228
+        },
+        {
+          "key": "pastClosureRate",
+          "label": "직전 1년 폐업률",
+          "definition": "t−3~t 폐업 수 합 ÷ t−4 점포 수",
+          "expectedScoreDirection": -1,
+          "beta": 0.12137551557834805,
+          "standardError": 0.02118747059458022,
+          "pValue": 1.01533927931996e-8,
+          "mean": 0.1405338888637945,
+          "std": 0.09902209782012263
+        },
+        {
+          "key": "pastOpenRate",
+          "label": "직전 1년 개업률",
+          "definition": "t−3~t 개업 수 합 ÷ t−4 점포 수",
+          "expectedScoreDirection": 0,
+          "beta": 0.2713272000856598,
+          "standardError": 0.024587380531080963,
+          "pValue": 0,
+          "mean": 0.15575155400263527,
+          "std": 0.14682037245574292
+        },
+        {
+          "key": "franchiseShare",
+          "label": "프랜차이즈 비중",
+          "definition": "t 프랜차이즈 점포 수 ÷ t 점포 수",
+          "expectedScoreDirection": 0,
+          "beta": 0.11865253862617688,
+          "standardError": 0.01932427609042275,
+          "pValue": 8.28062951541142e-10,
+          "mean": 0.10871189505806136,
+          "std": 0.09334012177708564
+        }
+      ],
+      "trainQuarters": ["20221", "20222", "20223", "20224", "20231", "20232", "20233", "20234", "20241", "20242"],
+      "testQuarters": ["20243", "20244", "20251", "20252"],
+      "trainSize": 12904,
+      "testSize": 5162,
+      "trainPositiveRate": 0.49031308121512707,
+      "testPositiveRate": 0.4988376598217745,
+      "trainAuc": 0.632462908720681,
+      "testAuc": 0.6250103392241266,
+      "zClip": 3
+    },
+    {
+      "industryCode": "CS100010",
+      "industryName": "커피·음료",
+      "intercept": -0.04166969013664389,
+      "features": [
+        {
+          "key": "salesGrowth",
+          "label": "매출 증감률",
+          "definition": "log(t 매출) − log(t−4 매출)",
+          "expectedScoreDirection": 1,
+          "beta": -0.07079213152818142,
+          "standardError": 0.02524839727870873,
+          "pValue": 0.005050124898735797,
+          "mean": 0.06644523597583255,
+          "std": 0.4635903342229824
+        },
+        {
+          "key": "salesPerStore",
+          "label": "점포당 매출",
+          "definition": "log(t−3~t 매출 합 ÷ t−3~t 평균 점포 수)",
+          "expectedScoreDirection": 1,
+          "beta": -0.18975488083679412,
+          "standardError": 0.02538500277480564,
+          "pValue": 7.771561172376096e-14,
+          "mean": 17.745034471405518,
+          "std": 1.1688133002634418
+        },
+        {
+          "key": "storeCount",
+          "label": "동일 업종 점포 수",
+          "definition": "log(t 점포 수)",
+          "expectedScoreDirection": 0,
+          "beta": -0.02418414583252333,
+          "standardError": 0.023396779902623482,
+          "pValue": 0.3012985757778821,
+          "mean": 2.6967857855420587,
+          "std": 0.8221928731599814
+        },
+        {
+          "key": "pastClosureRate",
+          "label": "직전 1년 폐업률",
+          "definition": "t−3~t 폐업 수 합 ÷ t−4 점포 수",
+          "expectedScoreDirection": -1,
+          "beta": 0.050893126587107276,
+          "standardError": 0.023053375836768798,
+          "pValue": 0.027270580386679066,
+          "mean": 0.16384327003646232,
+          "std": 0.12592125228683881
+        },
+        {
+          "key": "pastOpenRate",
+          "label": "직전 1년 개업률",
+          "definition": "t−3~t 개업 수 합 ÷ t−4 점포 수",
+          "expectedScoreDirection": 0,
+          "beta": 0.10657451098800712,
+          "standardError": 0.025199940220085447,
+          "pValue": 0.000023472105683985944,
+          "mean": 0.2570405207585353,
+          "std": 0.21320633568212993
+        },
+        {
+          "key": "franchiseShare",
+          "label": "프랜차이즈 비중",
+          "definition": "t 프랜차이즈 점포 수 ÷ t 점포 수",
+          "expectedScoreDirection": 0,
+          "beta": 0.08566876837357229,
+          "standardError": 0.022962413644968482,
+          "pValue": 0.00019091001432269827,
+          "mean": 0.22219400040601264,
+          "std": 0.1781039960283355
+        }
+      ],
+      "trainQuarters": ["20221", "20222", "20223", "20224", "20231", "20232", "20233", "20234", "20241", "20242"],
+      "testQuarters": ["20243", "20244", "20251", "20252"],
+      "trainSize": 9131,
+      "testSize": 3670,
+      "trainPositiveRate": 0.4888840214653379,
+      "testPositiveRate": 0.493732970027248,
+      "trainAuc": 0.5766622228596575,
+      "testAuc": 0.5778953609117069,
+      "zClip": 3
+    }
+  ]
+}

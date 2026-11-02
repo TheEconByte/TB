@@ -6,7 +6,7 @@
 
 ## 적재
 
-- 실행: `npm --prefix app run market:load [-- --from <YYYYQ>] [--to <YYYYQ>]`. 기본은 서울 열린데이터광장 Open API(`app/.env.local`의 `SEOUL_OPEN_API_KEY`)에서 2024년 1분기부터 매출·점포가 모두 있는 최신 분기까지 받는다([ADR 0003](../decisions/0003-seoul-market-open-api.md)).
+- 실행: `npm --prefix app run market:load [-- --from <YYYYQ>] [--to <YYYYQ>]`. 기본은 서울 열린데이터광장 Open API(`app/.env.local`의 `SEOUL_OPEN_API_KEY`)에서 2021년 1분기(API의 첫 분기)부터 매출·점포가 모두 있는 최신 분기까지 받는다([ADR 0003](../decisions/0003-seoul-market-open-api.md), [ADR 0008](../decisions/0008-market-survival-score.md)). 2021~2023년 분기도 현재 영역 코드로 제공된다.
 - API 서비스는 영역 `TbgisTrdarRelm`, 추정매출 `VwsmTrdarSelngQq`, 점포 `VwsmTrdarStorQq`다. 분기마다 1,000행씩 받아 받은 행 수가 전체 건수와 같은지 확인한다. 받는 중 전체 건수가 바뀌거나, 요청한 분기가 비어 있거나, 응답 필드 구성이 기록과 다르면 적재하지 않는다.
 - API 출처는 서비스별 행 수와 행 순서와 무관한 내용 해시로 남고, 분기별 행 수·해시는 검증 요약(`sourceQuarters`)에 남는다. 로그와 오류는 인증키를 가린다.
 - `--source-dir <경로>`는 2026-09-09에 검증한 ZIP 원본을 적재한다.
@@ -31,8 +31,22 @@
 - 자료가 없는 조합은 0이 아니라 `dataStatus: NOT_PROVIDED`와 빈 `quarters`로, 매출만 없는 분기는 `salesStatus: NOT_PROVIDED`와 `salesAmount: null`로 응답한다.
 - 응답에는 지표 정의(원본 열·단위·해석 제한)와 제한 문구, 릴리스 출처·기준기간·입수일·파일별 SHA-256을 함께 담는다.
 
+## 상권 생존점수
+
+정의와 근거는 [ADR 0008](../decisions/0008-market-survival-score.md)에 있다.
+
+- 코드: `app/src/features/market/score`. 변수·라벨(`dataset.ts`), 로지스틱 회귀(`logistic.ts`), 학습·기준선 비교(`train.ts`), 점수 생성(`build.ts`), 점수 릴리스 적재(`loader.ts`), 공개 API 조립(`api.ts`), 화면(`ScorePanel.tsx`, `MarketGradeBanner.tsx`), `/`로 넘기는 상권 참조(`handoff.ts`). 모델 설정은 `config.ts` 하나에 있다.
+- 학습: `npm --prefix app run score:train [-- --version <버전>]`. ACTIVE 상권 릴리스로 업종별 모델을 학습하고 `app/models/market-score/<버전>.json`(계수)과 `<버전>.report.md`(학습 리포트)를 만든다. 같은 버전 파일은 덮어쓰지 않는다. 계수 파일과 리포트는 Git에 포함한다.
+- 점수 적재: `npm --prefix app run score:build [-- --model <계수 파일>]`. 기본은 `app/models/market-score`의 이름순 마지막 계수 파일이다. 최신 기준분기의 모든 상권 × 제공 업종 행을 `PENDING`으로 저장하고 행 수·점수 범위를 검증한 뒤 한 트랜잭션으로 활성화한다. 실패하면 행을 지우고 `FAILED`로 남기며 기존 ACTIVE를 유지한다. 계수 파일 checksum·상권 릴리스 키·기준분기가 같으면 `ALREADY_ACTIVE`다. 상권을 다시 적재하면 `score:build`를 다시 실행한다.
+- 테스트 AUC가 0.6 미만인 업종은 행을 만들지 않고 요약에 미지원으로 남긴다.
+- `/api/markets/score?areaCode=...&industryCode=...[&areaType=...]`(로그인 불필요): 활성 점수 릴리스가 없으면 503 `SCORE_UNAVAILABLE`, 형식 오류는 400, 점수 릴리스의 상권 영역에 없으면 404 `AREA_NOT_FOUND`다. 그 밖에는 200과 `status`(`OK`·`INSUFFICIENT_STORES`·`UNSUPPORTED_INDUSTRY`·`NO_DATA`), 상태 문구, 점수·등급·순위·상위 %, 기여 변수 최대 4개(이 상권 값·업종 평균·높음/낮음·올림/내림), 10점 구간 분포, 모델 정보(학습 기간·표본·AUC·계수표·등급 구간), 월매출 기본값(원 단위 정수 문자열, 잠정, 근거 원값, 같은 업종 하위·상위 1% 경계 밖인지), 한계 문구를 돌려준다.
+- 상위 %는 ⌈순위 ÷ 점수 낸 상권 수 × 100⌉이고, 점수가 같으면 같은 순위다. 업종 평균은 점수 낸 상권의 화면 표시값 산술 평균이다.
+- `/markets`는 지표와 점수를 따로 불러온다. 점수를 불러오지 못해도 지표는 그대로 보여 준다.
+
 ## 테스트
 
 - 항상: 원본 파싱·헤더 매핑·checksum·거부 규칙, 가짜 서울 API로 API 수신과 적재 원본 구성.
+- 항상: 생존점수 변수·라벨·회귀·점수·등급·기여도·예외 상태·월매출 기본값(`score.test.ts`, `build.test.ts`). 계수 파일은 스키마를 통과해야 한다.
+- 전용 테스트 DB가 있을 때: 합성 릴리스로 `score:build` 활성화·재실행·실패 시 유지, 점수 API 상태, 계획 스냅샷(`score-db.test.ts`). E2E는 `e2e/market-score.spec.ts`.
 - `data/raw/`에 검증본 파일이 있을 때: 기록된 행 수·결합·표본 대조.
 - 전용 테스트 DB가 있을 때: 합성 릴리스 적재. 끝나면 지우고 실행 전 ACTIVE 상태를 복원한다.

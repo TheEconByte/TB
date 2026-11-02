@@ -3,7 +3,8 @@ import { Prisma } from '@/generated/prisma/client';
 import { INPUT_SCHEMA_VERSION } from '@/features/finance/types';
 import { planFundingProfileJson } from '@/features/plans/funding-profile';
 import { resolveBusinessProfile } from '@/features/business-profile/resolve';
-import { planWriteSchema } from '@/features/plans/schema';
+import { resolvePlanMarketScore } from '@/features/plans/market-score';
+import { planCreateSchema } from '@/features/plans/schema';
 import { apiError, internalError, invalidZod } from '@/lib/api';
 import { getPrisma } from '@/lib/prisma';
 import { currentUser } from '@/lib/session';
@@ -41,9 +42,18 @@ export async function POST(request: Request) {
     if (!user) return apiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
     const limit = consumeRateLimit(`plan-create:${user.id}`, { max: 30, windowMs: 60_000 });
     if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
-    const parsed = planWriteSchema.safeParse(await request.json());
+    const parsed = planCreateSchema.safeParse(await request.json());
     if (!parsed.success) return invalidZod(parsed.error);
     const prisma = getPrisma();
+    const marketScore =
+      parsed.data.marketScore === undefined ? null : await resolvePlanMarketScore(prisma, parsed.data.marketScore);
+    if (parsed.data.marketScore !== undefined && marketScore === null) {
+      return apiError(
+        409,
+        'MARKET_SCORE_UNAVAILABLE',
+        '선택한 상권 점수를 점수 릴리스에서 확인하지 못했습니다. 상권 탐색에서 다시 시작해 주세요.',
+      );
+    }
     const resolvedBusiness =
       parsed.data.businessProfile == null ? null : await resolveBusinessProfile(prisma, parsed.data.businessProfile);
     if (resolvedBusiness && resolvedBusiness.kind !== 'OK') {
@@ -64,6 +74,8 @@ export async function POST(request: Request) {
         fundingProfileJson: planFundingProfileJson(parsed.data.fundingProfile),
         businessProfileJson:
           resolvedBusiness === null ? Prisma.DbNull : (resolvedBusiness.profile as Prisma.InputJsonValue),
+        // 저장 당시 점수 스냅샷. 다시 볼 때 재계산하지 않는다.
+        marketScoreJson: marketScore === null ? Prisma.DbNull : (marketScore as Prisma.InputJsonValue),
       },
     });
     return NextResponse.json({ plan }, { status: 201 });

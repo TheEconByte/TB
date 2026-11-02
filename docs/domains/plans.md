@@ -8,7 +8,7 @@
 ## API
 
 - `/api/auth/*`: Better Auth handler.
-- `/api/plans`: 내 계획 생성·목록.
+- `/api/plans`: 내 계획 생성·목록. 생성 본문에 상권 참조(`marketScore`: 점수 릴리스 키·상권 구분·상권 코드·업종)가 있으면 서버가 그 점수 릴리스에서 점수·등급·월매출 기본값을 다시 읽어 `plans.marketScoreJson`에 저장한다. 점수 릴리스가 ACTIVE·SUPERSEDED가 아니거나 점수를 낸 상권이 아니면 409 `MARKET_SCORE_UNAVAILABLE`이고 계획을 만들지 않는다. 수정(PUT)은 이 스냅샷을 바꾸지 않는다([ADR 0008](../decisions/0008-market-survival-score.md)).
 - `/api/plans/{id}`: 소유자만 상세·revision 수정·삭제.
 - `/api/plans/{id}/calculations`: 저장된 입력만 서버에서 계산하고 결과를 append-only로 저장.
 - `/api/plans/{id}/business-profile`: 소유자만 사업 조건을 저장하고 revision을 올림([business-profile.md](business-profile.md)).
