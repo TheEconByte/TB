@@ -131,6 +131,17 @@
 - 명령 출력: 직전 ACTIVE 릴리스에 없던 공고를 출처별로 나열한다. 운영자가 서울시 육성자금 같은 사람 관리 상품의 새 공고·변경공고를 찾는 데 쓴다.
 - 공고가 기업마당에서 사라지면 다음 동기화에서 빠지고, 신청 종료일이 지나면 그 전에도 접수 종료로 판정된다.
 
+#### 공고 본문과 AI 추출 결과 (ADR 0009)
+
+[ADR 0009](../decisions/0009-funding-ai-condition-extraction.md)의 저장소다. 테이블만 있고, 채우는 수집·추출은 다음 단계에서 funding:sync에 더한다.
+
+- `funding_notice_texts`: 상품 하나(`productKey`)의 본문과 첨부를 텍스트로 바꿔 합친 것. 소진공은 자금마다 상품이 따로라 같은 공지 본문이 자금마다 들어간다. 공고 URL, 합친 문서마다의 URL·형식·원 파일 checksum(`documents`), 처음 받은 시각을 함께 둔다. 원 파일은 저장하지 않는다.
+  - `textChecksum`은 텍스트의 SHA-256이며 CHECK 제약이 강제한다. `productKey + textChecksum`이 UNIQUE라 본문이 바뀌면 새 행이 생기고, 예전과 같은 본문이 다시 오면 그 행을 다시 쓴다.
+  - 상품의 지금 본문은 받은 시각이 아니라 ACTIVE 릴리스의 상품 버전이 가리키는 `textChecksum`으로 정한다. 적재에 실패한 동기화가 받은 본문은 화면에 쓰이지 않는다.
+- `funding_condition_extractions`: 본문 텍스트에서 AI가 읽은 항목별 값·원문 인용(`fields`, 인용 검증 후), AI 응답 원본(`rawOutput`), 모델 id, 프롬프트 버전, 토큰 수, 추출 시각.
+  - `productKey + textChecksum + model + promptVersion`이 UNIQUE라 같은 상품의 같은 본문을 같은 모델·프롬프트로 두 번 추출하지 않는다. 성공한 추출만 남긴다.
+  - 결과는 `productKey + textChecksum`으로 본문 행을 가리킨다. 결과가 가리키는 본문 행은 지울 수 없고 텍스트도 바꿀 수 없다(외래키 RESTRICT와 CHECK). 그 밖의 열과 결과가 없는 본문 행은 DB가 막지 않으므로, 적재 코드가 고치거나 지우지 않는다.
+
 ### 판정
 
 - 판정 규칙(`eligibility.ts`): 조건별로 PASS/FAIL/UNKNOWN을 계산한다. FAIL이 하나라도 있으면 FAIL, FAIL 없이 UNKNOWN이 있으면 UNKNOWN, 모두 PASS면 PASS다.
