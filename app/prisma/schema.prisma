@@ -87,6 +87,9 @@ model Plan {
   // 상품 확정 조건을 대출 가정으로 적용했을 때 어느 상품 버전·카탈로그를 썼는지
   // 보존한다. 사용자가 직접 입력한 값과 구분하며 계산 입력(inputJson)과 별도다.
   loanAssumptionJson Json?        @db.JsonB
+  // /markets의 [이 상권으로 재무 계획 시작]으로 만든 계획의 상권 점수 스냅샷(ADR 0008).
+  // 상권·업종·등급·모델 버전·월매출 기본값을 저장 당시 값으로 보존하고 다시 계산하지 않는다.
+  marketScoreJson    Json?        @db.JsonB
   revision           Int          @default(1)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
@@ -221,6 +224,59 @@ model MarketQuarterly {
   @@index([releaseId, areaCode, industryCode, quarter])
   @@index([releaseId, industryCode])
   @@map("market_quarterly")
+}
+
+// 상권 생존점수 릴리스(ADR 0008). score:build가 계수 파일과 ACTIVE 상권 릴리스로 만든다.
+// 상권 릴리스와 같이 PENDING → ACTIVE로만 활성화하고, 이전 릴리스의 행은 지우거나 고치지 않는다.
+model MarketScoreRelease {
+  id               String              @id @default(cuid())
+  releaseKey       String              @unique
+  status           MarketReleaseStatus @default(PENDING)
+  modelVersion     String
+  // 계수 파일 SHA-256과 내용 스냅샷(계수표·학습 기간·표본 수·AUC)
+  modelChecksum    String
+  modelJson        Json                @db.JsonB
+  marketReleaseId  String
+  marketReleaseKey String
+  baseQuarter      String
+  // 업종별 점수 낸 상권 수, 10점 구간 분포, 등급별 수, 변수 평균, 제외 수, 점수를 내는 업종
+  summaryJson      Json                @db.JsonB
+  activatedAt      DateTime?
+  failedAt         DateTime?
+  failureReason    String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  scores           MarketScore[]
+
+  @@index([status, activatedAt])
+  @@map("market_score_releases")
+}
+
+// 상권 × 업종 한 행. 점수를 내지 않은 상권도 이유(status)와 함께 남긴다.
+model MarketScore {
+  id                    String             @id @default(cuid())
+  releaseId             String
+  industryCode          String
+  areaType              String
+  areaCode              String
+  // SCORED | INSUFFICIENT_STORES | NO_DATA
+  status                String
+  storeCount            Int?
+  score                 Int?
+  grade                 String?
+  probability           Float?
+  // 같은 업종 점수 낸 상권 중 순위(점수가 같으면 같은 순위)
+  rank                  Int?
+  // 재무 계획 월매출 기본값(잠정, ADR 0002): t−3~t 매출 원값 합 ÷ 점포 수 합. 원 단위
+  monthlyRevenueDefault Decimal?           @db.Decimal(18, 0)
+  // 변수별 값·표준화 값·기여도·화면 표시값과 계산에 쓴 원값
+  detailJson            Json?              @db.JsonB
+  createdAt             DateTime           @default(now())
+  release               MarketScoreRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, industryCode, areaType, areaCode])
+  @@index([releaseId, industryCode, score])
+  @@map("market_scores")
 }
 
 enum BusinessDirectoryReleaseStatus {

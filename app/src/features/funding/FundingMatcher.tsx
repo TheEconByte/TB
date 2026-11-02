@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
+import MarketGradeBanner from '@/features/market/score/MarketGradeBanner';
 import type { FundingCandidatesResponse } from './candidates.ts';
 import { SEOUL_DISTRICTS } from './districts.ts';
 import { industryCodeIssue, purposeLabel, stageLabel } from './eligibility.ts';
@@ -118,6 +119,14 @@ export default function FundingMatcher() {
           </Link>
         </div>
       </header>
+
+      <MarketGradeBanner
+        onLoaded={(score) => {
+          // 상권에서 넘어오면 비어 있는 자치구·업종만 채운다. 사업 단계와 용도는 사용자가 고른다.
+          setDistrictCode((current) => (current === '' ? score.area.districtCode : current));
+          setIndustryCode((current) => (current.trim() === '' ? score.industry.code : current));
+        }}
+      />
 
       <section className="hero funding-hero">
         <p className="eyebrow">자금 후보 조회</p>
