@@ -8,6 +8,7 @@
   - 카탈로그 Zod 스키마(`schema.ts`), 규칙 검사(`validation.ts`), 고정 조건 판정(`eligibility.ts`)
   - 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`), 요청 스키마·응답 조립(`candidates.ts`)
   - 출처별 수집 결과를 사람이 관리하는 카탈로그와 합쳐 적재하는 동기화(`sync.ts`), 출처별 수집기(`sources/`)
+  - 공고 파일(PDF·HWP·HWPX)을 텍스트로 바꾸는 `notice-text.ts`. 적재 명령에서만 쓰며 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절). HWP·HWPX 표는 칸 안의 문단마다 한 줄이고(빈 칸은 빈 줄) 행·칸 구분 표시가 없다. 각주·미주·머리말·꼬리말은 빠진다. PDF 표는 행마다 한 줄이고 칸 사이가 공백이다.
   - 페이지 단위 후보 화면(`FundingMatcher.tsx`), 두 화면이 함께 쓰는 결과 표시(`FundingCandidatesPanel.tsx`)
 - `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서.
 
@@ -208,5 +209,6 @@
 - DB 없이: 자동 상품의 최신성·승격 보류·상환 계산 스위치, v1.0.0 릴리스 읽기, 자동 상품 규칙 검사, 동기화의 상품 버전 재사용 규칙, 사업 단계·지원 유형 미확인 상품의 규칙 검사와 판정, 지원 유형별 갈래와 갈래별 개수, 자동 상품의 출처 정보.
 - DB 없이(`sources/bizinfo.test.ts`): 기업마당 신청기간·지역 해석, 수집 범위와 사유별 제외, 만든 상품의 규칙 검사 통과와 추가 확인 판정, 요청 인자, 키 없음·403·429·재시도·JSON 아님·잘린 응답, 오류 문장의 키 가림.
 - DB 없이(`sources/semas-ols.test.ts`, 사이트 원문이 아닌 HTML 조각 fixture): 소진공 접수기간 표기 해석과 모호한 표기 거부, 정책자금 표·홈 화면 접수 표시·공지 목록·공지 상세 해석과 필수 항목 누락 실패, 공지 고르기, 접수 상태 판정(세부 유형 카드, 날짜 모순, 마감 표시, 상시접수, 제외 신호), 모호한 금리·여러 금액 한도를 확정 값으로 옮기지 않음, 만든 상품의 규칙 검사 통과와 스위치·최신성에 따른 판정, 근거별 페이지 checksum, 요청 순서와 1초 이상 간격, 연락처 없음·robots.txt 생김·403·429·자동 입력 방지 화면·재시도·잘린 공지 목록.
+- DB 없이(`notice-text.test.ts`, 직접 만든 PDF·HWP·HWPX fixture와 [만든 방법](../../app/src/features/funding/fixtures/README.md)): 공고 파일의 본문과 표 칸을 읽는 순서대로 추출, 글꼴을 넣지 않은 한글 CID 글꼴 PDF, 글자 없는 파일의 `NO_TEXT`, 깨진·암호·형식이 다른 파일의 `UNREADABLE`, 라이브러리·CMap을 불러오지 못하면 결과 대신 예외. 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절).
 - `TEST_DATABASE_URL` 전용 DB: 카탈로그 적재, 실제 DB에서의 후보 조회·계획 조건 판정·상품 조건 적용, 출처 저장과 과거 결과 불변성. 합성 카탈로그만 만들고 끝나면 지우며 실행 전 ACTIVE 상태를 복원한다.
 - `TEST_DATABASE_URL` 전용 DB의 동기화(`sync.test.ts`): 합성 수집기로 적재, 버전 재사용과 새 버전, 출처 실패 시 직전 상품 유지, 빈 응답·급감, 검증 실패, 사람 기록 우선, dry run, 새 공고 목록, 기업마당 수집기(가짜 응답)로 유형 미확인 상품 적재와 추가 확인 판정.
