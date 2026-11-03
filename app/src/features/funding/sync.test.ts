@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
 import { evaluateCandidates } from './eligibility.ts';
 import { findActiveFundingCatalog } from './read.ts';
@@ -199,6 +199,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     }
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
+    await db().fundingConditionExtraction.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
+    await db().fundingConditionExtraction.deleteMany({
+      where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } },
+    });
     await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
     await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     const baseline = await db().fundingCatalogRelease.findFirst({
@@ -218,6 +222,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     for (const release of releases) await db().fundingCatalogRelease.delete({ where: { id: release.id } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
+    await db().fundingConditionExtraction.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
+    await db().fundingConditionExtraction.deleteMany({
+      where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } },
+    });
     await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
     await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     if (previousActiveId) {
@@ -540,6 +548,78 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     const report = await run('2026-10-03', 2);
     expect(report.sources[0]).toMatchObject({ status: 'SUCCEEDED', noticeTexts: { INCOMPLETE: 1 } });
     expect(await activeChecksum()).toBe(before);
+  });
+
+  // ADR 0009 §3: 적재한 본문마다 조건을 읽어 남기고, 같은 본문은 다시 부르지 않으며, 실패는 동기화 실패가 아니다.
+  it('reads conditions from stored bodies once, and retries failures on the next sync', async () => {
+    const body = '□ 신청대상 : 업력 3년 이내 소상공인';
+    const product = (asOfDate: string) =>
+      collected('conditions', asOfDate, {
+        notice: {
+          sourceUrl: OLS_URL,
+          inline: [{ kind: 'NOTICE_PAGE', name: '공지', url: OLS_URL, text: body }],
+          files: [],
+        },
+      });
+    const notMentioned = { mentioned: false, value: null, quote: null };
+    const output = {
+      businessStage: notMentioned,
+      businessAge: { mentioned: true, value: { min: null, max: 3, maxExclusive: false }, quote: '업력 3년 이내' },
+      age: notMentioned,
+      region: notMentioned,
+      foodBusiness: notMentioned,
+      targetGroups: notMentioned,
+      applicationPeriod: notMentioned,
+      supportTypes: notMentioned,
+    };
+    let fail = true;
+    const extractor = vi.fn(async () => {
+      if (fail) throw new Error('529 overloaded');
+      return { output, inputTokens: 100, outputTokens: 20 } as never;
+    });
+    const run = (asOfDate: string) =>
+      runFundingSync({
+        prisma: db(),
+        catalogPath: manualCatalogFile(),
+        adapters: [adapter(() => collection([product(asOfDate)]))],
+        asOfDate,
+        outputDir: tempDir(),
+        now: () => new Date(`${asOfDate}T01:00:00.000Z`),
+        conditionExtractor: extractor,
+      });
+
+    const failed = await run('2026-10-04');
+    expect(failed.sources[0].status).toBe('SUCCEEDED');
+    expect(failed.load?.outcome).toBe('ACTIVATED');
+    expect(failed.conditions?.counts).toMatchObject({ FAILED: 1 });
+    expect(await db().fundingConditionExtraction.count({ where: { productKey: 'test-sync-conditions' } })).toBe(0);
+
+    fail = false;
+    const retried = await run('2026-10-05');
+    expect(retried.conditions?.counts).toMatchObject({ EXTRACTED: 1 });
+    const [row] = await db().fundingConditionExtraction.findMany({ where: { productKey: 'test-sync-conditions' } });
+    expect(row.fields).toMatchObject({
+      businessAge: { status: 'READ', value: { min: null, max: 3, maxExclusive: false } },
+      age: { status: 'NOT_MENTIONED' },
+    });
+
+    extractor.mockClear();
+    const cached = await run('2026-10-06');
+    expect(extractor).not.toHaveBeenCalled();
+    expect(cached.conditions?.counts).toMatchObject({ CACHED: 1 });
+
+    // dry run은 AI를 부르지 않는다.
+    const dry = await runFundingSync({
+      prisma: db(),
+      catalogPath: manualCatalogFile(),
+      adapters: [adapter(() => collection([product('2026-10-07')]))],
+      asOfDate: '2026-10-07',
+      outputDir: tempDir(),
+      dryRun: true,
+      conditionExtractor: extractor,
+    });
+    expect(dry.conditions).toBeNull();
+    expect(extractor).not.toHaveBeenCalled();
   });
 
   it('does not write notice texts in a dry run', async () => {

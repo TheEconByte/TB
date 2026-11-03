@@ -1,9 +1,11 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Anthropic from '@anthropic-ai/sdk';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.ts';
 import { secretMasker } from '../src/features/market/seoul-api.ts';
 import { todayInKst } from '../src/features/funding/dates.ts';
+import { createClaudeConditionExtractor } from '../src/features/funding/notice-extraction.ts';
 import { createBizinfoAdapter } from '../src/features/funding/sources/bizinfo.ts';
 import { createSemasOlsAdapter } from '../src/features/funding/sources/semas-ols.ts';
 import { runFundingSync, type FundingSourceAdapter } from '../src/features/funding/sync.ts';
@@ -23,7 +25,9 @@ const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [
 ];
 
 // 출력에 인증키가 남지 않게 가린다.
-const mask = secretMasker(process.env.BIZINFO_API_KEY ?? '');
+const maskBizinfo = secretMasker(process.env.BIZINFO_API_KEY ?? '');
+const maskAnthropic = secretMasker(process.env.ANTHROPIC_API_KEY?.trim() ?? '');
+const mask = (text: string) => maskAnthropic(maskBizinfo(text));
 // 새 공고 이름은 이 수까지만 출력한다.
 const MAX_LISTED_NEW_PRODUCTS = 30;
 
@@ -35,6 +39,8 @@ const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하�
 환경변수:
   DATABASE_URL       PostgreSQL 연결 문자열
   BIZINFO_API_KEY    기업마당 지원사업정보 API 인증키. 없으면 기업마당 출처는 실패로 기록됩니다
+  ANTHROPIC_API_KEY  공고 본문에서 조건을 읽는 Claude API 키(ADR 0009). 없으면 조건을 읽지 않고, 읽지 못한
+                     공고는 다음 동기화에서 다시 읽습니다. 출처 동기화 결과는 같습니다
   FUNDING_SYNC_CONTACT
                      소진공 정책자금 사이트와 기업마당 공고 파일 요청의 User-Agent에 밝힐 운영자 연락처
                      (메일 주소나 웹 주소, ASCII). 없으면 소진공 출처는 실패로 기록되고, 파일이 있는 기업마당 공고는
@@ -94,6 +100,7 @@ async function main() {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL이 없습니다. app/.env.local을 준비하거나 DATABASE_URL을 지정해 주세요.');
   }
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() ?? '';
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   try {
     const report = await runFundingSync({
@@ -103,6 +110,9 @@ async function main() {
       asOfDate: todayInKst(),
       outputDir: options.outputDir,
       dryRun: options.dryRun,
+      // 키가 있을 때만 만든다. 다른 경로(로그인 프로필 등)의 자격 증명은 쓰지 않는다.
+      conditionExtractor:
+        anthropicKey === '' ? null : createClaudeConditionExtractor(new Anthropic({ apiKey: anthropicKey })),
       log: (message) => console.log(mask(message)),
     });
     console.log('');
@@ -132,6 +142,12 @@ async function main() {
       }
     }
     console.log(`사람이 기록한 상품 ${report.manualProductCount}건 · 자동 상품 ${report.automatedProductCount}건`);
+    if (report.conditions !== null) {
+      const counts = report.conditions.counts;
+      console.log(
+        `공고 조건 추출: 이미 읽음 ${counts.CACHED}건 · 새로 읽음 ${counts.EXTRACTED}건 · 실패 ${counts.FAILED}건 · 키 없음 ${counts.NOT_CONFIGURED}건 · 너무 김 ${counts.TOO_LONG}건 · 본문 없음 ${counts.NO_TEXT}건 · 입력 ${report.conditions.inputTokens}토큰 · 출력 ${report.conditions.outputTokens}토큰`,
+      );
+    }
     if (report.overriddenByManual.length > 0) {
       console.log(`사람 기록이 우선해 뺀 자동 상품: ${report.overriddenByManual.join(', ')}`);
     }
