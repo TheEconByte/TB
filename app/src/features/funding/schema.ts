@@ -146,6 +146,9 @@ export const fundingProductSchema = z.object({
   // 적어 두며, 그때는 사람 기록이 자동 상품보다 우선한다. 기본값을 두지 않아 이 필드가
   // 없는 기존 상품 버전의 저장 내용이 바뀌지 않는다.
   sourceRef: sourceRefSchema.optional(),
+  // funding:sync가 이 상품에 쓴 공고 본문(funding_notice_texts)의 checksum(ADR 0009 §2). ACTIVE 릴리스의 상품 버전이
+  // 가리키는 본문이 이 상품의 지금 본문이다. 본문이 없거나 읽지 못했으면 없다. sourceRef처럼 기본값을 두지 않는다.
+  noticeTextChecksum: sha256Hex.optional(),
 });
 
 // 출처별 동기화 결과. 자동 상품의 최신성(마지막 성공 동기화일)과 실패 사유를 남긴다.

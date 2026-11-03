@@ -945,7 +945,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   let client: PrismaClient | null = null;
   let startedAt = new Date(0);
   let previousActiveId: string | null = null;
-  const REAL_VERSION = '2026-09-28.2';
+  const REAL_VERSION = '2026-11-03.1';
   const REVIEWED_CATALOG_PATH = reviewedCatalogFile();
 
   const db = (): PrismaClient => {

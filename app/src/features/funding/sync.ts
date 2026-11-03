@@ -3,6 +3,9 @@ import { join } from 'node:path';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { canonicalJson } from './canonical.ts';
 import { loadFundingCatalog, readFundingCatalogFile, type FundingLoadReport } from './loader.ts';
+import type { NoticeDownload, NoticeExtract, NoticePlan } from './notice-body.ts';
+import { prismaNoticeTextStore, resolveNoticeText, type NoticeTextOutcome } from './notice-sync.ts';
+import { extractNoticeText } from './notice-text.ts';
 import { findActiveFundingCatalog } from './read.ts';
 import {
   fundingProductSchema,
@@ -16,8 +19,13 @@ import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION, isAutoReviewer, type Fun
 import { FundingCatalogError, validateFundingCatalog } from './validation.ts';
 
 // 출처별 수집기가 만든 상품. 상품 버전과 검수자는 동기화가 정한다(ADR 0006 2절).
-export type CollectedFundingProduct = Omit<FundingProduct, 'version' | 'reviewer' | 'sourceRef'> & {
+// notice는 공고 본문을 모을 계획이다. 동기화가 본문을 정해 noticeTextChecksum으로 바꾼다(ADR 0009 §2).
+export type CollectedFundingProduct = Omit<
+  FundingProduct,
+  'version' | 'reviewer' | 'sourceRef' | 'noticeTextChecksum'
+> & {
   sourceRef: FundingSourceRef;
+  notice?: NoticePlan;
 };
 
 export type FundingSourceCollection = {
@@ -31,6 +39,8 @@ export type FundingSourceCollection = {
 export type FundingSourceAdapter = {
   source: FundingSource;
   collect(context: { asOfDate: string; log: (message: string) => void }): Promise<FundingSourceCollection>;
+  // 공고 본문 계획의 파일을 받는다. 파일이 있는 계획을 만드는 수집기만 둔다.
+  downloadNoticeFile?: NoticeDownload;
 };
 
 export type FundingSyncOptions = {
@@ -46,6 +56,8 @@ export type FundingSyncOptions = {
   dryRun?: boolean;
   now?: () => Date;
   log?: (message: string) => void;
+  // 첨부를 텍스트로 바꾸는 함수. 테스트에서 바꿔 끼운다.
+  noticeExtract?: NoticeExtract;
 };
 
 export type FundingSourceSyncReport = FundingSourceSync & {
@@ -55,7 +67,13 @@ export type FundingSourceSyncReport = FundingSourceSync & {
   carriedOver: boolean;
   // 직전 ACTIVE 릴리스에 없던 공고로 만든 상품. 운영자가 새 공고·변경공고를 살펴보는 데 쓴다.
   addedProducts: Array<{ productKey: string; name: string }>;
+  // 공고 본문을 정한 결과별 상품 수. 출처가 실패했으면 모두 0이다.
+  noticeTexts: Record<NoticeTextOutcome['outcome'], number>;
 };
+
+function emptyNoticeCounts(): Record<NoticeTextOutcome['outcome'], number> {
+  return { REUSED: 0, STORED: 0, NO_TEXT: 0, INCOMPLETE: 0 };
+}
 
 export type FundingSyncReport = {
   catalogFile: string;
@@ -138,10 +156,20 @@ async function collectSource(
     prisma: PrismaClient;
     manual: FundingCatalog;
     previousSync: FundingSourceSync | null;
+    // 직전 ACTIVE 릴리스에 있던 이 출처의 상품. 공고 본문을 다시 쓸 수 있는지 보는 데 쓴다.
+    previousProducts: readonly FundingProduct[];
     asOfDate: string;
+    dryRun: boolean;
+    now: () => Date;
+    extract: NoticeExtract;
     log: (message: string) => void;
   },
-): Promise<{ products: FundingProduct[]; fetchedCount: number; responseChecksum: string }> {
+): Promise<{
+  products: FundingProduct[];
+  fetchedCount: number;
+  responseChecksum: string;
+  noticeTexts: Record<NoticeTextOutcome['outcome'], number>;
+}> {
   const collection = await adapter.collect({ asOfDate: context.asOfDate, log: context.log });
   if (collection.fetchedCount === 0 || collection.products.length === 0) {
     throw new SourceSyncFailure(
@@ -170,10 +198,54 @@ async function collectSource(
     refs.add(refKey);
   }
 
+  // 공고 본문을 정한다. 본문이 바뀌면 상품 내용(noticeTextChecksum)이 바뀌어 새 상품 버전이 된다.
+  const noticeTexts = emptyNoticeCounts();
+  const incompleteReasons: string[] = [];
+  const store = prismaNoticeTextStore(context.prisma, { dryRun: context.dryRun });
+  const previousChecksums = new Map(
+    context.previousProducts.map((product) => [product.productKey, product.noticeTextChecksum ?? null]),
+  );
   const products: FundingProduct[] = [];
-  for (const product of collection.products) {
-    products.push(await assignVersion(context.prisma, { ...product, reviewer: AUTO_REVIEWER }));
+  for (const collected of collection.products) {
+    const { notice, ...product } = collected;
+    let noticeTextChecksum: string | null = null;
+    if (notice !== undefined) {
+      const download = adapter.downloadNoticeFile;
+      if (notice.files.length > 0 && download === undefined) {
+        throw new SourceSyncFailure(
+          `${adapter.source} 수집기가 받을 파일이 있는 본문 계획을 만들었지만 파일을 받는 방법이 없습니다.`,
+        );
+      }
+      const resolved = await resolveNoticeText(
+        {
+          productKey: product.productKey,
+          plan: notice,
+          previousChecksum: previousChecksums.get(product.productKey) ?? null,
+        },
+        {
+          store,
+          download:
+            download ?? (async () => ({ ok: false, transient: false, message: '파일을 받는 방법이 없습니다.' })),
+          extract: context.extract,
+          now: context.now,
+        },
+      );
+      noticeTexts[resolved.outcome] += 1;
+      if (resolved.outcome === 'INCOMPLETE') incompleteReasons.push(`${product.productKey}: ${resolved.reason}`);
+      noticeTextChecksum = resolved.textChecksum;
+    }
+    products.push(
+      await assignVersion(context.prisma, {
+        ...product,
+        reviewer: AUTO_REVIEWER,
+        ...(noticeTextChecksum === null ? {} : { noticeTextChecksum }),
+      }),
+    );
   }
+  context.log(
+    `출처 ${adapter.source} 공고 본문: 그대로 ${noticeTexts.REUSED}건, 새로 읽음 ${noticeTexts.STORED}건, 읽을 문서 없음 ${noticeTexts.NO_TEXT}건, 파일을 다 받지 못함 ${noticeTexts.INCOMPLETE}건${context.dryRun ? '(dry run이라 저장하지 않음)' : ''}.`,
+  );
+  for (const reason of incompleteReasons.slice(0, 5)) context.log(`  - ${reason}`);
 
   // 수집한 상품만으로 카탈로그 검증을 먼저 돌린다. 파서가 필수 항목을 못 찾은 상품이 있으면
   // 그 출처만 실패로 기록하고, 사람이 관리하는 상품과 다른 출처는 그대로 적재한다.
@@ -197,7 +269,12 @@ async function collectSource(
       .join(' / ');
     throw new SourceSyncFailure(`수집한 상품이 카탈로그 검증을 통과하지 못했습니다: ${issues}`);
   }
-  return { products, fetchedCount: collection.fetchedCount, responseChecksum: collection.responseChecksum };
+  return {
+    products,
+    fetchedCount: collection.fetchedCount,
+    responseChecksum: collection.responseChecksum,
+    noticeTexts,
+  };
 }
 
 // 출처별로 공고를 모아 사람이 관리하는 카탈로그와 합치고, 기존 적재기로 새 릴리스를 적재한다(ADR 0006).
@@ -237,7 +314,17 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
       (product) => isAutoReviewer(product.reviewer) && product.sourceRef?.source === adapter.source,
     );
     try {
-      const collected = await collectSource(adapter, { prisma, manual, previousSync, asOfDate, log });
+      const collected = await collectSource(adapter, {
+        prisma,
+        manual,
+        previousSync,
+        previousProducts,
+        asOfDate,
+        dryRun: options.dryRun ?? false,
+        now,
+        extract: options.noticeExtract ?? extractNoticeText,
+        log,
+      });
       automatedProducts.push(...collected.products);
       const previousRefs = new Set(
         previousProducts.flatMap((product) =>
@@ -257,6 +344,7 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
         addedProducts: collected.products
           .filter((product) => product.sourceRef !== undefined && !previousRefs.has(sourceRefKey(product.sourceRef)))
           .map((product) => ({ productKey: product.productKey, name: product.name })),
+        noticeTexts: collected.noticeTexts,
       });
       log(
         `출처 ${adapter.source}: 공고 ${collected.fetchedCount}건을 받아 상품 ${collected.products.length}건을 만들었습니다.`,
@@ -274,6 +362,7 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
         productCount: previousProducts.length,
         carriedOver: true,
         addedProducts: [],
+        noticeTexts: emptyNoticeCounts(),
       });
       log(
         `출처 ${adapter.source} 동기화 실패: ${describeError(error)} 직전 ACTIVE 릴리스의 상품 ${previousProducts.length}건을 그대로 둡니다.`,

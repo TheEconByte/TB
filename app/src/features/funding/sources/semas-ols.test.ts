@@ -503,12 +503,22 @@ describe('홈 화면 접수 표시와 공지', () => {
   });
 
   it('공지 상세에서 접수기간·신청대상·제외 문장을 읽는다', () => {
-    expect(parseSemasNoticeDetail(DETAILS[404])).toEqual({
+    const detail = parseSemasNoticeDetail(DETAILS[404]);
+    expect(detail).toMatchObject({
       title: '2026년 4분기 일반경영안정자금(대리대출) 접수 안내',
       periodText: '2026. 10. 6.(화) 10:00 ~ 예산소진 시까지',
       target: '업력 무관 소상공인',
       exclusionLines: [],
     });
+    // 본문 전체가 줄마다 남는다(ADR 0009 §2).
+    const lines = detail.bodyText.split('\n');
+    const order = [
+      '□ 신청대상 : 업력 무관 소상공인',
+      '□ 접수기간 : 2026. 10. 6.(화) 10:00 ~ 예산소진 시까지',
+      '* 예산 소진시 조기마감',
+    ].map((line) => lines.findIndex((candidate) => candidate.trim() === line));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
     expect(parseSemasNoticeDetail(DETAILS[402])).toMatchObject({
       periodText: '2026년 9월 7일 (월) 10:00 ~ 예산 소진 시까지',
       target: expect.stringContaining('의 지원대상은 연매출 1억 4백만원 미만'),
@@ -763,6 +773,7 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
         periodText: '2026. 1. 5.(월) 10:00 ~ 2026. 10. 30.(금) 18:00',
         target: null,
         exclusionLines: [],
+        bodyText: '□ 접수기간 : 2026. 1. 5.(월) 10:00 ~ 2026. 10. 30.(금) 18:00',
       },
     };
     const narrowed = mapSemasFunds(
@@ -829,6 +840,33 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
     expect(mapping.duplicateRows).toBe(1);
     expect(mapping.products).toHaveLength(6);
     expect(mapping.unmatchedCards).toEqual(["대리대출 '신규특별자금' (접수중)"]);
+  });
+});
+
+// ADR 0009 §2: 소진공은 공지 상세 본문 전체와 정책자금 표의 자금 행을 텍스트로 남긴다. 첨부 파일은 받지 않는다.
+describe('소진공 자금의 공고 본문 계획', () => {
+  it('holds the fund row, the common qualification and the whole notice body', () => {
+    const { byName } = mapDefault();
+    const notice = byName.get('소공인특화자금(대리대출)')?.notice;
+    expect(notice?.sourceUrl).toBe('https://ols.semas.or.kr/ols/man/SMAN052M/page.do?bltwtrSeq=326&bbsTypeCd=01');
+    expect(notice?.files).toEqual([]);
+    const [table, page] = notice?.inline ?? [];
+    expect(table).toMatchObject({ kind: 'FUND_TABLE', url: 'https://ols.semas.or.kr/ols/man/SMAN018M/page.do' });
+    for (const part of ['소공인특화자금', '제조업을 영위하는 상시근로자수 10인 미만의 소공인', '기준금리+0.6%P']) {
+      expect(table.text).toContain(part);
+    }
+    // 제외 업종은 공통 지원자격에만 있다. 음식점·카페 제외 여부를 읽으려면 함께 있어야 한다.
+    expect(table.text).toContain('제외업종: 유흥 향락 업종, 전문업종, 금융업, 보험업, 부동산업 등');
+    expect(page).toMatchObject({ kind: 'NOTICE_PAGE', url: notice?.sourceUrl });
+    expect(page.text).toContain('□ 신청대상 : 제조업을 영위하는 상시근로자수 10인 미만 소공인');
+    expect(page.text).toContain('□ 접수기간 : 2026. 1. 5.(월) 10:00 ~ 예산소진 시까지');
+  });
+
+  it('keeps only the fund table when no notice matches the fund', () => {
+    const { byName } = mapDefault();
+    const notice = byName.get('장애인기업지원자금(대리대출)')?.notice;
+    expect(notice?.inline.map((part) => part.kind)).toEqual(['FUND_TABLE']);
+    expect(notice?.inline[0].text).toContain('장애인기업확인서를 소지한 장애 소상공인');
   });
 });
 

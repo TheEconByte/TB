@@ -89,6 +89,8 @@ export type SemasNoticeDetail = {
   target: string | null;
   // '제외'가 들어간 본문 줄.
   exclusionLines: string[];
+  // 본문 전체를 줄 단위로 이은 텍스트(ADR 0009 §2).
+  bodyText: string;
 };
 
 export type SemasPeriod = {
@@ -346,7 +348,13 @@ export function parseSemasNoticeDetail(html: string): SemasNoticeDetail {
         ? `${lines[sentence]} ${lines[sentence + 1]}`
         : lines[sentence];
   const target = lines.map((line) => TARGET_LINE.exec(line)?.[1].trim()).find(Boolean) ?? sentenceTarget;
-  return { title, periodText, target, exclusionLines: lines.filter((line) => line.includes('제외')) };
+  return {
+    title,
+    periodText,
+    target,
+    exclusionLines: lines.filter((line) => line.includes('제외')),
+    bodyText: lines.join('\n'),
+  };
 }
 
 const DATE_TOKEN =
@@ -567,6 +575,21 @@ export type SemasMapping = {
   unmatchedCards: string[];
 };
 
+// 표의 자금 행 한 줄과 공통 지원자격. 칸 이름은 표 머리글을 그대로 붙인다.
+function fundTableText(row: SemasFundRow, overview: SemasOverview): string {
+  return [
+    row.heading,
+    `자금명: ${row.name}`,
+    `신청요건: ${row.requirement}`,
+    `대출기간: ${row.term}`,
+    `대출한도: ${row.limit}`,
+    `대출금리: ${row.rate}`,
+    ...(overview.baseRate === null ? [] : [`금리 안내: ${overview.baseRate}`]),
+    '공통 지원자격',
+    ...overview.qualification,
+  ].join('\n');
+}
+
 // 정책자금 표의 자금마다 카탈로그 상품 하나를 만든다. 원문이 알려 주지 않는 용도·업종은 추측하지 않고
 // 미확인으로 남기며, 금리가 기준금리 연동이거나 모호하면 확정 금리로 기록하지 않는다(ADR 0006 5절).
 export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: string }): SemasMapping {
@@ -731,6 +754,29 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       additionalChecks,
       evidence,
       sourceRef: { source: 'SEMAS_OLS', externalId },
+      notice: {
+        sourceUrl: noticeUrl ?? SEMAS_OLS_URLS.overview,
+        inline: [
+          {
+            kind: 'FUND_TABLE',
+            name: `${OVERVIEW_DOCUMENT} · ${row.heading} · ${row.name}`,
+            url: SEMAS_OLS_URLS.overview,
+            text: fundTableText(row, overview),
+          },
+          ...(notice === null || noticeUrl === null
+            ? []
+            : [
+                {
+                  kind: 'NOTICE_PAGE' as const,
+                  name: `소진공 정책자금 공지사항 · ${notice.detail.title}`,
+                  url: noticeUrl,
+                  text: notice.detail.bodyText,
+                },
+              ]),
+        ],
+        // 공지의 첨부(신청안내자료)는 받지 않는다. ADR 0009 §2는 공지 본문과 표의 자금 행만 읽는다.
+        files: [],
+      },
     });
   }
 

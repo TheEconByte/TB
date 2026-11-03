@@ -34,6 +34,7 @@
 - 스키마 `funding-catalog-v1.2.0`은 v1.1.0에 원문이 알려 주지 않는 값을 추측 없이 기록하는 방법을 더했다. 이전 버전의 릴리스도 읽는다.
   - 지원 유형 `UNKNOWN`(DB enum `FundingSupportType`에도 있다). 상환방식은 `UNKNOWN`이어야 하고 확정 금리·상환기간·거치를 기록할 수 없다. 금융 조건 근거를 요구하지 않는다.
   - `eligibleBusinessStages`의 빈 배열은 사업 단계 미확인이다. 이때 사업 단계 근거를 요구하지 않는다.
+- 스키마 `funding-catalog-v1.3.0`은 v1.2.0에 상품의 `noticeTextChecksum`(funding:sync가 쓴 공고 본문의 checksum, [ADR 0009](../decisions/0009-funding-ai-condition-extraction.md))을 더했다. 이전 버전의 릴리스도 읽는다.
 - 자동 상품은 검수자에 사람 대신 자동 규칙 버전(`AUTO:funding-auto-v1`)을 적는다. 규칙 검사는 다음을 오류로 본다: 출처 식별자 없는 자동 검수자, 같은 공고를 가리키는 상품 두 개, 같은 출처의 동기화 결과 두 개. 자동 상품에는 다음 검토일이 없어도 된다.
 - 웹 페이지 근거(`OFFICIAL_WEB_PAGE`)의 checksum은 사람이 기록한 상품에서는 오류다(내려받은 파일이 없다). 자동 상품에서는 funding:sync가 실제로 받은 응답이므로 그 페이지의 checksum을 남길 수 있다.
 
@@ -71,6 +72,7 @@
 |---|---|---|---|---|
 | `SEMAS_OLS` | 소진공 정책자금 사이트 `ols.semas.or.kr` | 2026-09-28 | robots.txt 없음(404). 약관에 자동 수집 금지 조항 없음. 담당자가 출처 표시 조건으로 수집 허용. 2026-09-29에 robots.txt 404 재확인. 페이지의 `<meta name="robots" content="noindex, follow">`는 검색 색인 지시라 수집 허용 여부와 무관하다 | `sources/semas-ols.ts` |
 | `BIZINFO` | 기업마당 지원사업정보 Open API `www.bizinfo.go.kr/uss/rss/bizinfoApi.do` | 2026-09-28 | 인증키를 발급하는 공식 Open API. 실제 응답 확인(ADR 0006 Context) | `sources/bizinfo.ts` |
+| `BIZINFO` 공고 파일 | 본문출력파일·첨부 `www.bizinfo.go.kr/cmm/fms/getImageFile.do` | 2026-11-02 | robots.txt가 막지 않음(ADR 0009 Context). 동기화마다 robots.txt를 다시 확인한다 | `sources/bizinfo.ts` |
 
 #### 소진공 정책자금 수집
 
@@ -133,7 +135,19 @@
 
 #### 공고 본문과 AI 추출 결과 (ADR 0009)
 
-[ADR 0009](../decisions/0009-funding-ai-condition-extraction.md)의 저장소다. 테이블만 있고, 채우는 수집·추출은 다음 단계에서 funding:sync에 더한다.
+[ADR 0009](../decisions/0009-funding-ai-condition-extraction.md)의 저장소다. funding:sync가 본문을 모아 `funding_notice_texts`에 남긴다. AI 추출은 아직 없다(다음 단계).
+
+- 모으는 본문(수집기가 상품마다 만드는 본문 계획 `notice`):
+  - 기업마당: API의 사업개요(`bsnsSumryCn`), 본문출력파일(`printFlpthNm`), 첨부(`flpthNm`). 파일은 이름의 확장자와 파일 머리말이 모두 PDF·HWP·HWPX일 때만 텍스트로 바꾼다. 이미지·엑셀 등은 받지 않는다.
+  - 소진공: 정책자금 표의 자금 행(칸 이름을 붙인 줄)과 공통 지원자격, 연결된 접수 안내 공지의 본문 전체. 공지의 첨부(신청안내자료)는 받지 않는다.
+- 합친 텍스트는 문서마다 `[문서 종류: 이름]` 줄로 시작한다. 줄바꿈을 LF로 맞추고 탭·줄바꿈 밖의 제어 문자(U+0000 포함)를 지운다.
+- 문서마다 `documents`에 상태를 남긴다: 읽음, 같은 파일(바이트가 같아 한 번만 읽음), 글자 없음, 읽지 못함, 형식 아님, 너무 큼(30MB 초과), 받지 못함(404 등).
+- 읽은 문서가 하나도 없으면 행을 만들지 않고 상품에 checksum을 적지 않는다(조건은 읽지 못함).
+- 직전 ACTIVE 상품 버전의 본문과 문서 목록(파일은 주소, 출처가 준 글은 내용 checksum)이 같으면 파일을 다시 받지 않고 그 본문을 쓴다. 같은 주소의 파일이 바뀌는 경우는 보지 못한다(기업마당 변경공고는 새 파일 식별자로 올라온다).
+- 일시 장애(연결 실패, 5xx, robots.txt·403·429로 멈춤, 운영자 연락처 없음)로 파일 하나라도 받지 못하면 일부만 읽은 본문을 만들지 않고 직전 본문을 계속 쓴다. 직전 본문이 없으면 checksum을 적지 않는다. 출처 동기화는 실패로 보지 않는다.
+- 상품 버전의 `noticeTextChecksum`이 바뀌면 새 상품 버전이 된다. dry run은 본문을 모으지만 DB에 쓰지 않는다.
+- 기업마당 파일 받기: 처음 요청 전에 `robots.txt`를 확인해 `/cmm/fms/getImageFile.do`를 막으면 받지 않는다(2026-11-02 확인 때는 막지 않음). `www.bizinfo.go.kr`의 그 경로만 요청하고, 요청 사이 1초 이상 쉬며, User-Agent에 `FUNDING_SYNC_CONTACT`를 밝힌다. 403·429를 만나면 그 동기화에서는 더 받지 않는다. 5xx·연결 오류는 두 번까지 다시 시도한다.
+- 명령 출력에 출처별로 그대로 쓴 본문, 새로 읽은 본문, 읽을 문서 없음, 파일을 다 받지 못함의 수를 남긴다.
 
 - `funding_notice_texts`: 상품 하나(`productKey`)의 본문과 첨부를 텍스트로 바꿔 합친 것. 소진공은 자금마다 상품이 따로라 같은 공지 본문이 자금마다 들어간다. 공고 URL, 합친 문서마다의 URL·형식·원 파일 checksum(`documents`), 처음 받은 시각을 함께 둔다. 원 파일은 저장하지 않는다.
   - `textChecksum`은 텍스트의 SHA-256이며 CHECK 제약이 강제한다. `productKey + textChecksum`이 UNIQUE라 본문이 바뀌면 새 행이 생기고, 예전과 같은 본문이 다시 오면 그 행을 다시 쓴다.

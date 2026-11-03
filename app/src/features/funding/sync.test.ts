@@ -199,6 +199,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     }
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
+    await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
+    await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     const baseline = await db().fundingCatalogRelease.findFirst({
       where: { catalogKey: { not: { startsWith: 'test-' } }, status: { in: ['ACTIVE', 'SUPERSEDED'] } },
       orderBy: { activatedAt: 'desc' },
@@ -216,6 +218,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     for (const release of releases) await db().fundingCatalogRelease.delete({ where: { id: release.id } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: 'test-' } } });
     await db().fundingProductVersion.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
+    await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: 'test-sync-' } } });
+    await db().fundingNoticeText.deleteMany({ where: { productKey: { startsWith: BIZINFO_TEST_KEY_PREFIX } } });
     if (previousActiveId) {
       const previous = await db().fundingCatalogRelease.findUnique({ where: { id: previousActiveId } });
       if (previous && previous.status !== 'ACTIVE') {
@@ -445,5 +449,66 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     await expect(
       sync({ asOfDate: '2026-09-27', catalogPath, result: () => collection([collected('fund-a', '2026-09-27')]) }),
     ).rejects.toBeInstanceOf(FundingCatalogError);
+  });
+
+  // ADR 0009 §2: 본문 텍스트를 DB에 남기고, 상품 버전이 그 본문을 가리킨다. 지금 본문은 ACTIVE 릴리스가 정한다.
+  it('stores the notice body and points the product version at it', async () => {
+    const withBody = (body: string, asOfDate: string) =>
+      collected('notice', asOfDate, {
+        notice: {
+          sourceUrl: OLS_URL,
+          inline: [{ kind: 'NOTICE_PAGE', name: '테스트 공지', url: OLS_URL, text: body }],
+          files: [],
+        },
+      });
+    const productKey = 'test-sync-notice';
+    const activeNotice = async () =>
+      (await findActiveFundingCatalog(db()))?.catalog.products.find((product) => product.productKey === productKey);
+
+    const first = await sync({
+      asOfDate: '2026-09-28',
+      result: () => collection([withBody('업력 3년 이내', '2026-09-28')]),
+    });
+    expect(first.sources[0].noticeTexts).toMatchObject({ STORED: 1 });
+    const firstProduct = await activeNotice();
+    const stored = await db().fundingNoticeText.findMany({ where: { productKey } });
+    expect(stored).toHaveLength(1);
+    expect(stored[0].text).toContain('업력 3년 이내');
+    expect(firstProduct?.noticeTextChecksum).toBe(stored[0].textChecksum);
+
+    // 같은 본문이면 다시 읽지 않고 상품 버전도 그대로다.
+    const same = await sync({
+      asOfDate: '2026-09-29',
+      result: () => collection([withBody('업력 3년 이내', '2026-09-29')]),
+    });
+    expect(same.sources[0].noticeTexts).toMatchObject({ REUSED: 1, STORED: 0 });
+    expect((await activeNotice())?.version).toBe(firstProduct?.version);
+
+    // 본문이 바뀌면 새 상품 버전이 새 본문을 가리키고, 이전 본문은 남는다.
+    await sync({ asOfDate: '2026-09-30', result: () => collection([withBody('업력 7년 이내', '2026-09-30')]) });
+    const changed = await activeNotice();
+    expect(changed?.version).not.toBe(firstProduct?.version);
+    const texts = await db().fundingNoticeText.findMany({ where: { productKey } });
+    expect(texts).toHaveLength(2);
+    expect(texts.find((row) => row.textChecksum === changed?.noticeTextChecksum)?.text).toContain('업력 7년 이내');
+  });
+
+  it('does not write notice texts in a dry run', async () => {
+    const report = await sync({
+      asOfDate: '2026-10-01',
+      dryRun: true,
+      result: () =>
+        collection([
+          collected('dry-notice', '2026-10-01', {
+            notice: {
+              sourceUrl: OLS_URL,
+              inline: [{ kind: 'NOTICE_PAGE', name: '공지', url: OLS_URL, text: '예비창업자 신청 가능' }],
+              files: [],
+            },
+          }),
+        ]),
+    });
+    expect(report.sources[0].noticeTexts).toMatchObject({ STORED: 1 });
+    expect(await db().fundingNoticeText.count({ where: { productKey: 'test-sync-dry-notice' } })).toBe(0);
   });
 });

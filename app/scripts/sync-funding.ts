@@ -16,7 +16,10 @@ const DEFAULT_OUTPUT_DIR = fileURLToPath(new URL('../../data/funding-sync/', imp
 // 키·연락처가 없어도 등록한다. 그러면 그 출처는 실패로 기록되고, 직전 릴리스의 상품이 그대로 남는다.
 const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [
   createSemasOlsAdapter({ contact: process.env.FUNDING_SYNC_CONTACT }),
-  createBizinfoAdapter({ apiKey: process.env.BIZINFO_API_KEY }),
+  createBizinfoAdapter({
+    apiKey: process.env.BIZINFO_API_KEY,
+    files: { contact: process.env.FUNDING_SYNC_CONTACT },
+  }),
 ];
 
 // 출력에 인증키가 남지 않게 가린다.
@@ -33,8 +36,8 @@ const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하�
   DATABASE_URL       PostgreSQL 연결 문자열
   BIZINFO_API_KEY    기업마당 지원사업정보 API 인증키. 없으면 기업마당 출처는 실패로 기록됩니다
   FUNDING_SYNC_CONTACT
-                     소진공 정책자금 사이트 요청의 User-Agent에 밝힐 운영자 연락처(메일 주소나 웹 주소, ASCII).
-                     없으면 소진공 출처는 실패로 기록됩니다
+                     소진공 정책자금 사이트와 기업마당 공고 파일 요청의 User-Agent에 밝힐 운영자 연락처
+                     (메일 주소나 웹 주소, ASCII). 없으면 소진공 출처는 실패로 기록되고 기업마당 공고 파일은 받지 않습니다
 
 옵션:
   --catalog <경로>      사람이 관리하는 카탈로그 JSON (기본값: app/catalog/funding/catalog.json)
@@ -48,6 +51,9 @@ const USAGE = `공식 출처에서 자금 공고를 모아 사람이 관리하�
   - 출처가 실패하면(장애, 빈 응답, 직전 성공 대비 절반 미만, 검증 실패) 그 출처의 상품은 직전 ACTIVE 릴리스의 것을 그대로 두고 마지막 성공일도 그대로 둡니다.
   - 자동 상품은 출처의 마지막 성공 동기화가 3일을 넘기면 현재 후보에서 빠집니다.
   - 사람이 기록한 상품이 같은 공고를 가리키면 사람 기록이 우선합니다.
+  - 공고 본문(기업마당 사업개요·본문출력파일·첨부의 PDF·HWP·HWPX, 소진공 공지 본문·정책자금 표)을 텍스트로 모아
+    DB에 남깁니다(ADR 0009). 직전 본문과 문서 목록이 같으면 파일을 다시 받지 않습니다. 기업마당 파일은
+    robots.txt를 확인한 뒤 1초 이상 쉬며 받고, 403·429를 만나면 그 동기화에서는 더 받지 않습니다.
   - 내용이 같은 자동 상품은 이미 적재된 상품 버전을 재사용하고, 바뀌면 새 버전을 만듭니다.
   - 합친 카탈로그는 funding:load와 같은 검사를 거쳐 PENDING → ACTIVE로 적재합니다.`;
 
@@ -106,6 +112,12 @@ async function main() {
           `출처 ${source.source}: ${state} · 상품 ${source.productCount}건${source.carriedOver ? '(직전 릴리스에서 유지)' : ''} · 마지막 성공일 ${source.lastSucceededOn ?? '없음'}`,
         ),
       );
+      if (source.status === 'SUCCEEDED') {
+        const texts = source.noticeTexts;
+        console.log(
+          `  공고 본문: 그대로 ${texts.REUSED}건 · 새로 읽음 ${texts.STORED}건 · 읽을 문서 없음 ${texts.NO_TEXT}건 · 파일을 다 받지 못함 ${texts.INCOMPLETE}건`,
+        );
+      }
       if (source.addedProducts.length > 0) {
         console.log(`  직전 릴리스에 없던 공고 ${source.addedProducts.length}건:`);
         for (const product of source.addedProducts.slice(0, MAX_LISTED_NEW_PRODUCTS)) {
