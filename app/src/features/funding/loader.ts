@@ -187,7 +187,7 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
     },
   });
   log(
-    `임시 카탈로그 릴리스 ${release.id} 생성(${catalog.catalogKey}@${catalog.catalogVersion}). 활성화 전까지 후보로 쓰지 않습니다.`,
+    `임시 카탈로그 릴리스 ${release.id} 생성(${catalog.catalogKey}@${catalog.catalogVersion}). 활성화 전까지 맞춰 보기에 쓰지 않습니다.`,
   );
 
   const createdIds: string[] = [];

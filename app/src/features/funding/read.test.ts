@@ -98,6 +98,26 @@ describe('활성 카탈로그 읽기', () => {
     ]);
   });
 
+  // 화면이 맞춰 본 기준으로 보여 주는 릴리스 정보다. DB의 날짜 열은 한국 시간 날짜(YYYY-MM-DD)로 읽는다.
+  it('릴리스 정보와 날짜를 그대로 옮긴다', async () => {
+    const active = await findActiveFundingCatalog(stubPrisma({ products: [membership('test-loan', 0)] }));
+    expect(active).toMatchObject({
+      releaseId: 'release-1',
+      catalogKey: 'test-catalog',
+      catalogVersion: '2026-09-20.1',
+      basisDate: TEST_DATE,
+      reviewedAt: TEST_DATE,
+      activatedAt: '2026-09-20T03:00:00.000Z',
+      reviewer: 'test-reviewer',
+      productCount: 1,
+    });
+    expect(active?.catalog).toMatchObject({
+      catalogKey: 'test-catalog',
+      catalogVersion: '2026-09-20.1',
+      basisDate: TEST_DATE,
+    });
+  });
+
   // v1.0.0에는 자동화 설정이 없었다. 그 릴리스는 모두 꺼진 기본값으로 읽는다(docs/domains/funding.md 카탈로그).
   it('v1.0.0 스키마로 적재된 릴리스도 자동화 설정 없이 읽는다', async () => {
     const active = await findActiveFundingCatalog(

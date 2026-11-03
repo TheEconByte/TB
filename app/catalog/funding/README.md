@@ -21,7 +21,7 @@ npm --prefix app run funding:load
 1. 공식 기관 원문(기업마당, 중소벤처기업부, 서울시, 서울신보, K-Startup 등)에서 공고명·기관·접수기간·접수 상태·대상 사업단계·지역·용도·업종·금리·한도·상환 조건을 확인한다.
 2. 확인한 날짜를 `observedAt`, 사람이 검수한 날짜를 `reviewedAt`, 다음 재확인 날짜를 `nextReviewAt`에 기록한다.
 3. 원문에서 확정하지 못한 값은 0이나 추정값으로 채우지 않고 `null` 또는 `UNKNOWN`으로 남기고, 왜 확정할 수 없는지 `unsupportedCalculationReasons`·`additionalChecks`·`note`에 적는다. 지원 유형을 확인하지 못했으면 `supportType`을 `UNKNOWN`, 신청 가능한 사업 단계를 확인하지 못했으면 `eligibleBusinessStages`를 빈 배열로 둔다.
-4. 조건별로 `evidence`에 공식 URL·문서명·확인일·확인 방법을 남긴다. 지역·용도·업종을 미확인이 아닌 값으로 기록하려면 각각 REGION·PURPOSE·INDUSTRY의 공식 원문 근거가 필요하다(규칙 검사). 맞춰 보기는 사업 단계·지역을 공식 원문 근거가 있을 때만 운영자 확인 값으로 쓴다. 검색 결과 요약만 확인한 경우 `retrievalMethod`를 `SEARCH_RESULT_SUMMARY`로 기록하며, 그 조건은 운영자 확인 값으로 쓰지 않는다.
+4. 조건별로 `evidence`에 공식 URL·문서명·확인일·확인 방법을 남긴다. 지역·용도·업종을 미확인이 아닌 값으로 기록하려면 각각 REGION·PURPOSE·INDUSTRY 근거가 있어야 한다(규칙 검사). 검색 결과 요약만 확인한 경우 `retrievalMethod`를 `SEARCH_RESULT_SUMMARY`로 기록한다. 규칙 검사는 이를 주의로 알리고, 맞춰 보기는 그 조건을 운영자 확인 값으로 쓰지 않는다. 맞춰 보기는 사업 단계·지역에 공식 원문(검색 결과 요약이 아닌) 근거가 있을 때만 운영자 확인 값으로 쓴다.
 5. 내용이 바뀌면 기존 항목을 덮어쓰지 않고 `version`을 올려 새 항목으로 추가하고, 카탈로그 `catalogVersion`도 올린다.
 6. `npm --prefix app run funding:validate`로 확인한 뒤 `funding:load`를 실행한다.
 

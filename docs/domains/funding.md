@@ -8,7 +8,7 @@
   - 카탈로그 Zod 스키마(`schema.ts`), 규칙 검사와 상환 계산 대상 여부(`validation.ts`)
   - 릴리스·상품 버전 적재, 활성 카탈로그 읽기(`read.ts`)
   - 출처별 수집 결과를 사람이 관리하는 카탈로그와 합쳐 적재하는 동기화(`sync.ts`), 출처별 수집기(`sources/`)
-  - 공고 파일(PDF·HWP·HWPX)을 텍스트로 바꾸는 `notice-text.ts`. 적재 명령에서만 쓰며 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절). HWP·HWPX 표는 칸 안의 문단마다 한 줄이고(빈 칸은 빈 줄) 행·칸 구분 표시가 없다. 각주·미주·머리말·꼬리말은 빠진다. PDF 표는 행마다 한 줄이고 칸 사이가 공백이다.
+  - 공고 파일(PDF·HWP·HWPX)을 텍스트로 바꾸는 `notice-text.ts`. funding:sync의 본문 수집에서만 쓴다(아래 공고 본문과 AI 추출 결과). HWP·HWPX 표는 칸 안의 문단마다 한 줄이고(빈 칸은 빈 줄) 행·칸 구분 표시가 없다. 각주·미주·머리말·꼬리말은 빠진다. PDF 표는 행마다 한 줄이고 칸 사이가 공백이다.
   - [ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) §4의 맞춰 보기: 추출 결과의 이름·저장 모양(`condition-fields.ts`), 판정(`matching.ts`), 활성 카탈로그와 추출 결과 읽기(`match-list.ts`), 사용자 입력 스키마와 저장된 조건 읽기(`match-profile.ts`)
   - 맞춰 보기 화면: 페이지 단위 화면(`FundingMatcher.tsx`), 두 화면이 함께 쓰는 입력란(`FundingProfileFields.tsx`, 상태와 본문 변환은 `profile-form.ts`)과 결과 표시(`FundingMatchesPanel.tsx`), 판정 코드를 문장으로 바꾸는 `match-text.ts`
 - `app/catalog/funding`: 운영자가 공식 공고를 정리한 JSON 카탈로그와 갱신 절차 문서.
@@ -258,7 +258,7 @@ AI가 읽은 값으로는 공고를 숨기지 않는다. AI 값은 항목마다 
 - DB 없이(`read.test.ts`, Prisma mock): 활성 릴리스의 position 순서, v1.0.0(자동화 설정 없음)·v1.3.0 릴리스 읽기, 상품 없는 릴리스, 활성 릴리스 없음.
 - DB 없이(`sources/bizinfo.test.ts`): 기업마당 신청기간 해석, 수집 범위와 사유별 제외(지역으로 거르지 않음), 만든 상품의 사업 단계·지원 유형·지역 미확인과 규칙 검사 통과, 요청 인자, 키 없음·403·429·재시도·JSON 아님·잘린 응답, 오류 문장의 키 가림.
 - DB 없이(`sources/semas-ols.test.ts`, 사이트 원문이 아닌 HTML 조각 fixture): 소진공 접수기간 표기 해석과 모호한 표기 거부, 정책자금 표·홈 화면 접수 표시·공지 목록·공지 상세 해석과 필수 항목 누락 실패, 공지 고르기, 접수 상태 판정(세부 유형 카드, 날짜 모순, 마감 표시, 상시접수, 제외 신호), 모호한 금리·여러 금액 한도를 확정 값으로 옮기지 않음, 만든 상품의 사업 단계·지역 미확인과 규칙 검사 통과, 맞춰 보기의 갈래·마감·보류(접수 상태·출처 최신성), 근거별 페이지 checksum, 요청 순서와 1초 이상 간격, 연락처 없음·robots.txt 생김·403·429·자동 입력 방지 화면·재시도·잘린 공지 목록.
-- DB 없이(`notice-text.test.ts`, 직접 만든 PDF·HWP·HWPX fixture와 [만든 방법](../../app/src/features/funding/fixtures/README.md)): 공고 파일의 본문과 표 칸을 읽는 순서대로 추출, 글꼴을 넣지 않은 한글 CID 글꼴 PDF, 글자 없는 파일의 `NO_TEXT`, 깨진·암호·형식이 다른 파일의 `UNREADABLE`, 라이브러리·CMap을 불러오지 못하면 결과 대신 예외. 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절).
+- DB 없이(`notice-text.test.ts`, 직접 만든 PDF·HWP·HWPX fixture와 [만든 방법](../../app/src/features/funding/fixtures/README.md)): 공고 파일의 본문과 표 칸을 읽는 순서대로 추출, 글꼴을 넣지 않은 한글 CID 글꼴 PDF, 글자 없는 파일의 `NO_TEXT`, 깨진·암호·형식이 다른 파일의 `UNREADABLE`, 라이브러리·CMap을 불러오지 못하면 결과 대신 예외.
 - `TEST_DATABASE_URL` 전용 DB: 카탈로그 적재(상환 계산 대상 여부 저장 포함), 저장된 계획 조건으로 맞춰 보기(조건 수정 반영, 예전 모양 읽기와 다음 저장 때 지금 모양으로 쓰기, 조건 비우기), 저장된 대출 가정의 읽기와 과거 결과 불변성. 합성 카탈로그만 만들고 끝나면 지우며 실행 전 ACTIVE 상태를 복원한다.
 - DB 없이(`matching.test.ts`·`condition-fields.test.ts`): 항목별 맞음·안 맞음·확인 필요, 업력의 개업 연월 경계와 미만·이하, 운영자 확인 값과 공식 근거, 마감 근거, 그룹·최신성·차단 목록·갈래, 저장한 추출 결과를 다시 읽기와 모양이 다른 항목.
 - `TEST_DATABASE_URL` 전용 DB(`match-list.test.ts`): ACTIVE 상품 버전의 본문 checksum과 지금 모델·프롬프트 버전의 추출 결과만 읽음, 활성 릴리스 없음.

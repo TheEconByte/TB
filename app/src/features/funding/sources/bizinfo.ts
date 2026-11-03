@@ -409,7 +409,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
         const { skipped } = mapping;
         log(
           mask(
-            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 추가 확인 후보로 만들었습니다(대상 아님 ${skipped.notTarget}건, 신청 종료 ${skipped.ended}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
+            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 상품으로 만들었습니다(대상 아님 ${skipped.notTarget}건, 신청 종료 ${skipped.ended}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
           ),
         );
         return { products: mapping.products, fetchedCount: items.length, responseChecksum };

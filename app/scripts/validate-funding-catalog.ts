@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex } from '../src/lib/checksum.ts';
 import { todayInKst } from '../src/features/funding/dates.ts';
-import { matchCatalog, type FundingMatchProfile } from '../src/features/funding/matching.ts';
+import { FUNDING_TAB_LABELS } from '../src/features/funding/match-text.ts';
+import { FUNDING_TABS, matchCatalog, type FundingMatchProfile } from '../src/features/funding/matching.ts';
 import { validateFundingCatalog, type FundingValidationCheck } from '../src/features/funding/validation.ts';
 
 const NO_INPUT: FundingMatchProfile = {
@@ -13,7 +14,6 @@ const NO_INPUT: FundingMatchProfile = {
   age: null,
   targetGroups: null,
 };
-const TAB_LABELS = { POLICY_FUND: '정책자금', SUPPORT_PROGRAM: '지원사업' } as const;
 
 const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json', import.meta.url));
 
@@ -124,9 +124,9 @@ function main() {
   // 마감은 출처·운영자의 접수 상태와 신청 종료일로만 정한다.
   const matches = matchCatalog(catalog, new Map(), NO_INPUT, { asOfDate });
   console.log('  맞춰 보기 갈래(사용자 입력·AI 추출 결과 없음 기준):');
-  for (const [tab, label] of Object.entries(TAB_LABELS) as [keyof typeof TAB_LABELS, string][]) {
+  for (const tab of FUNDING_TABS) {
     const { counts, products } = matches.tabs[tab];
-    console.log(`    ${label} ${products.length}건 (마감 ${counts.CLOSED})`);
+    console.log(`    ${FUNDING_TAB_LABELS[tab]} ${products.length}건 (마감 ${counts.CLOSED})`);
   }
   if (matches.hiddenCount > 0) console.log(`    차단 목록이라 보여 주지 않는 자동 상품 ${matches.hiddenCount}건`);
   console.log('');
