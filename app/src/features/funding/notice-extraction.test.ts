@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -366,6 +367,21 @@ describe('createClaudeConditionExtractor', () => {
     const { extractor } = client({ stop_reason: 'end_turn', text: JSON.stringify(answer) });
     const result = await extractor(BODY, '청년 창업 지원');
     expect(verifyConditionOutput(result.output, BODY).businessStage.status).toBe('UNREADABLE');
+  });
+});
+
+// 적재 명령은 Node가 TypeScript를 그대로 돌린다(타입만 지우는 방식). Vitest는 다른 변환기를 써서, 그 방식이 못 읽는
+// 문법(생성자 매개변수 속성 등)을 써도 테스트는 통과한다. 명령을 실제로 띄워 확인한다.
+describe('the funding:sync command', () => {
+  it('loads under Node without a build step', () => {
+    const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+    const result = spawnSync(process.execPath, ['scripts/sync-funding.ts', '--help'], {
+      cwd: appDir,
+      encoding: 'utf8',
+    });
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('ANTHROPIC_API_KEY');
   });
 });
 

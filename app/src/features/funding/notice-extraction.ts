@@ -237,12 +237,14 @@ export function verifyConditionOutput(output: ConditionOutput, text: string): Ve
 
 // AI 호출이 실패했다. 응답을 받은 뒤의 실패면 그 호출의 토큰 수를 함께 남긴다(비용 기록).
 export class ConditionExtractionFailure extends Error {
-  constructor(
-    message: string,
-    readonly inputTokens = 0,
-    readonly outputTokens = 0,
-  ) {
+  // Node가 TypeScript를 그대로 돌리는 적재 명령에서는 생성자 매개변수 속성(readonly x = …)을 쓸 수 없다.
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+
+  constructor(message: string, inputTokens = 0, outputTokens = 0) {
     super(message);
+    this.inputTokens = inputTokens;
+    this.outputTokens = outputTokens;
   }
 }
 
