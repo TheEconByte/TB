@@ -1817,7 +1817,7 @@ footer {
   margin-top: 18px;
 }
 .reference-summary small {
-  color: #dbe6ff;
+  color: var(--muted);
   font-size: 12px;
 }
 .reference-detail-grid {
