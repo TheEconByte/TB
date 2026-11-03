@@ -269,6 +269,8 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await expect(page.locator('#monthlyRevenue')).toHaveValue('3,000,000');
   await expect(page.getByLabel('계획 제목')).toHaveValue('E2E 상권 한식 계획');
   await expect(page.getByLabel('2. 사업장·거주 자치구')).toHaveValue('11200');
+  // 자금 조건에는 자치구만 채운다. 업종은 채우지 않는다(ADR 0009 §6의 ADR 0008 개정).
+  await expect(page.getByLabel('3. 업종 코드 (선택)')).toHaveValue('');
 
   // 사용자가 고친 월매출은 재무 입력에, 상권 기본값은 스냅샷에 따로 남는다.
   await page.locator('#monthlyRevenue').fill('2500000');
@@ -299,6 +301,8 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await page.goto(`/funding?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=CS100001&scoreRelease=${releaseKey}`);
   await expect(page.getByTestId('funding-grade')).toContainText('상권 생존점수 등급 A (72점)');
   await expect(page.getByTestId('funding-grade')).toContainText('자금 후보 판정 조건에 쓰지 않으며');
+  await expect(page.getByLabel('2. 사업장·거주 자치구')).toHaveValue('11200');
+  await expect(page.getByLabel('3. 업종 코드 (선택)')).toHaveValue('');
 });
 
 // 해제는 상권 출처만 떼어 낸다. 해제 문구('미리 채운 값은 직접 고칠 수 있습니다')대로

@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { financeInputSchema } from './schema';
 import type { FinanceInput, FinanceResult, ScenarioResult, ValueResult } from './types';
 
@@ -215,12 +215,6 @@ export type PlannerProps = {
   revision?: number | null;
   resultRevision?: number | null;
   busy?: boolean;
-  // 계획 화면이 상품 확정 조건을 대출 가정으로 적용했을 때 폼을 저장된 입력으로 다시
-  // 채우기 위한 신호. 값이 바뀌면 폼을 현재 저장된 입력으로 되돌린다.
-  syncToken?: number;
-  // 재무 입력에 저장하지 않은 변경이 있는지 상위 화면에 알린다. 상품 조건 적용은
-  // 저장된 초안을 바꾸는 일이므로 저장되지 않은 편집이 있으면 막아야 한다.
-  onDirtyChange?: (dirty: boolean) => void;
   // 월 운영 가정 입력란 위에 보여 줄 출처(예: 상권 점수에서 넘어온 월매출 기본값).
   revenueNotice?: ReactNode;
   onSave: (title: string, input: FinanceInput) => Promise<unknown>;
@@ -234,8 +228,6 @@ export default function FinancePlanner({
   revision = null,
   resultRevision = null,
   busy = false,
-  syncToken,
-  onDirtyChange,
   revenueNotice,
   onSave,
   onCalculate,
@@ -249,18 +241,6 @@ export default function FinancePlanner({
     const timer = window.setTimeout(() => setResult(initialResult), 0);
     return () => window.clearTimeout(timer);
   }, [initialResult]);
-  useEffect(() => {
-    onDirtyChange?.(dirty);
-  }, [dirty, onDirtyChange]);
-  const syncedToken = useRef(syncToken);
-  useEffect(() => {
-    if (syncToken === undefined || syncedToken.current === syncToken) return;
-    syncedToken.current = syncToken;
-    setForm(fromInput(initialInput));
-    setTitle(initialTitle);
-    setErrors([]);
-    setDirty(false);
-  }, [syncToken, initialInput, initialTitle]);
   const change = (key: string, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
     setDirty(true);

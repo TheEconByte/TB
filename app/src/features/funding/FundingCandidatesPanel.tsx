@@ -145,19 +145,6 @@ export function formatFundingWon(value: string): string {
   return `${numberFormat.format(BigInt(value))}원`;
 }
 
-// 계획 화면에서만 쓰는 적용 동작. 페이지 단위 조회(/funding)는 계획이 없으므로
-// 이 값 없이 같은 결과 표시를 재사용한다.
-export type FundingApplyContext = {
-  disabled: boolean;
-  disabledReason: string;
-  applyingKey: string | null;
-  appliedKey: string | null;
-  // 계획에 저장된 사용자의 시뮬레이션 원금. 공개 한도와 비교하고 상품 조건 적용 시
-  // 그대로 유지한다.
-  principalKrw: string | null;
-  onApply: (evaluation: FundingCandidateEvaluation) => void;
-};
-
 // 조건을 입력하지 않아 판정이 UNKNOWN으로만 남는 상태인지. 후보 0건·카탈로그
 // 없음과 구분해 화면에서 따로 안내한다.
 export function isEmptyFundingProfile(profile: FundingProfile): boolean {
@@ -212,13 +199,11 @@ export function FundingCandidatesPanel({
   result,
   profileSummary,
   planLabel,
-  apply,
 }: {
   readonly result: FundingCandidatesResponse;
   readonly profileSummary: string;
   // 계획 기준 조회면 어느 계획·revision의 조건인지 밝힌다.
   readonly planLabel?: string;
-  readonly apply?: FundingApplyContext;
 }) {
   const { summary } = result;
   const emptyProfile = isEmptyFundingProfile(result.profile);
@@ -309,7 +294,6 @@ export function FundingCandidatesPanel({
             note={note}
             evaluations={result.evaluations.filter((evaluation) => evaluation.branch === branch)}
             branchSummary={result.summaryByBranch[branch]}
-            apply={apply}
           />
         ))}
     </>
@@ -322,14 +306,12 @@ function BranchSection({
   note,
   evaluations,
   branchSummary,
-  apply,
 }: {
   readonly branch: FundingBranch;
   readonly title: string;
   readonly note: string;
   readonly evaluations: readonly FundingCandidateEvaluation[];
   readonly branchSummary: FundingCandidatesResponse['summary'];
-  readonly apply?: FundingApplyContext;
 }) {
   const anchor = branchAnchor(branch);
   return (
@@ -364,11 +346,7 @@ function BranchSection({
               </p>
               <div className="candidate-list">
                 {items.map((evaluation) => (
-                  <CandidateCard
-                    key={`${evaluation.productKey}@${evaluation.version}`}
-                    evaluation={evaluation}
-                    apply={apply}
-                  />
+                  <CandidateCard key={`${evaluation.productKey}@${evaluation.version}`} evaluation={evaluation} />
                 ))}
               </div>
             </div>
@@ -379,23 +357,8 @@ function BranchSection({
   );
 }
 
-function CandidateCard({
-  evaluation,
-  apply,
-}: {
-  readonly evaluation: FundingCandidateEvaluation;
-  readonly apply?: FundingApplyContext;
-}) {
+function CandidateCard({ evaluation }: { readonly evaluation: FundingCandidateEvaluation }) {
   const { repayment } = evaluation;
-  const cardKey = `${evaluation.productKey}@${evaluation.version}`;
-  const amountIssue =
-    apply && repayment.publicLimitKrw !== null
-      ? apply.principalKrw === null || apply.principalKrw === '0'
-        ? '재무 입력의 신규 대출금을 1원 이상 입력하고 초안을 저장해 주세요.'
-        : BigInt(apply.principalKrw) > BigInt(repayment.publicLimitKrw)
-          ? `저장된 신규 대출금이 공개 한도 ${formatFundingWon(repayment.publicLimitKrw)}를 초과합니다.`
-          : null
-      : null;
   return (
     <article className="candidate-card">
       <div className="candidate-head">
@@ -540,22 +503,6 @@ function CandidateCard({
             </ul>
           )}
           <p className="table-note">{repayment.note}</p>
-          {apply && repayment.supported && evaluation.candidateStatus === 'CURRENT_CANDIDATE' && (
-            <div className="button-row">
-              <button
-                type="button"
-                disabled={apply.disabled || amountIssue !== null || apply.applyingKey === cardKey}
-                onClick={() => apply.onApply(evaluation)}
-              >
-                {apply.applyingKey === cardKey ? '적용 중…' : '저장된 신규 대출금에 이 상품 조건 적용'}
-              </button>
-              {apply.disabled && apply.applyingKey !== cardKey && <p className="table-note">{apply.disabledReason}</p>}
-              {!apply.disabled && amountIssue && <p className="table-note">{amountIssue}</p>}
-              {apply.appliedKey === cardKey && (
-                <p className="table-note">현재 저장된 대출 가정이 이 상품 확정 조건입니다.</p>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
