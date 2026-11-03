@@ -26,6 +26,7 @@ import { fundingProfileSummary, type ViewedFundingGap } from '@/features/funding
 import type { FundingMatchProfile } from '@/features/funding/matching';
 import {
   EMPTY_FUNDING_FORM,
+  businessDistrictUnsaved,
   fundingFormFromProfile,
   fundingFormPayload,
   type FundingProfileForm,
@@ -431,6 +432,9 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const fundingDirty =
     plan !== null && fundingFormKey(fundingForm) !== fundingFormKey(fundingFormFromStored(plan.fundingProfileJson));
   const savedBusinessDistrict = plan ? businessProfileDistrict(plan.businessProfileJson) : null;
+  // 사업 조건의 자치구를 바꾸고 저장하지 않았으면 서버가 화면과 다른 자치구로 맞춰 보므로 조회를 막는다.
+  const businessDistrictDirty =
+    plan !== null && businessDistrictUnsaved(fundingForm, businessForm.districtCode, savedBusinessDistrict);
   // 보고 있는 저장 결과의 부족자금. 다시 계산하지 않는다.
   const viewedFundingGap: ViewedFundingGap = storedResult
     ? { revision: storedResult.inputRevision, value: storedResult.resultJson.plannedFundingGap }
@@ -588,6 +592,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             savedBusinessDistrict={savedBusinessDistrict}
             fundingGap={viewedFundingGap}
             dirty={fundingDirty}
+            businessDistrictDirty={businessDistrictDirty}
             loading={matchesLoading}
             matches={matches}
             error={matchesError}
@@ -675,6 +680,7 @@ function PlanFundingPanel({
   savedBusinessDistrict,
   fundingGap,
   dirty,
+  businessDistrictDirty,
   loading,
   matches,
   error,
@@ -689,6 +695,8 @@ function PlanFundingPanel({
   readonly savedBusinessDistrict: string | null;
   readonly fundingGap: ViewedFundingGap;
   readonly dirty: boolean;
+  // 자금 조건의 자치구가 비어 있고 사업 조건의 자치구를 바꾼 뒤 저장하지 않았다.
+  readonly businessDistrictDirty: boolean;
   readonly loading: boolean;
   readonly matches: PlanFundingMatchesResponse | null;
   readonly error: FundingLoadError | null;
@@ -699,11 +707,12 @@ function PlanFundingPanel({
   // 조건 미입력·저장 전 변경·정상 조회를 서로 다른 상태로 보여 준다. 조회는 항상
   // 서버에 저장된 조건으로만 하므로 저장하지 않은 변경이 있으면 막는다.
   const hasStoredProfile = stored !== null && stored.kind !== 'NONE';
-  const canQuery = plan !== null && hasStoredProfile && !dirty && !loading;
+  const canQuery = plan !== null && hasStoredProfile && !dirty && !businessDistrictDirty && !loading;
+  // 자치구만 입력했다가 비우면 조건이 하나도 없어 저장된 조건이 비워진다(조회 불가). 그래서 다른 조건과 함께일 때로 쓴다.
   const districtHint =
     savedBusinessDistrict === null
-      ? '비워 두면 계획에 저장된 사업 조건의 자치구로 맞춰 봅니다. 그것도 없으면 지역은 확인 필요로 남습니다.'
-      : `비워 두면 계획에 저장된 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
+      ? '자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구로 맞춰 봅니다. 그것도 없으면 지역은 확인 필요로 남습니다.'
+      : `자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
   return (
     <section className="picker" aria-labelledby="plan-funding">
       <h2 id="plan-funding">계획 기준 자금 공고 맞춰 보기</h2>
@@ -735,7 +744,7 @@ function PlanFundingPanel({
           {stored?.kind === 'OK' && stored.legacy && (
             <p className="picker-note" role="note">
               예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 업종·용도는 더 쓰지 않으며, 다음에 초안을 저장하면
-              지금 모양으로 저장합니다.
+              지금 모양으로 저장합니다(옮길 값이 없으면 저장된 조건을 비웁니다).
             </p>
           )}
           {stored?.kind === 'INVALID' && (
@@ -746,6 +755,12 @@ function PlanFundingPanel({
           {dirty && (
             <p className="inline-error" role="status">
               아직 저장하지 않은 조건 변경이 있습니다. 초안을 저장한 뒤 조회해 주세요.
+            </p>
+          )}
+          {!dirty && businessDistrictDirty && (
+            <p className="inline-error" role="status">
+              사업 조건의 자치구를 바꾼 뒤 저장하지 않았습니다. 자금 조건의 자치구가 비어 있어 그 값으로 맞춰 보므로,
+              초안을 저장한 뒤 조회해 주세요.
             </p>
           )}
           <div className="button-row">

@@ -19,7 +19,8 @@ export const BIZINFO_SEARCH_COUNT = 5000;
 // 무관한 수출·기술개발 공고가 대부분인 중소기업 전용 공고를 빼기 위한 기계적인 거름이다.
 export const BIZINFO_TARGET_TAGS: readonly string[] = ['소상공인', '창업벤처'];
 
-// 공고명 앞 [지역] 표시와 소관기관 이름으로 서울 밖 공고를 뺀다.
+// 공고명 앞 [지역] 표시와 소관기관 이름으로 서울 밖 공고를 가린다. 가린 공고도 빼지 않고 지역 UNKNOWN으로 올린다
+// (ADR 0009 §2). 이 추측 규칙은 ADR 0009 6단계에서 지운다.
 const OTHER_REGION_TAGS: readonly string[] = [
   '부산',
   '대구',

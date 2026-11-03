@@ -230,17 +230,20 @@ export function closedText(product: ProductMatch): string | null {
   }
 }
 
+// 신청기간 문장. 한쪽 날짜만 있으면 빈 쪽은 비워 두고(예: "2026. 10. 1. ~"), 날짜 대신 적힌 문장을 괄호로 붙인다.
+function periodText(start: string | null, end: string | null, note: string | null): string {
+  if (start === null && end === null) return note ?? '기록 없음';
+  const range = `${start === null ? '' : formatDate(start)} ~ ${end === null ? '' : formatDate(end)}`.trim();
+  return note === null ? range : `${range} (${note})`;
+}
+
 // 출처·운영자가 기록한 신청기간.
 export function applicationPeriodText(period: ProductMatch['application']['period']): string {
-  if (period.start === null && period.end === null) return period.note ?? '기록 없음';
-  const range = `${formatDate(period.start)} ~ ${formatDate(period.end)}`;
-  return period.note === null ? range : `${range} (${period.note})`;
+  return periodText(period.start, period.end, period.note);
 }
 
 export function aiPeriodText(value: ConditionValues['applicationPeriod']): string {
-  if (value.start === null && value.end === null) return value.text ?? '기록 없음';
-  const range = `${value.start === null ? '' : formatDate(value.start)} ~ ${value.end === null ? '' : formatDate(value.end)}`;
-  return value.text === null ? range.trim() : `${range.trim()} (${value.text})`;
+  return periodText(value.start, value.end, value.text);
 }
 
 export function supportTypesText(values: ConditionValues['supportTypes']): string {

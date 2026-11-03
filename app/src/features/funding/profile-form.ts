@@ -71,3 +71,15 @@ export function toggleTargetGroup(
 export function toggleNoTargetGroup(_current: UserTargetGroup[] | null, checked: boolean): UserTargetGroup[] | null {
   return checked ? [] : null;
 }
+
+// 자금 조건의 자치구를 비우면 서버는 계획에 저장된 사업 조건의 자치구로 맞춰 본다(match-profile.ts). 화면의 사업 조건
+// 자치구가 저장된 것과 다르면, 저장하기 전에는 화면과 다른 자치구로 맞춰지므로 저장 전 변경으로 본다.
+export function businessDistrictUnsaved(
+  form: FundingProfileForm,
+  businessFormDistrict: string,
+  savedBusinessDistrict: string | null,
+): boolean {
+  return (
+    form.districtCode === '' && (businessFormDistrict === '' ? null : businessFormDistrict) !== savedBusinessDistrict
+  );
+}

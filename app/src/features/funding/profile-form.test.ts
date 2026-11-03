@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EMPTY_FUNDING_FORM,
+  businessDistrictUnsaved,
   fundingFormFromProfile,
   fundingFormPayload,
   toggleTargetGroup,
@@ -54,7 +55,8 @@ describe('자금 조건 입력란 → 본문', () => {
   });
 
   it('나이가 0~120의 정수가 아니면 저장 전에 알린다', () => {
-    for (const age of ['34.5', '-1', '121', '서른', '1e2', '3 5']) {
+    // 입력란은 받은 글자를 그대로 넘긴다(FundingProfileFields). "35세"를 입력하지 않음으로 바꾸지 않고 알린다.
+    for (const age of ['34.5', '-1', '121', '서른', '35세', '1e2', '3 5']) {
       const payload = fundingFormPayload({ ...FORM, age });
       expect(payload.kind, age).toBe('INVALID');
     }
@@ -64,7 +66,7 @@ describe('자금 조건 입력란 → 본문', () => {
   it('개업 연월이 실제 달이 아니거나 이번 달보다 늦으면 저장 전에 알린다', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-03T03:00:00.000Z'));
-    for (const openedYearMonth of ['2024-13', '2024-3', '2026-12']) {
+    for (const openedYearMonth of ['2024-13', '2024-3', '2024-', '2024년 3월', '2026-12']) {
       expect(fundingFormPayload({ ...FORM, openedYearMonth }).kind, openedYearMonth).toBe('INVALID');
     }
     expect(fundingFormPayload({ ...FORM, openedYearMonth: '2026-11' }).kind).toBe('OK');
@@ -123,5 +125,25 @@ describe('저장된 조건 → 입력란', () => {
       const empty = Object.values(profile).every((value) => value === null);
       expect(payload).toEqual(empty ? { kind: 'EMPTY' } : { kind: 'OK', profile });
     }
+  });
+});
+
+describe('사업 조건 자치구의 저장 전 변경', () => {
+  // 자금 조건의 자치구가 비면 서버는 저장된 사업 조건의 자치구로 맞춰 본다(ADR 0009 §4). 화면에서 바꾼 사업 조건 자치구가
+  // 저장되기 전에 조회하면 화면과 다른 자치구로 맞춰진다.
+  const empty = { ...FORM, districtCode: '' };
+
+  it('자금 조건의 자치구가 비어 있고 사업 조건 자치구가 저장된 것과 다르면 저장 전 변경이다', () => {
+    expect(businessDistrictUnsaved(empty, '11200', '11440')).toBe(true);
+    // 처음 입력한 사업 조건 자치구도 저장 전에는 서버가 모른다.
+    expect(businessDistrictUnsaved(empty, '11200', null)).toBe(true);
+    // 저장된 사업 조건 자치구를 화면에서 지운 경우도 같다.
+    expect(businessDistrictUnsaved(empty, '', '11440')).toBe(true);
+  });
+
+  it('같거나, 자금 조건의 자치구가 있으면 사업 조건 자치구와 상관없다', () => {
+    expect(businessDistrictUnsaved(empty, '11440', '11440')).toBe(false);
+    expect(businessDistrictUnsaved(empty, '', null)).toBe(false);
+    expect(businessDistrictUnsaved(FORM, '11200', '11440')).toBe(false);
   });
 });

@@ -132,7 +132,8 @@ export function FundingMatchesPanel({
             <dt>공고 수</dt>
             <dd>
               {numberFormat.format(result.release.productCount)}건
-              {result.hiddenCount > 0 && ` (운영자가 숨긴 ${numberFormat.format(result.hiddenCount)}건 제외)`}
+              {result.hiddenCount > 0 &&
+                ` (그중 운영자가 숨긴 ${numberFormat.format(result.hiddenCount)}건은 보여 주지 않음)`}
             </dd>
           </div>
           <div>

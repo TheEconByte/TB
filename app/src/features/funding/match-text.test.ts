@@ -4,6 +4,8 @@ import type { ConditionValues } from './condition-fields.ts';
 import {
   AI_READING_NOTICE,
   LIMIT_NOTE,
+  aiPeriodText,
+  applicationPeriodText,
   checkReasonText,
   closedText,
   conditionValueText,
@@ -205,6 +207,19 @@ describe('보류와 마감 문장', () => {
   });
 });
 
+describe('신청기간 문장', () => {
+  it('한쪽 날짜만 있으면 빈 쪽을 기록 없음으로 쓰지 않는다', () => {
+    expect(applicationPeriodText({ start: '2026-10-01', end: null, note: '예산 소진 시까지' })).toBe(
+      '2026. 10. 1. ~ (예산 소진 시까지)',
+    );
+    expect(applicationPeriodText({ start: '2026-10-01', end: '2026-12-31', note: null })).toBe(
+      '2026. 10. 1. ~ 2026. 12. 31.',
+    );
+    expect(applicationPeriodText({ start: null, end: null, note: null })).toBe('기록 없음');
+    expect(aiPeriodText({ start: null, end: '2026-10-15', text: null })).toBe('~ 2026. 10. 15.');
+  });
+});
+
 describe('한도와 부족자금 문장', () => {
   it('출처의 한도 문장을 우선하고, 없으면 공개 한도를 쓴다', () => {
     expect(limitText({ publicLimitKrw: '70000000', limitText: '업체당 최대 7천만원' })).toContain(
@@ -280,7 +295,15 @@ describe('쓰지 않는 문구', () => {
 
   it('맞춰 보기 화면 파일에 그런 문구를 쓰지 않는다', () => {
     // 렌더링하지 않는 분기까지 보려고 소스를 읽는다. 주석에도 쓰지 않는다.
-    for (const file of ['match-text.ts', 'FundingMatchesPanel.tsx', 'FundingProfileFields.tsx', 'FundingMatcher.tsx']) {
+    const files = [
+      'match-text.ts',
+      'FundingMatchesPanel.tsx',
+      'FundingProfileFields.tsx',
+      'FundingMatcher.tsx',
+      // 계획 화면의 자금 패널.
+      '../plans/TrendBenchApp.tsx',
+    ];
+    for (const file of files) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
       for (const word of FORBIDDEN) expect(source.includes(word), `${file}: ${word}`).toBe(false);
     }

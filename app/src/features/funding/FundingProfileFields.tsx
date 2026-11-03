@@ -1,6 +1,5 @@
 'use client';
 
-import { todayInKst } from './dates.ts';
 import { SEOUL_DISTRICTS } from './districts.ts';
 import { USER_TARGET_GROUP_LABELS } from './match-text.ts';
 import { MAX_AGE } from './match-profile.ts';
@@ -44,12 +43,15 @@ export default function FundingProfileFields({
           <label className="field">
             <span>개업 연월 (선택)</span>
             <span className="input-wrap">
+              {/* 글자 입력란으로 둔다. month·number 입력란은 덜 채웠거나 형식이 틀린 글자를 빈 값으로 넘겨,
+                  입력하지 않음으로 바뀐 것을 알릴 수 없다(profile-form.ts가 받은 글자 그대로 검사한다). */}
               <input
                 id={`${idPrefix}-opened`}
                 className="text-input"
-                type="month"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
                 value={form.openedYearMonth}
-                max={todayInKst().slice(0, 7)}
                 placeholder="2024-03"
                 onChange={(event) => onChange({ ...form, openedYearMonth: event.target.value })}
               />
@@ -78,17 +80,15 @@ export default function FundingProfileFields({
             <input
               id={`${idPrefix}-age`}
               className="text-input"
-              type="number"
+              type="text"
               inputMode="numeric"
-              min={0}
-              max={MAX_AGE}
-              step={1}
+              autoComplete="off"
               value={form.age}
               placeholder="예: 35"
               onChange={(event) => onChange({ ...form, age: event.target.value })}
             />
           </span>
-          <small>만 나이입니다. 청년 한정 공고도 나이로 맞춰 봅니다.</small>
+          <small>만 나이(0~{MAX_AGE})입니다. 청년 한정 공고도 나이로 맞춰 봅니다.</small>
         </label>
       </div>
       <fieldset className="field target-groups">
