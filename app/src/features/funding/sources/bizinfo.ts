@@ -468,6 +468,8 @@ export function mapBizinfoItems(
       ],
       evidence,
       sourceRef: { source: 'BIZINFO', externalId: item.pblancId },
+      // 지원분야는 정책자금·지원사업 갈래를 정하는 출처 항목이다(ADR 0009 §1). 값이 없으면 남기지 않는다.
+      ...(realm === '' ? {} : { sourceCategory: realm.slice(0, 100) }),
       notice: {
         sourceUrl: officialUrl,
         inline: [

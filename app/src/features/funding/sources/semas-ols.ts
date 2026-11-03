@@ -739,6 +739,8 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       sourceDocumentRetrieved: false,
       sourceChecksum: null,
       publicLimit: parseSemasSingleLimit(row.limit),
+      // 대출한도 칸 그대로. 금액이 여럿이어도 정책자금 카드에 참고 문장으로 보여 준다(ADR 0009 §4).
+      ...(row.limit.trim() === '' ? {} : { limitText: row.limit.trim().slice(0, 500) }),
       interestCondition:
         overview.baseRate === null ? `대출금리 ${row.rate}` : `대출금리 ${row.rate} (${overview.baseRate})`,
       interestRateConfirmed: false,

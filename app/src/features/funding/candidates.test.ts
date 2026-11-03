@@ -371,6 +371,16 @@ describe('후보 판정과 응답', () => {
     expect(payload.evaluations[0].candidateStatus).toBe('CURRENT_CANDIDATE');
   });
 
+  // v1.4.0은 기업마당 지원분야·소진공 대출한도 문장(선택 필드)만 더했다. 그 전 릴리스는 그 필드 없이 읽는다.
+  it('v1.3.0 스키마로 적재된 릴리스도 읽는다', async () => {
+    const { prisma } = stubPrisma({
+      schemaVersion: 'funding-catalog-v1.3.0',
+      products: [membership(rawProduct(), 0)],
+    });
+    const payload = await candidatesOf(prisma);
+    expect(payload.release.schemaVersion).toBe('funding-catalog-v1.3.0');
+  });
+
   it('검수 기한이 지난 상품은 접수 중이어도 검수 기한 경과로 분리한다', async () => {
     const { prisma } = stubPrisma({
       products: [

@@ -504,8 +504,14 @@ describe('the web request path', () => {
     });
   }
 
-  it('never reaches the Anthropic SDK or the notice extraction from app routes and pages', () => {
-    const entries = files(join(SRC, 'app'));
+  // 맞춰 보기는 사용자 입력(장애 여부 같은 민감한 답 포함)을 다루므로 AI 클라이언트에 닿지 않아야 한다(ADR 0009 Consequences).
+  // 아직 화면에 연결하지 않았어도 맞춰 보기 모듈에서 따로 출발해 확인한다.
+  it('never reaches the Anthropic SDK or the notice extraction from app routes, pages and matching', () => {
+    const entries = [
+      ...files(join(SRC, 'app')),
+      join(SRC, 'features/funding/matching.ts'),
+      join(SRC, 'features/funding/match-list.ts'),
+    ];
     const seen = new Set<string>();
     const reached: string[] = [];
     const queue = [...entries];

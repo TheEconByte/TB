@@ -149,6 +149,11 @@ export const fundingProductSchema = z.object({
   // funding:sync가 이 상품에 쓴 공고 본문(funding_notice_texts)의 checksum(ADR 0009 §2). ACTIVE 릴리스의 상품 버전이
   // 가리키는 본문이 이 상품의 지금 본문이다. 본문이 없거나 읽지 못했으면 없다. sourceRef처럼 기본값을 두지 않는다.
   noticeTextChecksum: sha256Hex.optional(),
+  // 출처가 준 지원분야 원문 값(기업마당 `pldirSportRealmLclasCodeNm`, 예: '금융'). 정책자금·지원사업 갈래를 정한다(ADR 0009 §1).
+  // 출처가 주지 않으면 없다. sourceRef처럼 기본값을 두지 않는다.
+  sourceCategory: z.string().trim().min(1).max(100).optional(),
+  // 출처가 준 한도 문장(소진공 정책자금 표의 대출한도 칸). 정책자금 카드에 참고로 보여 주고 계산에는 쓰지 않는다(ADR 0009 §4).
+  limitText: z.string().trim().min(1).max(500).optional(),
 });
 
 // 출처별 동기화 결과. 자동 상품의 최신성(마지막 성공 동기화일)과 실패 사유를 남긴다.

@@ -1,0 +1,503 @@
+import {
+  CONDITION_FIELD_NAMES,
+  type ConditionFieldName,
+  type ConditionRange,
+  type ConditionTargetGroup,
+  type ConditionValues,
+  type VerifiedConditions,
+  type VerifiedField,
+} from './condition-fields.ts';
+import { SEOUL_DISTRICTS } from './districts.ts';
+import { sourceRefKey, type FundingAutomation, type FundingCatalog, type FundingProduct } from './schema.ts';
+import {
+  FUNDING_SOURCE_LABELS,
+  POLICY_LOAN_SUPPORT_TYPES,
+  compareIsoDates,
+  isAutoReviewer,
+  isPrimaryRetrievalMethod,
+  isSourceFresh,
+  type EvidenceSubject,
+  type FundingSource,
+  type ObservedApplicationStatus,
+  type SupportType,
+} from './types.ts';
+
+// 공고에서 읽은 조건과 사용자 입력을 맞춰 본다(ADR 0009 §4). React·DB·외부 API에 의존하지 않는다.
+// 사용자 입력은 AI에 보내지 않는다. 이 파일은 AI 클라이언트에 닿지 않는다(notice-extraction.test.ts가 확인한다).
+
+// 사용자가 고르는 대상 한정. 청년은 나이로 맞춰 보므로 고르지 않는다(ADR §4).
+export const USER_TARGET_GROUPS = ['WOMEN', 'DISABLED', 'RESTART', 'DAMAGED'] as const;
+export type UserTargetGroup = (typeof USER_TARGET_GROUPS)[number];
+
+// 맞춰 보기에 쓰는 사용자 입력. null은 입력하지 않음이다.
+export type FundingMatchProfile = {
+  businessStatus: 'PRE_STARTUP' | 'BUSINESS' | null;
+  // 사업자의 개업 연월(YYYY-MM). 예비 창업자면 쓰지 않는다.
+  openedYearMonth: string | null;
+  // 자금 조건의 자치구, 비어 있으면 계획 사업 프로필의 자치구. 호출하는 쪽이 정해 넘긴다.
+  districtCode: string | null;
+  // 대표자 만 나이.
+  age: number | null;
+  // null은 답하지 않음, 빈 목록은 해당 없음이다. 장애 여부는 민감한 답이라 맞춰 보기에만 쓴다(ADR Consequences).
+  targetGroups: UserTargetGroup[] | null;
+};
+
+// 맞춰 보는 조건. 신청기간은 마감에, 지원 방식은 표시에만 쓴다.
+export const MATCH_CONDITION_KEYS = [
+  'businessStage',
+  'businessAge',
+  'age',
+  'region',
+  'foodBusiness',
+  'targetGroups',
+] as const satisfies readonly ConditionFieldName[];
+export type MatchConditionKey = (typeof MATCH_CONDITION_KEYS)[number];
+
+export type MatchVerdict = 'MATCH' | 'MISMATCH' | 'CHECK';
+// 확인 필요의 이유. NOT_READ는 추출 결과가 없거나(읽지 않음·실패) 운영자 기록도 없는 경우다. UNCERTAIN은 값을 읽었고
+// 입력도 있지만 그것만으로 정할 수 없는 경우다(개업 연월의 날짜, 입력으로 알 수 없는 대상 등).
+export type CheckReason = 'NOT_MENTIONED' | 'UNREADABLE' | 'NOT_READ' | 'INPUT_MISSING' | 'UNCERTAIN';
+
+// 조건을 어디서 읽었는지. 운영자 확인은 catalog.json에 사람이 적은 값이며 인용 대신 근거 요약이 있다(ADR §3).
+export type ConditionReading<T> =
+  | { status: 'READ'; source: 'AI'; value: T; quote: string }
+  | { status: 'READ'; source: 'OPERATOR'; value: T; evidence: string[] }
+  | { status: 'NOT_MENTIONED' }
+  | { status: 'UNREADABLE'; reason: string }
+  | { status: 'NOT_READ' };
+
+type Readings = { [K in ConditionFieldName]: ConditionReading<ConditionValues[K]> };
+
+export type ConditionMatch = {
+  [K in MatchConditionKey]: {
+    key: K;
+    reading: ConditionReading<ConditionValues[K]>;
+    verdict: MatchVerdict;
+    checkReason: CheckReason | null;
+  };
+}[MatchConditionKey];
+
+export const FUNDING_MATCH_GROUPS = ['MATCHING', 'NEEDS_CHECK', 'NOT_MATCHING', 'CLOSED'] as const;
+export type FundingMatchGroup = (typeof FUNDING_MATCH_GROUPS)[number];
+
+// 갈래(ADR §1). 출처와 출처의 지원분야로만 정한다.
+export const FUNDING_TABS = ['POLICY_FUND', 'SUPPORT_PROGRAM'] as const;
+export type FundingTab = (typeof FUNDING_TABS)[number];
+
+// 조건이 모두 맞아도 맞아 보임으로 두지 않는 이유. 접수 중이 아님, 출처 확인이 끊김(3일 최신성, ADR §6이 유지).
+export type MatchHold = 'STATUS_NOT_OPEN' | 'SOURCE_STALE';
+// 마감의 근거. 출처·운영자의 접수 상태와 종료일이 먼저고, 출처에 종료일이 없을 때만 AI가 읽은 종료일을 쓴다(사용자 결정 2026-11-03).
+export type ClosedBy = 'SOURCE_STATUS' | 'SOURCE_END_DATE' | 'AI_END_DATE';
+
+export type ProductMatch = {
+  productKey: string;
+  version: string;
+  name: string;
+  organization: string;
+  supportType: SupportType;
+  tab: FundingTab;
+  group: FundingMatchGroup;
+  officialUrl: string;
+  // 자동으로 모은 상품의 출처와 마지막 성공 확인일. 사람이 등록한 상품은 null이다.
+  automation: { source: FundingSource; sourceLabel: string; lastSucceededOn: string | null; fresh: boolean } | null;
+  application: {
+    status: ObservedApplicationStatus;
+    period: FundingProduct['applicationPeriod'];
+    aiPeriod: ConditionReading<ConditionValues['applicationPeriod']>;
+    closedBy: ClosedBy | null;
+  };
+  holds: MatchHold[];
+  conditions: ConditionMatch[];
+  supportTypes: ConditionReading<ConditionValues['supportTypes']>;
+  // 정책자금 카드의 한도. 공개 한도는 최대치이며 실제 금액은 심사로 정해진다(ADR §4).
+  limit: { publicLimitKrw: string | null; limitText: string | null };
+};
+
+export type FundingMatchList = {
+  asOfDate: string;
+  tabs: Record<FundingTab, { counts: Record<FundingMatchGroup, number>; products: ProductMatch[] }>;
+};
+
+// 기업마당 지원분야 중 정책자금 갈래로 보는 값(ADR §1).
+const BIZINFO_FINANCE_CATEGORY = '금융';
+
+export function fundingTab(product: FundingProduct): FundingTab {
+  if (isAutoReviewer(product.reviewer)) {
+    if (product.sourceRef?.source === 'SEMAS_OLS') return 'POLICY_FUND';
+    if (product.sourceRef?.source === 'BIZINFO' && product.sourceCategory === BIZINFO_FINANCE_CATEGORY)
+      return 'POLICY_FUND';
+    return 'SUPPORT_PROGRAM';
+  }
+  return POLICY_LOAN_SUPPORT_TYPES.includes(product.supportType) ? 'POLICY_FUND' : 'SUPPORT_PROGRAM';
+}
+
+function fromExtraction<T>(field: VerifiedField<T> | undefined): ConditionReading<T> {
+  if (field === undefined) return { status: 'NOT_READ' };
+  if (field.status === 'READ') return { status: 'READ', source: 'AI', value: field.value, quote: field.quote };
+  return field;
+}
+
+// 사람이 공식 원문에서 직접 확인한 근거. 검색 결과 요약만 있으면 확인한 값으로 보지 않는다(예전 판정 규칙을 잇는다).
+function operatorEvidence(product: FundingProduct, subject: EvidenceSubject): string[] | null {
+  const summaries = product.evidence
+    .filter((entry) => entry.subject === subject && isPrimaryRetrievalMethod(entry.retrievalMethod))
+    .map((entry) => entry.summary);
+  return summaries.length > 0 ? summaries : null;
+}
+
+function operatorStage(product: FundingProduct): ConditionValues['businessStage'] | null {
+  const stages = new Set(product.eligibleBusinessStages);
+  if (stages.has('PRE_REGISTRATION') && stages.has('POST_REGISTRATION')) return 'BOTH';
+  if (stages.has('PRE_REGISTRATION')) return 'PRE_STARTUP_ONLY';
+  if (stages.has('POST_REGISTRATION')) return 'BUSINESS_ONLY';
+  return null;
+}
+
+const DISTRICT_NAMES = new Map(SEOUL_DISTRICTS.map((district) => [district.code, district.name]));
+
+function operatorRegion(product: FundingProduct): ConditionValues['region'] | null {
+  const base = {
+    provinces: [] as string[],
+    districts: [] as string[],
+    excludedProvinces: [] as string[],
+    excludedDistricts: [] as string[],
+    districtCodes: [] as string[],
+    excludedDistrictCodes: [] as string[],
+  };
+  switch (product.region.scope) {
+    case 'NATIONWIDE':
+      return { ...base, scope: 'NATIONWIDE' };
+    case 'SEOUL':
+      return { ...base, scope: 'PROVINCES', provinces: ['서울'] };
+    case 'DISTRICTS': {
+      const codes = product.region.districtCodes;
+      if (codes.length === 0) return null;
+      return {
+        ...base,
+        scope: 'SEOUL_DISTRICTS',
+        provinces: ['서울'],
+        districts: codes.map((code) => DISTRICT_NAMES.get(code) ?? code),
+        districtCodes: [...codes],
+      };
+    }
+    case 'UNKNOWN':
+      return null;
+  }
+}
+
+// 상품에서 읽은 조건. 사람이 등록한 상품은 공식 근거와 함께 적은 사업 단계·지역을 AI 값 대신 쓴다(ADR §3). 자동 상품의
+// 사업 단계·지역 필드는 수집기의 추측이라 쓰지 않는다(ADR 0009 Context·§7).
+export function readProductConditions(product: FundingProduct, extraction: VerifiedConditions | null): Readings {
+  const readings = Object.fromEntries(
+    CONDITION_FIELD_NAMES.map((name) => [
+      name,
+      fromExtraction(extraction?.[name] as VerifiedField<ConditionValues[typeof name]> | undefined),
+    ]),
+  ) as Readings;
+  if (isAutoReviewer(product.reviewer)) return readings;
+  const stage = operatorStage(product);
+  const stageEvidence = operatorEvidence(product, 'BUSINESS_STAGE');
+  if (stage !== null && stageEvidence !== null) {
+    readings.businessStage = { status: 'READ', source: 'OPERATOR', value: stage, evidence: stageEvidence };
+  }
+  const region = operatorRegion(product);
+  const regionEvidence = operatorEvidence(product, 'REGION');
+  if (region !== null && regionEvidence !== null) {
+    readings.region = { status: 'READ', source: 'OPERATOR', value: region, evidence: regionEvidence };
+  }
+  return readings;
+}
+
+type Judgment = { verdict: MatchVerdict; checkReason: CheckReason | null };
+const MATCH: Judgment = { verdict: 'MATCH', checkReason: null };
+const MISMATCH: Judgment = { verdict: 'MISMATCH', checkReason: null };
+const check = (checkReason: CheckReason): Judgment => ({ verdict: 'CHECK', checkReason });
+
+function inRange(value: number, range: ConditionRange): boolean {
+  if (range.min !== null && value < range.min) return false;
+  if (range.max !== null && (range.maxExclusive ? value >= range.max : value > range.max)) return false;
+  return true;
+}
+
+const unlimited = (range: ConditionRange) => range.min === null && range.max === null;
+
+function stageJudgment(value: ConditionValues['businessStage'], profile: FundingMatchProfile): Judgment {
+  if (value === 'BOTH') return MATCH;
+  if (profile.businessStatus === null) return check('INPUT_MISSING');
+  const wanted = value === 'PRE_STARTUP_ONLY' ? 'PRE_STARTUP' : 'BUSINESS';
+  return profile.businessStatus === wanted ? MATCH : MISMATCH;
+}
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+// 날짜에 개월을 더한다. 그달에 같은 날이 없으면 말일이다(1월 31일 + 1개월 = 2월 말일).
+function addMonths(isoDate: string, months: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const index = year * 12 + (month - 1) + months;
+  const nextYear = Math.floor(index / 12);
+  const nextMonth = (index % 12) + 1;
+  return `${nextYear}-${pad(nextMonth)}-${pad(Math.min(day, lastDayOfMonth(nextYear, nextMonth)))}`;
+}
+
+// 년을 개월로. 0.5년처럼 개월로 떨어지지 않는 값은 날짜로 비교할 수 없어 null이다.
+function yearsToMonths(years: number): number | null {
+  const months = years * 12;
+  const rounded = Math.round(months);
+  return Math.abs(months - rounded) < 1e-9 ? rounded : null;
+}
+
+// 업력은 개업일부터 기준일까지다. 개업 연월만 알아서 개업일은 그달 1일~말일 중 하나이고, 양 끝에서 결과가 갈리면
+// 확인 필요다(기본값). 예비 창업자는 업력 0년으로 본다(기본값).
+function businessAgeJudgment(range: ConditionRange, profile: FundingMatchProfile, asOfDate: string): Judgment {
+  if (unlimited(range)) return MATCH;
+  if (profile.businessStatus === null) return check('INPUT_MISSING');
+  if (profile.businessStatus === 'PRE_STARTUP') return inRange(0, range) ? MATCH : MISMATCH;
+  if (profile.openedYearMonth === null) return check('INPUT_MISSING');
+  const minMonths = range.min === null ? null : yearsToMonths(range.min);
+  const maxMonths = range.max === null ? null : yearsToMonths(range.max);
+  if ((range.min !== null && minMonths === null) || (range.max !== null && maxMonths === null))
+    return check('UNCERTAIN');
+  const [year, month] = profile.openedYearMonth.split('-').map(Number);
+  const earliest = `${profile.openedYearMonth}-01`;
+  if (compareIsoDates(earliest, asOfDate) > 0) return check('UNCERTAIN');
+  const monthEnd = `${profile.openedYearMonth}-${pad(lastDayOfMonth(year, month))}`;
+  const latest = compareIsoDates(monthEnd, asOfDate) > 0 ? asOfDate : monthEnd;
+  // 개업일이 늦을수록 업력이 짧다. 가장 이른 개업일에도 하한에 못 미치거나, 가장 늦은 개업일에도 상한을 넘으면 안 맞음이다.
+  const tooYoung = (opened: string) =>
+    minMonths !== null && compareIsoDates(addMonths(opened, minMonths), asOfDate) > 0;
+  const tooOld = (opened: string) => {
+    if (maxMonths === null) return false;
+    const limit = compareIsoDates(asOfDate, addMonths(opened, maxMonths));
+    return range.maxExclusive ? limit >= 0 : limit > 0;
+  };
+  if (tooYoung(earliest) || tooOld(latest)) return MISMATCH;
+  if (!tooYoung(latest) && !tooOld(earliest)) return MATCH;
+  return check('UNCERTAIN');
+}
+
+function ageJudgment(range: ConditionRange, profile: FundingMatchProfile): Judgment {
+  if (unlimited(range)) return MATCH;
+  if (profile.age === null) return check('INPUT_MISSING');
+  return inRange(profile.age, range) ? MATCH : MISMATCH;
+}
+
+// 자치구는 코드로 맞춘다. 입력이 없어도 결과가 정해지는 경우(제외 지역 없는 전국)만 맞음이고, 나머지는 확인 필요다.
+function regionJudgment(value: ConditionValues['region'], profile: FundingMatchProfile): Judgment {
+  const district = profile.districtCode;
+  if (district === null) {
+    const noExclusion = value.excludedProvinces.length === 0 && value.excludedDistrictCodes.length === 0;
+    return value.scope === 'NATIONWIDE' && noExclusion ? MATCH : check('INPUT_MISSING');
+  }
+  // 자치구는 서울 자치구만 고를 수 있다.
+  if (value.excludedProvinces.includes('서울') || value.excludedDistrictCodes.includes(district)) return MISMATCH;
+  switch (value.scope) {
+    case 'NATIONWIDE':
+      return MATCH;
+    case 'PROVINCES':
+      return value.provinces.includes('서울') ? MATCH : MISMATCH;
+    case 'SEOUL_DISTRICTS':
+      return value.districtCodes.includes(district) ? MATCH : MISMATCH;
+  }
+}
+
+function foodJudgment(value: ConditionValues['foodBusiness']): Judgment {
+  return value === 'EXCLUDED' ? MISMATCH : MATCH;
+}
+
+type Membership = boolean | 'INPUT_MISSING' | 'UNCERTAIN';
+
+function membership(
+  group: ConditionTargetGroup,
+  profile: FundingMatchProfile,
+  age: ConditionReading<ConditionRange>,
+): Membership {
+  if (group === 'OTHER') return 'UNCERTAIN';
+  if (group === 'YOUTH') {
+    // 청년 한정은 나이로 맞춰 본다(ADR §4). 청년 기준 나이를 읽지 못했으면 알 수 없다.
+    if (age.status !== 'READ' || unlimited(age.value)) return 'UNCERTAIN';
+    if (profile.age === null) return 'INPUT_MISSING';
+    return inRange(profile.age, age.value);
+  }
+  if (profile.targetGroups === null) return 'INPUT_MISSING';
+  return profile.targetGroups.includes(group);
+}
+
+// 여러 대상은 그중 하나에 해당하면 된다. 어느 것에도 해당하지 않으면 안 맞음, 알 수 없는 대상이 남으면 확인 필요다(ADR §4).
+function targetGroupsJudgment(
+  value: ConditionValues['targetGroups'],
+  profile: FundingMatchProfile,
+  age: ConditionReading<ConditionRange>,
+): Judgment {
+  if (value.groups.length === 0) return MATCH;
+  const results = [...new Set(value.groups)].map((group) => membership(group, profile, age));
+  if (results.includes(true)) return MATCH;
+  if (results.includes('INPUT_MISSING')) return check('INPUT_MISSING');
+  if (results.includes('UNCERTAIN')) return check('UNCERTAIN');
+  return MISMATCH;
+}
+
+function unread(reading: ConditionReading<unknown>): Judgment | null {
+  switch (reading.status) {
+    case 'NOT_MENTIONED':
+      return check('NOT_MENTIONED');
+    case 'UNREADABLE':
+      return check('UNREADABLE');
+    case 'NOT_READ':
+      return check('NOT_READ');
+    case 'READ':
+      return null;
+  }
+}
+
+export function matchConditions(readings: Readings, profile: FundingMatchProfile, asOfDate: string): ConditionMatch[] {
+  const judge = <K extends MatchConditionKey>(
+    key: K,
+    decide: (value: ConditionValues[K]) => Judgment,
+  ): {
+    key: K;
+    reading: ConditionReading<ConditionValues[K]>;
+    verdict: MatchVerdict;
+    checkReason: CheckReason | null;
+  } => {
+    const reading = readings[key] as ConditionReading<ConditionValues[K]>;
+    const judgment = unread(reading) ?? decide((reading as { value: ConditionValues[K] }).value);
+    return { key, reading, ...judgment };
+  };
+  const age = judge('age', (value) => ageJudgment(value, profile));
+  const groups = readings.targetGroups;
+  // "청년 또는 여성"처럼 청년과 다른 대상을 함께 한정하면 나이 상한이 청년에만 걸릴 수 있다. 나이만으로 안 맞음이라고 하지 않는다.
+  const youthAmongOthers =
+    groups.status === 'READ' &&
+    groups.value.groups.includes('YOUTH') &&
+    groups.value.groups.some((group) => group !== 'YOUTH');
+  if (youthAmongOthers && age.verdict === 'MISMATCH') Object.assign(age, check('UNCERTAIN'));
+  return [
+    judge('businessStage', (value) => stageJudgment(value, profile)),
+    judge('businessAge', (value) => businessAgeJudgment(value, profile, asOfDate)),
+    age,
+    judge('region', (value) => regionJudgment(value, profile)),
+    judge('foodBusiness', foodJudgment),
+    judge('targetGroups', (value) => targetGroupsJudgment(value, profile, readings.age)),
+  ];
+}
+
+function closedBy(
+  product: FundingProduct,
+  aiPeriod: ConditionReading<ConditionValues['applicationPeriod']>,
+  asOfDate: string,
+): ClosedBy | null {
+  if (product.observedApplicationStatus === 'CLOSED') return 'SOURCE_STATUS';
+  // 종료일 당일까지는 접수 중이다.
+  const end = product.applicationPeriod.end;
+  if (end !== null) return compareIsoDates(end, asOfDate) < 0 ? 'SOURCE_END_DATE' : null;
+  if (aiPeriod.status === 'READ' && aiPeriod.value.end !== null && compareIsoDates(aiPeriod.value.end, asOfDate) < 0)
+    return 'AI_END_DATE';
+  return null;
+}
+
+export function matchProduct(
+  product: FundingProduct,
+  extraction: VerifiedConditions | null,
+  profile: FundingMatchProfile,
+  context: { asOfDate: string; automation: FundingAutomation },
+): ProductMatch {
+  const readings = readProductConditions(product, extraction);
+  const conditions = matchConditions(readings, profile, context.asOfDate);
+  const auto = isAutoReviewer(product.reviewer);
+  const source = auto ? product.sourceRef?.source : undefined;
+  const fresh =
+    !auto || (source !== undefined && isSourceFresh(source, context.automation.sourceSyncs, context.asOfDate));
+  const closed = closedBy(product, readings.applicationPeriod, context.asOfDate);
+  const holds: MatchHold[] =
+    closed === null
+      ? [
+          ...(product.observedApplicationStatus === 'OPEN' ? [] : (['STATUS_NOT_OPEN'] as const)),
+          ...(fresh ? [] : (['SOURCE_STALE'] as const)),
+        ]
+      : [];
+  const group: FundingMatchGroup =
+    closed !== null
+      ? 'CLOSED'
+      : conditions.some((entry) => entry.verdict === 'MISMATCH')
+        ? 'NOT_MATCHING'
+        : conditions.every((entry) => entry.verdict === 'MATCH') && holds.length === 0
+          ? 'MATCHING'
+          : 'NEEDS_CHECK';
+  return {
+    productKey: product.productKey,
+    version: product.version,
+    name: product.name,
+    organization: product.organization,
+    supportType: product.supportType,
+    tab: fundingTab(product),
+    group,
+    officialUrl: product.officialUrl,
+    automation:
+      source === undefined
+        ? null
+        : {
+            source,
+            sourceLabel: FUNDING_SOURCE_LABELS[source],
+            lastSucceededOn:
+              context.automation.sourceSyncs.find((entry) => entry.source === source)?.lastSucceededOn ?? null,
+            fresh,
+          },
+    application: {
+      status: product.observedApplicationStatus,
+      period: product.applicationPeriod,
+      aiPeriod: readings.applicationPeriod,
+      closedBy: closed,
+    },
+    holds,
+    conditions,
+    supportTypes: readings.supportTypes,
+    limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
+  };
+}
+
+function emptyCounts(): Record<FundingMatchGroup, number> {
+  return { MATCHING: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 };
+}
+
+// 활성 카탈로그 전체를 맞춰 본다. extractions는 상품 키별로, 그 상품의 지금 본문(noticeTextChecksum)을 지금 모델·프롬프트로
+// 읽은 결과만 담는다(match-list.ts). 차단 목록의 자동 상품은 보여 주지 않는다(ADR §6 운영자 숨김).
+export function matchCatalog(
+  catalog: FundingCatalog,
+  extractions: ReadonlyMap<string, VerifiedConditions>,
+  profile: FundingMatchProfile,
+  options: { asOfDate: string },
+): FundingMatchList {
+  const blocked = new Set(catalog.automation.blockedSources.map((entry) => sourceRefKey(entry)));
+  const matches = catalog.products
+    .filter(
+      (product) =>
+        !(
+          isAutoReviewer(product.reviewer) &&
+          product.sourceRef !== undefined &&
+          blocked.has(sourceRefKey(product.sourceRef))
+        ),
+    )
+    .map((product) =>
+      matchProduct(
+        product,
+        product.noticeTextChecksum === undefined ? null : (extractions.get(product.productKey) ?? null),
+        profile,
+        { asOfDate: options.asOfDate, automation: catalog.automation },
+      ),
+    );
+  const order = (group: FundingMatchGroup) => FUNDING_MATCH_GROUPS.indexOf(group);
+  const tabs = Object.fromEntries(
+    FUNDING_TABS.map((tab) => {
+      // 그룹 순서로 놓고, 같은 그룹 안에서는 카탈로그 순서를 지킨다(Array.prototype.sort는 안정 정렬이다).
+      const products = matches.filter((entry) => entry.tab === tab).sort((a, b) => order(a.group) - order(b.group));
+      const counts = emptyCounts();
+      for (const entry of products) counts[entry.group] += 1;
+      return [tab, { counts, products }];
+    }),
+  ) as FundingMatchList['tabs'];
+  return { asOfDate: options.asOfDate, tabs };
+}

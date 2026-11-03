@@ -2,15 +2,17 @@
 // stored as-is in the JSON catalog and mirrored by the Prisma enums, so a name
 // change here is a catalog schema change too.
 
-export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.3.0';
+export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.4.0';
 
 // 이미 적재된 릴리스를 읽을 수 있는 스키마 버전. v1.1.0은 v1.0.0에 출처 식별자와
 // 자동화 설정을, v1.2.0은 지원 유형 UNKNOWN과 사업 단계 미확인(빈 배열)을, v1.3.0은 공고 본문
-// checksum(noticeTextChecksum)을 더했을 뿐이라 이전 릴리스도 그대로 읽는다.
+// checksum(noticeTextChecksum)을, v1.4.0은 출처의 지원분야(sourceCategory)와 한도 문장(limitText)을 더했을 뿐이라
+// 이전 릴리스도 그대로 읽는다.
 export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
   'funding-catalog-v1.0.0',
   'funding-catalog-v1.1.0',
   'funding-catalog-v1.2.0',
+  'funding-catalog-v1.3.0',
   FUNDING_CATALOG_SCHEMA_VERSION,
 ];
 
