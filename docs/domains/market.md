@@ -35,7 +35,7 @@
 
 정의와 근거는 [ADR 0008](../decisions/0008-market-survival-score.md)에 있다.
 
-- 코드: `app/src/features/market/score`. 변수·라벨(`dataset.ts`), 로지스틱 회귀(`logistic.ts`), 학습·기준선 비교(`train.ts`), 점수 생성(`build.ts`), 점수 릴리스 적재(`loader.ts`), 공개 API 조립(`api.ts`), 화면(`ScorePanel.tsx`, `MarketGradeBanner.tsx`), `/`로 넘기는 상권 참조(`handoff.ts`). 모델 설정은 `config.ts` 하나에 있다.
+- 코드: `app/src/features/market/score`. 변수·라벨(`dataset.ts`), 로지스틱 회귀(`logistic.ts`), 학습·기준선 비교(`train.ts`), 점수 생성(`build.ts`), 점수 릴리스 적재(`loader.ts`), 공개 API 조립(`api.ts`), 화면(`ScorePanel.tsx`, `MarketGradeBanner.tsx`), `/`와 `/funding`으로 넘기는 상권 참조(`handoff.ts`). 모델 설정은 `config.ts` 하나에 있다.
 - 학습: `npm --prefix app run score:train [-- --version <버전>]`. ACTIVE 상권 릴리스로 업종별 모델을 학습하고 `app/models/market-score/<버전>.json`(계수)과 `<버전>.report.md`(학습 리포트)를 만든다. 같은 버전 파일은 덮어쓰지 않는다. 계수 파일과 리포트는 Git에 포함한다.
 - 점수 적재: `npm --prefix app run score:build [-- --model <계수 파일>]`. 기본은 `app/models/market-score`의 이름순 마지막 계수 파일이다. 최신 기준분기의 모든 상권 × 제공 업종 행을 `PENDING`으로 저장하고 행 수·점수 범위를 검증한 뒤 한 트랜잭션으로 활성화한다. 실패하면 행을 지우고 `FAILED`로 남기며 기존 ACTIVE를 유지한다. 계수 파일 checksum·상권 릴리스 키·기준분기가 같으면 `ALREADY_ACTIVE`다. 상권을 다시 적재하면 `score:build`를 다시 실행한다.
 - 테스트 AUC가 0.6 미만인 업종은 행을 만들지 않고 요약에 미지원으로 남긴다.
