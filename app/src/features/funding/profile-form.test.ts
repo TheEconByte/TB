@@ -66,10 +66,18 @@ describe('자금 조건 입력란 → 본문', () => {
   it('개업 연월이 실제 달이 아니거나 이번 달보다 늦으면 저장 전에 알린다', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-03T03:00:00.000Z'));
-    for (const openedYearMonth of ['2024-13', '2024-3', '2024-', '2024년 3월', '2026-12']) {
+    for (const openedYearMonth of ['2024-13', '202413', '20243', '2024-', '2024년 3월', '2026-12', '202612']) {
       expect(fundingFormPayload({ ...FORM, openedYearMonth }).kind, openedYearMonth).toBe('INVALID');
     }
     expect(fundingFormPayload({ ...FORM, openedYearMonth: '2026-11' }).kind).toBe('OK');
+    // iOS 숫자 키패드에는 "-"가 없어 붙여 쓴 6자리로 입력한다. 점·빗금·공백으로 나눈 표기와 한 자리 달도 받는다.
+    // 서버 스키마는 YYYY-MM만 받으므로 보낼 때 그 모양으로 바꾼다.
+    for (const typed of ['202403', '2024.03', '2024. 3.', '2024/3', '2024 3', '2024-3', ' 2024-03 ']) {
+      expect(fundingFormPayload({ ...FORM, openedYearMonth: typed }), typed).toMatchObject({
+        kind: 'OK',
+        profile: { openedYearMonth: '2024-03' },
+      });
+    }
     // 사업자인데 개업 연월을 비우면 입력하지 않음이다(업력은 확인 필요로 남는다).
     expect(fundingFormPayload({ ...FORM, openedYearMonth: '' })).toMatchObject({
       kind: 'OK',
@@ -139,6 +147,12 @@ describe('사업 조건 자치구의 저장 전 변경', () => {
     expect(businessDistrictUnsaved(empty, '11200', null)).toBe(true);
     // 저장된 사업 조건 자치구를 화면에서 지운 경우도 같다.
     expect(businessDistrictUnsaved(empty, '', '11440')).toBe(true);
+  });
+
+  it('서울 자치구가 아닌 사업 조건 자치구는 서버처럼 없는 것으로 보고 비교한다', () => {
+    // 서버는 서울 자치구 코드만 보충에 쓴다(match-profile.ts). 화면 값을 그대로 비교하면 저장해도 풀리지 않는 막힘이 된다.
+    expect(businessDistrictUnsaved(empty, '41110', null)).toBe(false);
+    expect(businessDistrictUnsaved(empty, '41110', '11440')).toBe(true);
   });
 
   it('같거나, 자금 조건의 자치구가 있으면 사업 조건 자치구와 상관없다', () => {

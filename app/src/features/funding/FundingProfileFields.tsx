@@ -56,7 +56,10 @@ export default function FundingProfileFields({
                 onChange={(event) => onChange({ ...form, openedYearMonth: event.target.value })}
               />
             </span>
-            <small>업력 조건을 맞춰 봅니다. 달까지만 받아, 기준에 걸치는 달이면 확인 필요로 남습니다.</small>
+            <small>
+              업력 조건을 맞춰 봅니다. 202403처럼 붙여 써도 됩니다. 달까지만 받아, 기준에 걸치는 달이면 확인 필요로
+              남습니다.
+            </small>
           </label>
         )}
         <label className="field">
