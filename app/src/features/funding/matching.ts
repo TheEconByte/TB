@@ -25,11 +25,13 @@ import {
 // 공고에서 읽은 조건과 사용자 입력을 맞춰 본다(ADR 0009 §4). React·DB·외부 API에 의존하지 않는다.
 // 사용자 입력은 AI에 보내지 않는다. 이 파일은 AI 클라이언트에 닿지 않는다(notice-extraction.test.ts가 확인한다).
 
-// 사용자가 고르는 대상 한정. 청년은 나이로 맞춰 보므로 고르지 않는다(ADR §4).
-export const USER_TARGET_GROUPS = ['WOMEN', 'DISABLED', 'RESTART', 'DAMAGED'] as const;
+// 사용자가 고르는 대상 한정. 청년은 나이로 맞춰 보므로 고르지 않는다(ADR §4). 재난 피해 대상 공고는 범위 밖이라 피해
+// 소상공인은 고르지 않는다(사용자 결정 2026-11-03).
+export const USER_TARGET_GROUPS = ['WOMEN', 'DISABLED', 'RESTART'] as const;
 export type UserTargetGroup = (typeof USER_TARGET_GROUPS)[number];
 
-// 맞춰 보기에 쓰는 사용자 입력. null은 입력하지 않음이다.
+// 맞춰 보기에 쓰는 사용자 입력. null은 입력하지 않음이다. 값의 형식은 호출하는 쪽이 검증해 넘긴다: 개업 연월은 실제 달
+// (YYYY-MM, 01~12), 나이는 0 이상의 정수, 자치구는 서울 자치구 코드(districts.ts). 이 함수는 형식을 다시 검사하지 않는다.
 export type FundingMatchProfile = {
   businessStatus: 'PRE_STARTUP' | 'BUSINESS' | null;
   // 사업자의 개업 연월(YYYY-MM). 예비 창업자면 쓰지 않는다.
@@ -86,7 +88,8 @@ export type FundingTab = (typeof FUNDING_TABS)[number];
 
 // 조건이 모두 맞아도 맞아 보임으로 두지 않는 이유. 접수 중이 아님, 출처 확인이 끊김(3일 최신성, ADR §6이 유지).
 export type MatchHold = 'STATUS_NOT_OPEN' | 'SOURCE_STALE';
-// 마감의 근거. 출처·운영자의 접수 상태와 종료일이 먼저고, 출처에 종료일이 없을 때만 AI가 읽은 종료일을 쓴다(사용자 결정 2026-11-03).
+// 마감의 근거. 출처·운영자의 접수 상태와 종료일이 먼저고, 출처가 접수 중이라고도 종료일도 알려 주지 않을 때만 AI가 읽은
+// 종료일을 쓴다(사용자 결정 2026-11-03).
 export type ClosedBy = 'SOURCE_STATUS' | 'SOURCE_END_DATE' | 'AI_END_DATE';
 
 export type ProductMatch = {
@@ -316,9 +319,12 @@ function membership(
   age: ConditionReading<ConditionRange>,
 ): Membership {
   if (group === 'OTHER') return 'UNCERTAIN';
+  // 피해 소상공인은 입력받지 않는다. 다른 대상과 함께 한정한 공고에서는 해당하지 않는 것으로 본다.
+  if (group === 'DAMAGED') return false;
   if (group === 'YOUTH') {
-    // 청년 한정은 나이로 맞춰 본다(ADR §4). 청년 기준 나이를 읽지 못했으면 알 수 없다.
-    if (age.status !== 'READ' || unlimited(age.value)) return 'UNCERTAIN';
+    // 청년 한정은 나이로 맞춰 본다(ADR §4). 청년 기준에는 상한이 있으므로, 상한을 읽지 못했으면 청년 기준 나이를 읽지
+    // 못한 것이다(하한만 읽으면 누구나 청년이 된다).
+    if (age.status !== 'READ' || age.value.max === null) return 'UNCERTAIN';
     if (profile.age === null) return 'INPUT_MISSING';
     return inRange(profile.age, age.value);
   }
@@ -394,6 +400,9 @@ function closedBy(
   // 종료일 당일까지는 접수 중이다.
   const end = product.applicationPeriod.end;
   if (end !== null) return compareIsoDates(end, asOfDate) < 0 ? 'SOURCE_END_DATE' : null;
+  // 출처가 접수 중으로 확인했으면 AI 종료일로 마감하지 않는다. 소진공은 다른 회차 공지의 날짜를 쓰지 않는데, AI는 그 공지
+  // 본문에서 지난 종료일을 읽을 수 있다.
+  if (product.observedApplicationStatus === 'OPEN') return null;
   if (aiPeriod.status === 'READ' && aiPeriod.value.end !== null && compareIsoDates(aiPeriod.value.end, asOfDate) < 0)
     return 'AI_END_DATE';
   return null;
@@ -463,8 +472,18 @@ function emptyCounts(): Record<FundingMatchGroup, number> {
   return { MATCHING: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 };
 }
 
+// 대상을 재난·피해 소상공인으로만 한정한 공고. 제품 범위 밖이라 보여 주지 않는다(사용자 결정 2026-11-03).
+function disasterOnly(extraction: VerifiedConditions | null): boolean {
+  const target = extraction?.targetGroups;
+  return (
+    target?.status === 'READ' &&
+    target.value.groups.length > 0 &&
+    target.value.groups.every((group) => group === 'DAMAGED')
+  );
+}
+
 // 활성 카탈로그 전체를 맞춰 본다. extractions는 상품 키별로, 그 상품의 지금 본문(noticeTextChecksum)을 지금 모델·프롬프트로
-// 읽은 결과만 담는다(match-list.ts). 차단 목록의 자동 상품은 보여 주지 않는다(ADR §6 운영자 숨김).
+// 읽은 결과만 담는다(match-list.ts). 차단 목록의 자동 상품과 재난 피해 대상 공고는 보여 주지 않는다(ADR §6 운영자 숨김).
 export function matchCatalog(
   catalog: FundingCatalog,
   extractions: ReadonlyMap<string, VerifiedConditions>,
@@ -472,23 +491,15 @@ export function matchCatalog(
   options: { asOfDate: string },
 ): FundingMatchList {
   const blocked = new Set(catalog.automation.blockedSources.map((entry) => sourceRefKey(entry)));
-  const matches = catalog.products
-    .filter(
-      (product) =>
-        !(
-          isAutoReviewer(product.reviewer) &&
-          product.sourceRef !== undefined &&
-          blocked.has(sourceRefKey(product.sourceRef))
-        ),
-    )
-    .map((product) =>
-      matchProduct(
-        product,
-        product.noticeTextChecksum === undefined ? null : (extractions.get(product.productKey) ?? null),
-        profile,
-        { asOfDate: options.asOfDate, automation: catalog.automation },
-      ),
-    );
+  const matches = catalog.products.flatMap((product) => {
+    const hidden =
+      isAutoReviewer(product.reviewer) &&
+      product.sourceRef !== undefined &&
+      blocked.has(sourceRefKey(product.sourceRef));
+    const extraction = product.noticeTextChecksum === undefined ? null : (extractions.get(product.productKey) ?? null);
+    if (hidden || disasterOnly(extraction)) return [];
+    return [matchProduct(product, extraction, profile, { asOfDate: options.asOfDate, automation: catalog.automation })];
+  });
   const order = (group: FundingMatchGroup) => FUNDING_MATCH_GROUPS.indexOf(group);
   const tabs = Object.fromEntries(
     FUNDING_TABS.map((tab) => {

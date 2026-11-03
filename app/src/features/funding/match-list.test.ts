@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
 import { sha256Hex } from '../../lib/checksum.ts';
 import { CONDITION_MODEL, CONDITION_PROMPT_VERSION } from './condition-fields.ts';
 import { loadFundingCatalog } from './loader.ts';
-import { listFundingMatches } from './match-list.ts';
+import { findConditionExtractions, listFundingMatches } from './match-list.ts';
 import type { FundingMatchProfile } from './matching.ts';
 import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 
@@ -87,6 +87,43 @@ function catalogFile(noticeTextChecksum: string): string {
   );
   return path;
 }
+
+// 원격 CI는 DB 묶음을 돌리지 않으므로, 상품 키와 checksum의 짝은 DB 없이도 확인한다.
+describe('findConditionExtractions', () => {
+  it('상품마다 그 상품의 지금 본문 checksum으로 읽은 결과만 쓰고, 다른 상품의 checksum 행은 버린다', async () => {
+    const [checksumA, checksumB] = [sha256Hex('A 본문'), sha256Hex('B 본문')];
+    const read = { status: 'READ', value: 'EXCLUDED', quote: '음식점업 제외' };
+    const findMany = vi.fn().mockResolvedValue([
+      { productKey: 'product-a', textChecksum: checksumA, fields: { foodBusiness: read } },
+      // A에 B 본문의 행이 있어도(같은 본문을 공유하는 경우 등) A의 지금 본문이 아니므로 쓰지 않는다.
+      { productKey: 'product-a', textChecksum: checksumB, fields: { foodBusiness: { status: 'NOT_MENTIONED' } } },
+    ]);
+    const prisma = { fundingConditionExtraction: { findMany } } as unknown as Parameters<
+      typeof findConditionExtractions
+    >[0];
+    const found = await findConditionExtractions(prisma, [
+      { productKey: 'product-a', noticeTextChecksum: checksumA },
+      { productKey: 'product-b', noticeTextChecksum: checksumB },
+      { productKey: 'product-c', noticeTextChecksum: undefined },
+    ]);
+    expect([...found.keys()]).toEqual(['product-a']);
+    expect(found.get('product-a')?.foodBusiness).toEqual(read);
+    expect(findMany.mock.calls[0][0].where).toMatchObject({
+      productKey: { in: ['product-a', 'product-b'] },
+      model: CONDITION_MODEL,
+      promptVersion: CONDITION_PROMPT_VERSION,
+    });
+  });
+
+  it('본문 checksum이 있는 상품이 없으면 DB를 읽지 않는다', async () => {
+    const findMany = vi.fn();
+    const prisma = { fundingConditionExtraction: { findMany } } as unknown as Parameters<
+      typeof findConditionExtractions
+    >[0];
+    expect((await findConditionExtractions(prisma, [{ productKey: 'product-c' }])).size).toBe(0);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+});
 
 const ageField = (max: number, quote: string) => ({
   age: { status: 'READ', value: { min: null, max, maxExclusive: false }, quote },
