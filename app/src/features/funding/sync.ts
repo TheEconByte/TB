@@ -4,6 +4,14 @@ import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { canonicalJson } from './canonical.ts';
 import { loadFundingCatalog, readFundingCatalogFile, type FundingLoadReport } from './loader.ts';
 import type { NoticeDownload, NoticeExtract, NoticePlan } from './notice-body.ts';
+import {
+  CONDITION_MODEL,
+  CONDITION_PROMPT_VERSION,
+  extractNoticeConditions,
+  prismaConditionExtractionStore,
+  type ConditionExtractionReport,
+  type ConditionExtractor,
+} from './notice-extraction.ts';
 import { prismaNoticeTextStore, resolveNoticeText, type NoticeTextOutcome } from './notice-sync.ts';
 import { extractNoticeText } from './notice-text.ts';
 import { findActiveFundingCatalog } from './read.ts';
@@ -58,6 +66,8 @@ export type FundingSyncOptions = {
   log?: (message: string) => void;
   // 첨부를 텍스트로 바꾸는 함수. 테스트에서 바꿔 끼운다.
   noticeExtract?: NoticeExtract;
+  // 공고 본문에서 조건을 읽는 AI. null이거나 없으면 부르지 않는다(ANTHROPIC_API_KEY 없음).
+  conditionExtractor?: ConditionExtractor | null;
 };
 
 export type FundingSourceSyncReport = FundingSourceSync & {
@@ -86,6 +96,8 @@ export type FundingSyncReport = {
   overriddenByManual: string[];
   // 적재 결과. dryRun이면 null이다.
   load: FundingLoadReport | null;
+  // 공고 본문의 조건 추출 결과(ADR 0009 §3). dryRun이면 부르지 않아 null이다.
+  conditions: ConditionExtractionReport | null;
 };
 
 class SourceSyncFailure extends Error {}
@@ -431,6 +443,30 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
     load = await loadFundingCatalog({ catalogPath: catalogFile, prisma, asOfDate, log });
   }
 
+  // 적재한 카탈로그의 본문마다 조건을 읽는다. 직전 동기화에서 실패한 본문도 여기서 다시 부른다.
+  // 실패는 출처 동기화 실패가 아니다. dry run은 비용이 드는 AI를 부르지 않는다.
+  let conditions: ConditionExtractionReport | null = null;
+  if (!options.dryRun) {
+    const targets = new Map<string, { productKey: string; textChecksum: string }>();
+    for (const product of composed.products) {
+      if (product.noticeTextChecksum === undefined) continue;
+      targets.set(`${product.productKey}:${product.noticeTextChecksum}`, {
+        productKey: product.productKey,
+        textChecksum: product.noticeTextChecksum,
+      });
+    }
+    conditions = await extractNoticeConditions([...targets.values()], {
+      store: prismaConditionExtractionStore(prisma),
+      extractor: options.conditionExtractor ?? null,
+      now,
+    });
+    const counts = conditions.counts;
+    log(
+      `공고 조건 추출(${CONDITION_MODEL}, ${CONDITION_PROMPT_VERSION}): 이미 읽음 ${counts.CACHED}건, 새로 읽음 ${counts.EXTRACTED}건, 실패 ${counts.FAILED}건, 키 없음 ${counts.NOT_CONFIGURED}건, 너무 김 ${counts.TOO_LONG}건, 본문 없음 ${counts.NO_TEXT}건 · 입력 ${conditions.inputTokens}토큰, 출력 ${conditions.outputTokens}토큰`,
+    );
+    for (const failure of conditions.failures.slice(0, 5)) log(`  - ${failure}`);
+  }
+
   return {
     catalogFile,
     catalogKey: composed.catalogKey,
@@ -440,5 +476,6 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
     automatedProductCount: keptAutomated.length,
     overriddenByManual,
     load,
+    conditions,
   };
 }
