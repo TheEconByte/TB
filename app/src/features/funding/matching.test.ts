@@ -679,6 +679,20 @@ describe('카탈로그 전체 맞춰 보기', () => {
     const list = matchCatalog(catalog, new Map(), NO_INPUT, { asOfDate: AS_OF });
     const keys = [...list.tabs.POLICY_FUND.products, ...list.tabs.SUPPORT_PROGRAM.products].map((p) => p.productKey);
     expect(keys).toEqual(['semas-ols-agency-abc']);
+    // 화면은 릴리스 상품 수와 보여 준 수의 차이를 운영자 숨김으로 밝힌다.
+    expect(list.hiddenCount).toBe(1);
+  });
+
+  it('운영자 지역 메모는 사람이 등록한 상품에서만 넘긴다', () => {
+    // 자동 상품의 지역 필드는 수집기의 추측이라 쓰지 않는다(ADR 0009 Context·§7). 그 메모도 보여 주지 않는다.
+    const manual = manualProduct({ region: { scope: 'SEOUL', districtCodes: [], note: '서울 소재 사업장' } });
+    const auto = autoProduct('BIZINFO', {
+      region: { scope: 'UNKNOWN', districtCodes: [], note: '기업마당 공고에서 대상 지역을 확인하지 못했습니다.' },
+    });
+    const list = matchCatalog(catalogOf([manual, auto]), new Map(), NO_INPUT, { asOfDate: AS_OF });
+    expect(list.hiddenCount).toBe(0);
+    expect(list.tabs.POLICY_FUND.products[0]?.operatorRegionNote).toBe('서울 소재 사업장');
+    expect(list.tabs.SUPPORT_PROGRAM.products[0]?.operatorRegionNote).toBeNull();
   });
 
   // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 피해 소상공인만 한정했다고 읽은 공고도 접어 둔

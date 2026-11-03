@@ -51,6 +51,9 @@ export type FundingMatchesRelease = {
 
 export type FundingMatchesResponse = FundingMatchList & { release: FundingMatchesRelease };
 
+// API 응답. 맞춰 본 입력을 함께 돌려준다(계획 조회면 서버가 정한 자치구까지 들어 있다).
+export type FundingMatchesWithProfile = FundingMatchesResponse & { profile: FundingMatchProfile };
+
 export type FundingMatchesOutcome = { kind: 'OK'; payload: FundingMatchesResponse } | { kind: 'CATALOG_UNAVAILABLE' };
 
 // 활성 카탈로그가 없으면 빈 결과가 아니라 CATALOG_UNAVAILABLE이다(AGENTS.md §3의 2번).

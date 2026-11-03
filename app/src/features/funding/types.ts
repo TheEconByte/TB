@@ -16,9 +16,10 @@ export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
   FUNDING_CATALOG_SCHEMA_VERSION,
 ];
 
-// A product whose reviewer is still unassigned is kept in the catalog but the
-// operator commands warn: a real person must own the next review before the
-// catalog drives anything user-facing.
+// 검수자가 아직 지정되지 않은 상품. 카탈로그에 남기고 운영자 명령이 주의로 알린다. 맞춰 보기 화면(ADR 0009 §4)은
+// 검수자·검수 기한을 그룹에 쓰지 않으므로 이 상품도 보여 준다. 사업 단계·지역은 공식 원문 근거가 있을 때만 운영자
+// 확인 값으로 쓰고, 나머지 조건은 다른 상품처럼 AI가 공고문에서 읽은 값으로 맞춰 본다(matching.ts).
+// 예전 판정(eligibility.ts)은 이 상품을 현재 후보로 두지 않았으며, 그 코드는 ADR 0009 6단계에서 지운다.
 export const REVIEWER_UNASSIGNED = 'UNASSIGNED';
 
 // funding:sync가 공식 출처에서 모은 상품의 검수자. 사람 대신 자동 규칙 버전을 적고,

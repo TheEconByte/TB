@@ -1138,7 +1138,7 @@ footer {
   font-size: 13px;
 }
 .status-counts.branch-counts {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 .status-counts.branch-counts .status-count {
@@ -1390,6 +1390,232 @@ footer {
     align-items: flex-start;
     flex-direction: row;
     flex-wrap: wrap;
+  }
+}
+
+/* 자금 공고 맞춰 보기 (ADR 0009 §4) */
+.funding-fields {
+  display: grid;
+  gap: 20px;
+}
+.target-groups {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.target-groups legend {
+  padding: 0;
+  margin-bottom: 7px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333d4b;
+}
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+}
+.funding-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.funding-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px 16px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-bottom: 4px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+}
+.funding-tab span {
+  font-size: 17px;
+  font-weight: 800;
+}
+.funding-tab small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.funding-tab.active {
+  border-color: var(--ink);
+  border-bottom-color: var(--primary);
+}
+.funding-tab:hover:not(.active) {
+  background: var(--surface);
+}
+.match-limit-note {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff8ec;
+  color: #8a4b08;
+  font-size: 13px;
+}
+.match-limit-note p {
+  margin: 0;
+}
+.match-limit-note p + p {
+  margin-top: 4px;
+}
+.status-count.count-matching {
+  border-left: 4px solid var(--primary);
+}
+.status-count.count-needs_check {
+  border-left: 4px solid #f2b630;
+}
+.status-count.count-not_matching {
+  border-left: 4px solid #e5483f;
+}
+.match-folded > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.match-folded > summary::-webkit-details-marker {
+  display: none;
+}
+.match-folded[open] > summary span {
+  visibility: hidden;
+}
+.candidate-status.status-matching {
+  background: var(--primary);
+  color: white;
+}
+.candidate-status.status-needs_check {
+  background: #fdf3d6;
+  color: #a16207;
+}
+.candidate-status.status-not_matching {
+  background: #ffe4e2;
+  color: #c4271b;
+}
+.match-holds {
+  margin-top: 14px;
+  padding: 12px 14px 12px 30px;
+  border-radius: 10px;
+  background: #fdf3d6;
+  color: #7a4d06;
+}
+.match-quote {
+  display: block;
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: #4e5968;
+  font-size: 12px;
+  font-weight: 400;
+  word-break: break-word;
+}
+.match-quote::before {
+  content: '“';
+}
+.match-quote::after {
+  content: '”';
+}
+.match-conditions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.match-condition {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid #f2b630;
+  border-radius: 10px;
+  min-width: 0;
+}
+.match-condition.condition-match {
+  border-left-color: #0f8a5f;
+}
+.match-condition.condition-mismatch {
+  border-left-color: #d92d20;
+}
+.match-condition-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+.match-condition-value {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.match-evidence,
+.match-reason {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.verdict-match {
+  color: #0f8a5f;
+}
+.verdict-mismatch {
+  color: #d92d20;
+}
+.verdict-check {
+  color: #a16207;
+}
+.match-limit {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.match-limit p {
+  margin: 0;
+}
+.match-limit p + p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.match-ai-notice {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4e5968;
+}
+.match-version {
+  margin-left: 10px;
+  color: var(--muted);
+  word-break: break-all;
+}
+@media (max-width: 850px) {
+  .match-conditions {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .funding-tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+  .funding-tab {
+    padding: 12px;
+  }
+  .funding-tab span {
+    font-size: 15px;
   }
 }
 

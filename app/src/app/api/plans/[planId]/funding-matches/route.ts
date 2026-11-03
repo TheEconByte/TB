@@ -9,10 +9,11 @@ import { consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 type Context = { params: Promise<{ planId: string }> };
 
-// 저장된 계획 조건으로 자금 후보를 판정한다. 인증·소유자·오류 패턴은
+// 저장된 계획 조건으로 자금 공고를 맞춰 본다(ADR 0009 §4). 인증·소유자·오류 패턴은
 // /api/plans/{id}/calculations와 같다: 미로그인 401, 없거나 타인 소유 404,
-// 저장된 조건이 없거나 스키마와 다르면 400, 활성 카탈로그가 없으면 503이다.
-// 판정 기준일은 서버의 한국 시간 오늘이며 요청 본문으로 바꿀 수 없다.
+// 저장된 조건이 없거나 모양이 다르면 400, 활성 카탈로그가 없으면 503이다.
+// 판정 기준일은 서버의 한국 시간 오늘이며 요청 본문으로 바꿀 수 없다. 자치구가 비어 있으면
+// 계획의 사업 프로필에서 서버가 정한다.
 export async function POST(request: Request, context: Context) {
   try {
     const blocked = guardMutationRequest(request);
@@ -25,7 +26,7 @@ export async function POST(request: Request, context: Context) {
     const prisma = getPrisma();
     const plan = await prisma.plan.findFirst({
       where: { id: planId, userId: user.id },
-      select: { id: true, revision: true, fundingProfileJson: true },
+      select: { id: true, revision: true, fundingProfileJson: true, businessProfileJson: true },
     });
     if (!plan) return apiError(404, 'NOT_FOUND', '계획을 찾을 수 없습니다.');
 
@@ -34,17 +35,22 @@ export async function POST(request: Request, context: Context) {
       return apiError(
         400,
         'INVALID_INPUT',
-        '이 계획에는 저장된 자금 조건이 없습니다. 사업 단계·자치구·업종·용도를 저장한 뒤 다시 조회해 주세요.',
+        '이 계획에는 저장된 자금 조건이 없습니다. 사업자등록 여부·자치구·나이·대상 한정 중 하나 이상을 저장한 뒤 다시 조회해 주세요.',
       );
     }
     if (outcome.kind === 'PROFILE_INVALID') {
-      return apiError(400, 'INVALID_INPUT', '저장된 자금 조건이 현재 스키마와 맞지 않습니다.', outcome.error.flatten());
+      return apiError(
+        400,
+        'INVALID_INPUT',
+        '저장된 자금 조건의 모양이 지금 앱과 맞지 않습니다. 자금 조건을 다시 입력해 저장해 주세요.',
+        outcome.error.flatten(),
+      );
     }
     if (outcome.kind === 'CATALOG_UNAVAILABLE') {
       return apiError(
         503,
         'CATALOG_UNAVAILABLE',
-        '활성 자금 카탈로그 릴리스가 없습니다. 운영자가 검수한 카탈로그를 적재해야 후보를 조회할 수 있습니다.',
+        '활성 자금 카탈로그 릴리스가 없습니다. 운영자가 카탈로그를 적재해야 공고를 맞춰 볼 수 있습니다.',
       );
     }
     return NextResponse.json(outcome.payload);
