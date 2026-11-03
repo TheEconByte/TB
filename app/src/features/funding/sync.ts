@@ -11,6 +11,7 @@ import {
   prismaConditionExtractionStore,
   type ConditionExtractionReport,
   type ConditionExtractor,
+  type ConditionTarget,
 } from './notice-extraction.ts';
 import { prismaNoticeTextStore, resolveNoticeText, type NoticeTextOutcome } from './notice-sync.ts';
 import { extractNoticeText } from './notice-text.ts';
@@ -447,11 +448,12 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
   // 실패는 출처 동기화 실패가 아니다. dry run은 비용이 드는 AI를 부르지 않는다.
   let conditions: ConditionExtractionReport | null = null;
   if (!options.dryRun) {
-    const targets = new Map<string, { productKey: string; textChecksum: string }>();
+    const targets = new Map<string, ConditionTarget>();
     for (const product of composed.products) {
       if (product.noticeTextChecksum === undefined) continue;
       targets.set(`${product.productKey}:${product.noticeTextChecksum}`, {
         productKey: product.productKey,
+        name: product.name,
         textChecksum: product.noticeTextChecksum,
       });
     }

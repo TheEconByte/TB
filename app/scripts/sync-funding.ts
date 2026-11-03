@@ -26,7 +26,7 @@ const SOURCE_ADAPTERS: readonly FundingSourceAdapter[] = [
 
 // 출력에 인증키가 남지 않게 가린다.
 const maskBizinfo = secretMasker(process.env.BIZINFO_API_KEY ?? '');
-const maskAnthropic = secretMasker(process.env.ANTHROPIC_API_KEY ?? '');
+const maskAnthropic = secretMasker(process.env.ANTHROPIC_API_KEY?.trim() ?? '');
 const mask = (text: string) => maskAnthropic(maskBizinfo(text));
 // 새 공고 이름은 이 수까지만 출력한다.
 const MAX_LISTED_NEW_PRODUCTS = 30;
@@ -145,7 +145,7 @@ async function main() {
     if (report.conditions !== null) {
       const counts = report.conditions.counts;
       console.log(
-        `공고 조건 추출: 이미 읽음 ${counts.CACHED}건 · 새로 읽음 ${counts.EXTRACTED}건 · 실패 ${counts.FAILED}건 · 키 없음 ${counts.NOT_CONFIGURED}건 · 너무 김 ${counts.TOO_LONG}건 · 입력 ${report.conditions.inputTokens}토큰 · 출력 ${report.conditions.outputTokens}토큰`,
+        `공고 조건 추출: 이미 읽음 ${counts.CACHED}건 · 새로 읽음 ${counts.EXTRACTED}건 · 실패 ${counts.FAILED}건 · 키 없음 ${counts.NOT_CONFIGURED}건 · 너무 김 ${counts.TOO_LONG}건 · 본문 없음 ${counts.NO_TEXT}건 · 입력 ${report.conditions.inputTokens}토큰 · 출력 ${report.conditions.outputTokens}토큰`,
       );
     }
     if (report.overriddenByManual.length > 0) {

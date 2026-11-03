@@ -564,7 +564,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     const notMentioned = { mentioned: false, value: null, quote: null };
     const output = {
       businessStage: notMentioned,
-      businessAge: { mentioned: true, value: { maxYears: 3 }, quote: '업력 3년 이내' },
+      businessAge: { mentioned: true, value: { min: null, max: 3, maxExclusive: false }, quote: '업력 3년 이내' },
       age: notMentioned,
       region: notMentioned,
       foodBusiness: notMentioned,
@@ -599,7 +599,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(retried.conditions?.counts).toMatchObject({ EXTRACTED: 1 });
     const [row] = await db().fundingConditionExtraction.findMany({ where: { productKey: 'test-sync-conditions' } });
     expect(row.fields).toMatchObject({
-      businessAge: { status: 'READ', value: { maxYears: 3 } },
+      businessAge: { status: 'READ', value: { min: null, max: 3, maxExclusive: false } },
       age: { status: 'NOT_MENTIONED' },
     });
 
