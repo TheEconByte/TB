@@ -55,6 +55,7 @@ function product(overrides: Partial<ProductMatch> = {}): ProductMatch {
     supportTypes: { status: 'NOT_MENTIONED' },
     limit: { publicLimitKrw: null, limitText: null },
     operatorRegionNote: null,
+    operatorRecord: null,
     ...overrides,
   };
 }

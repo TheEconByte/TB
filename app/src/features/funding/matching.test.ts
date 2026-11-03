@@ -695,6 +695,18 @@ describe('카탈로그 전체 맞춰 보기', () => {
     expect(list.tabs.SUPPORT_PROGRAM.products[0]?.operatorRegionNote).toBeNull();
   });
 
+  it('사람이 등록한 상품은 기록일과 다음 검토일을 넘기고, 자동 상품은 넘기지 않는다', () => {
+    // 사람 상품은 출처 최신성을 따지지 않으므로(맞아 보임 판단은 그대로) 언제 기록한 내용인지 화면에 보여 준다(#57 리뷰).
+    // 자동 상품은 출처의 마지막 성공 확인일(automation)을 보여 준다.
+    const manual = manualProduct({ observedAt: '2026-09-20', nextReviewAt: '2026-10-01' });
+    const list = matchCatalog(catalogOf([manual, autoProduct('BIZINFO')]), new Map(), NO_INPUT, { asOfDate: AS_OF });
+    expect(list.tabs.POLICY_FUND.products[0]?.operatorRecord).toEqual({
+      observedAt: '2026-09-20',
+      nextReviewAt: '2026-10-01',
+    });
+    expect(list.tabs.SUPPORT_PROGRAM.products[0]?.operatorRecord).toBeNull();
+  });
+
   // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 피해 소상공인만 한정했다고 읽은 공고도 접어 둔
   // 안 맞아 보임에 남는다. 잘못 읽혀도(예: 경영애로 자금) 사라지지 않는다.
   it('피해 소상공인만 한정한 공고는 숨기지 않고 안 맞아 보임에 둔다', () => {

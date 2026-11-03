@@ -360,7 +360,9 @@ function MatchCard({
           <dd>
             {match.automation
               ? `자동 수집 · 출처 ${match.automation.sourceLabel} · 마지막 확인 ${formatDate(match.automation.lastSucceededOn)}`
-              : '운영자 등록'}
+              : match.operatorRecord
+                ? `운영자 등록 · 기록일 ${formatDate(match.operatorRecord.observedAt)} · 다음 검토일 ${formatDate(match.operatorRecord.nextReviewAt)}`
+                : '운영자 등록'}
           </dd>
         </div>
         {aiPeriod.status === 'READ' && (

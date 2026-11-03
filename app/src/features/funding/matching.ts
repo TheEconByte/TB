@@ -118,6 +118,9 @@ export type ProductMatch = {
   limit: { publicLimitKrw: string | null; limitText: string | null };
   // 사람이 등록한 상품에 운영자가 적은 지역 메모. 자동 상품의 지역 필드는 수집기의 추측이라 null이다.
   operatorRegionNote: string | null;
+  // 사람이 등록한 상품의 기록일과 다음 검토일. 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 보여 준다.
+  // 그룹에는 쓰지 않는다(검수자·검수 기한은 그룹에 쓰지 않는다). 자동 상품은 null이다.
+  operatorRecord: { observedAt: string; nextReviewAt: string | null } | null;
 };
 
 export type FundingMatchList = {
@@ -462,6 +465,7 @@ export function matchProduct(
     supportTypes: readings.supportTypes,
     limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
     operatorRegionNote: auto ? null : product.region.note,
+    operatorRecord: auto ? null : { observedAt: product.observedAt, nextReviewAt: product.nextReviewAt },
   };
 }
 
