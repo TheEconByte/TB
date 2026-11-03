@@ -1817,7 +1817,7 @@ footer {
   margin-top: 18px;
 }
 .reference-summary small {
-  color: #dbe6ff;
+  color: var(--muted);
   font-size: 12px;
 }
 .reference-detail-grid {
@@ -1887,7 +1887,7 @@ footer {
 .score-panel {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-top: 4px solid var(--green);
+  border-top: 4px solid var(--primary);
   border-radius: 14px;
   padding: 24px;
   margin-top: 18px;
@@ -1919,8 +1919,8 @@ footer {
   margin-left: 10px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: var(--sage);
-  color: var(--green);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
   font-size: 22px;
   align-self: center;
 }
@@ -1990,7 +1990,7 @@ footer {
   bottom: 0;
 }
 .factor-bar.raises {
-  background: var(--green);
+  background: var(--primary);
   border-radius: 0 6px 6px 0;
 }
 .factor-bar.lowers {
@@ -2019,7 +2019,7 @@ footer {
   border-radius: 4px 4px 0 0;
 }
 .histogram-bin.current span {
-  background: var(--green);
+  background: var(--primary);
 }
 .histogram-bin em {
   position: absolute;
@@ -2028,7 +2028,7 @@ footer {
   font-style: normal;
   font-size: 12px;
   font-weight: 800;
-  color: var(--green);
+  color: var(--primary-strong);
 }
 .histogram-bin small {
   color: var(--muted);
@@ -2062,7 +2062,7 @@ footer {
   margin-top: 16px;
   padding: 18px;
   border-radius: 10px;
-  background: var(--sage);
+  background: var(--primary-soft);
 }
 .score-unavailable strong {
   font-size: 18px;
@@ -2086,8 +2086,8 @@ footer {
   margin: 16px 0 6px;
 }
 .market-source {
-  background: var(--sage);
-  border-left: 4px solid var(--green);
+  background: var(--primary-soft);
+  border-left: 4px solid var(--primary);
   border-radius: 10px;
   padding: 14px 16px;
   margin: 0 0 16px;
@@ -2101,13 +2101,13 @@ footer {
   margin-top: 8px;
   padding: 6px 10px;
   background: transparent;
-  color: var(--green);
+  color: var(--primary-strong);
   border: 1px solid #b8c5bc;
 }
 .funding-grade {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--green);
+  border-left: 4px solid var(--primary);
   border-radius: 12px;
   padding: 14px 18px;
   margin-top: 18px;
