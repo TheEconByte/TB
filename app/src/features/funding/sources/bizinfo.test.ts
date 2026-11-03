@@ -9,6 +9,8 @@ import {
   BIZINFO_SEARCH_COUNT,
   bizinfoRegion,
   createBizinfoAdapter,
+  bizinfoRobotsDisallowFiles,
+  createBizinfoFileDownloader,
   mapBizinfoItems,
   parseBizinfoPeriod,
 } from './bizinfo.ts';
@@ -421,6 +423,255 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
     );
     expect(products[0].name).toBe('[서울] 소상공인 & 예비창업자 ‘상생’ 지원');
     expect(products[0].officialUrl.startsWith('https://www.bizinfo.go.kr/')).toBe(true);
+  });
+});
+
+// ADR 0009 §2: 사업개요와 본문출력파일·첨부를 본문 계획으로 넘긴다. 주소 형식은 기업마당 API 명세의 예시다.
+describe('기업마당 공고의 본문 계획', () => {
+  const PRINT = 'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_000000000613694&fileSn=1';
+  const ATTACH = 'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_000000000613641&fileSn=0';
+
+  it('holds the API summary, the print file and the attachment', () => {
+    const [product] = mapBizinfoItems(
+      [
+        item({
+          bsnsSumryCn: '<p>서울 소재 소상공인의&nbsp;디지털 전환을 지원합니다.</p><p>대표자 만 39세 이하</p>',
+          printFlpthNm: PRINT,
+          printFileNm: '2026년 디지털 전환 공고.pdf',
+          flpthNm: ATTACH,
+          fileNm: '신청서 양식.hwp',
+        }),
+      ],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice).toEqual({
+      sourceUrl: 'https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_000000000112345',
+      inline: [
+        {
+          kind: 'API_SUMMARY',
+          name: '기업마당 사업개요',
+          url: 'https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_000000000112345',
+          text: '서울 소재 소상공인의 디지털 전환을 지원합니다.\n대표자 만 39세 이하',
+        },
+      ],
+      files: [
+        { kind: 'PRINT_FILE', name: '2026년 디지털 전환 공고.pdf', url: PRINT },
+        { kind: 'ATTACHMENT', name: '신청서 양식.hwp', url: ATTACH },
+      ],
+    });
+  });
+
+  // 2026-11-03 실제 응답: 여러 파일은 '@'로 잇고, 주소마다 호출 때마다 새로 발급되는 downloadToken이 붙는다.
+  it('splits files joined with @ and keeps the download token out of the stored address', () => {
+    const token = (n: number) =>
+      `${ATTACH.replace('fileSn=0', `fileSn=${n}`)}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.sig${n}`;
+    const [product] = mapBizinfoItems(
+      [
+        item({
+          printFlpthNm: `${PRINT}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.print`,
+          printFileNm: '공고문.pdf',
+          flpthNm: `${token(1)}@${token(2)}`,
+          fileNm: '공고문.hwpx@모집포스터.pdf',
+        }),
+      ],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice?.files).toEqual([
+      {
+        kind: 'PRINT_FILE',
+        name: '공고문.pdf',
+        url: PRINT,
+        downloadUrl: `${PRINT}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.print`,
+      },
+      { kind: 'ATTACHMENT', name: '공고문.hwpx', url: ATTACH.replace('fileSn=0', 'fileSn=1'), downloadUrl: token(1) },
+      {
+        kind: 'ATTACHMENT',
+        name: '모집포스터.pdf',
+        url: ATTACH.replace('fileSn=0', 'fileSn=2'),
+        downloadUrl: token(2),
+      },
+    ]);
+  });
+
+  it('does not pair names with the wrong files when the counts differ', () => {
+    const [product] = mapBizinfoItems(
+      [item({ printFlpthNm: '', printFileNm: '', flpthNm: `${ATTACH}@${PRINT}`, fileNm: '하나뿐인 이름.pdf' })],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    // 이름을 믿을 수 없으면 형식을 알 수 없는 파일로 남긴다(받지 않는다).
+    expect(product.notice?.files.map((file) => file.name)).toEqual(['', '']);
+  });
+
+  // 본문의 부등호(&lt; &gt;)를 태그로 보고 지우면 "연매출 < 10억" 같은 조건이 사라진다.
+  it('keeps escaped comparison signs in a raw HTML summary', () => {
+    const [product] = mapBizinfoItems([item({ bsnsSumryCn: '<p>연매출 &lt; 10억, 업력 &gt; 3년</p>' })], {
+      asOfDate: AS_OF,
+      responseChecksum: CHECKSUM,
+    }).products;
+    expect(product.notice?.inline[0].text).toBe('연매출 < 10억, 업력 > 3년');
+  });
+
+  it('reads a summary whose HTML arrives escaped, and does not fail on broken entities', () => {
+    const [product] = mapBizinfoItems(
+      [item({ bsnsSumryCn: '&lt;p&gt;소상공인 지원&lt;/p&gt;&lt;p&gt;대표자 &amp; 공동대표&lt;/p&gt;&#1114112;&#0;' })],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    const text = product.notice?.inline[0].text ?? '';
+    expect(text).toContain('소상공인 지원');
+    expect(text).toContain('대표자 & 공동대표');
+    expect(text).not.toMatch(/<\/?p>/);
+  });
+
+  // 파일 받기는 www.bizinfo.go.kr의 공고 파일 경로만 요청한다. 계획에 다른 주소를 넣으면 날마다 실패로 남아
+  // 본문을 다시 쓰지 못한다.
+  it('plans only Bizinfo file paths, and reads bizinfo.go.kr without www as the same host', () => {
+    const [product] = mapBizinfoItems(
+      [
+        item({
+          printFlpthNm: 'https://bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_1&fileSn=0',
+          printFileNm: '공고문.pdf',
+          flpthNm: 'https://www.bizinfo.go.kr/web/other.do?x=1@https://www.mss.go.kr/file.pdf',
+          fileNm: '다른 페이지.pdf@다른 기관.pdf',
+        }),
+      ],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice?.files.map((file) => file.url)).toEqual([
+      'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_1&fileSn=0',
+    ]);
+  });
+
+  it('leaves out file links that are not official Bizinfo addresses', () => {
+    const [product] = mapBizinfoItems(
+      [item({ printFlpthNm: 'https://example.com/a.pdf', printFileNm: 'a.pdf', flpthNm: '', fileNm: '' })],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice?.files).toEqual([]);
+  });
+});
+
+// ADR 0009 §2와 ADR 0006 3절의 수집 규칙: robots.txt 확인, 요청 간격, 403·429에서 멈춤, 운영자 연락처.
+describe('기업마당 공고 파일 받기', () => {
+  const FILE = 'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_000000000700001&fileSn=0';
+  const FILE2 = 'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_000000000700001&fileSn=1';
+  type Reply = { status: number; body?: string } | Error;
+
+  function files(routes: Record<string, Reply | Reply[]>, contact: string | undefined = 'ops@example.com') {
+    const calls: Array<{ url: string; userAgent: string | undefined; redirect: string | undefined }> = [];
+    const sleeps: number[] = [];
+    const counts = new Map<string, number>();
+    const download = createBizinfoFileDownloader({
+      contact,
+      retryDelayMs: 0,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      fetchImpl: async (url, init) => {
+        calls.push({ url, userAgent: init.headers['User-Agent'], redirect: init.redirect });
+        const route = routes[url] ?? { status: 404 };
+        const index = counts.get(url) ?? 0;
+        counts.set(url, index + 1);
+        const reply = Array.isArray(route) ? route[Math.min(index, route.length - 1)] : route;
+        if (reply instanceof Error) throw reply;
+        const bytes = new TextEncoder().encode(reply.body ?? '');
+        return { status: reply.status, arrayBuffer: async () => bytes.buffer.slice(0) as ArrayBuffer };
+      },
+    });
+    return { download, calls, sleeps };
+  }
+
+  it('checks robots.txt first, names the operator and waits between requests', async () => {
+    const { download, calls, sleeps } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 200, body: 'User-agent: *\nDisallow: /admin/\n' },
+      [FILE]: { status: 200, body: '%PDF-1.7 공고문' },
+      [FILE2]: { status: 200, body: '%PDF-1.7 별표' },
+    });
+    expect(await download(FILE)).toMatchObject({ ok: true });
+    expect(await download(FILE2)).toMatchObject({ ok: true });
+    expect(calls.map((call) => call.url)).toEqual(['https://www.bizinfo.go.kr/robots.txt', FILE, FILE2]);
+    expect(calls.every((call) => call.userAgent?.includes('ops@example.com'))).toBe(true);
+    // 첫 요청 뒤의 요청마다 1초 이상 쉰다.
+    expect(sleeps).toHaveLength(2);
+    expect(sleeps.every((ms) => ms >= 1000)).toBe(true);
+  });
+
+  it('does not download files that robots.txt disallows', async () => {
+    const { download, calls } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 200, body: 'User-agent: *\nDisallow: /cmm/fms/\n' },
+    });
+    // 다음 동기화에서 다시 확인하도록 일시 실패로 돌려준다. 직전 본문은 그대로 쓴다.
+    expect(await download(FILE)).toMatchObject({
+      ok: false,
+      transient: true,
+      message: expect.stringContaining('robots.txt'),
+    });
+    expect(calls.map((call) => call.url)).toEqual(['https://www.bizinfo.go.kr/robots.txt']);
+  });
+
+  it.each([
+    ['a wildcard rule', 'User-agent: *\nDisallow: /*.do\n', true],
+    ['a rule for the whole site', 'User-agent: *\nDisallow: /\n', true],
+    ['a longer Allow rule', 'User-agent: *\nDisallow: /cmm/\nAllow: /cmm/fms/\n', false],
+    ['a rule only for another robot', 'User-agent: Googlebot\nDisallow: /\n', false],
+    ['an end-anchored rule that does not match', 'User-agent: *\nDisallow: /cmm/fms/$\n', false],
+  ])('reads robots.txt with %s', (_, robots, blocked) => {
+    expect(bizinfoRobotsDisallowFiles(robots)).toBe(blocked);
+  });
+
+  // 다른 경로로 넘어가는 응답을 따라가지 않는다. 그 경로가 robots.txt에 막혀 있을 수 있다.
+  it('does not follow redirects', async () => {
+    const { download, calls } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 404 },
+      [FILE]: { status: 302 },
+    });
+    expect(await download(FILE)).toMatchObject({ ok: false, transient: false });
+    // robots.txt는 넘김을 따라간다(RFC 9309 2.3.1.2). 공고 파일은 따라가지 않는다.
+    expect(calls.map((call) => call.redirect)).toEqual(['follow', 'manual']);
+  });
+
+  it('stops requesting after 403 or 429', async () => {
+    const { download, calls } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 404 },
+      [FILE]: { status: 429 },
+      [FILE2]: { status: 200, body: '%PDF-1.7' },
+    });
+    expect(await download(FILE)).toMatchObject({ ok: false, transient: true });
+    expect(await download(FILE2)).toMatchObject({ ok: false, transient: true });
+    expect(calls.map((call) => call.url)).toEqual(['https://www.bizinfo.go.kr/robots.txt', FILE]);
+  });
+
+  it('treats a missing file as permanent and retries server errors before giving up for this sync', async () => {
+    const { download, calls } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 404 },
+      [FILE]: { status: 404 },
+      [FILE2]: [{ status: 503 }, new TypeError('fetch failed'), { status: 502 }],
+    });
+    expect(await download(FILE)).toMatchObject({ ok: false, transient: false });
+    expect(await download(FILE2)).toMatchObject({ ok: false, transient: true });
+    expect(calls.filter((call) => call.url === FILE2)).toHaveLength(3);
+  });
+
+  it('only requests Bizinfo file paths', async () => {
+    const { download, calls } = files({ 'https://www.bizinfo.go.kr/robots.txt': { status: 404 } });
+    expect(await download('https://example.com/cmm/fms/getImageFile.do?atchFileId=X')).toMatchObject({
+      ok: false,
+      transient: false,
+    });
+    expect(await download('https://www.bizinfo.go.kr/web/lay1/bbs/view.do')).toMatchObject({
+      ok: false,
+      transient: false,
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('does not download without an operator contact', async () => {
+    const { download, calls } = files({}, '');
+    expect(await download(FILE)).toMatchObject({
+      ok: false,
+      transient: true,
+      message: expect.stringContaining('FUNDING_SYNC_CONTACT'),
+    });
+    expect(calls).toEqual([]);
   });
 });
 
