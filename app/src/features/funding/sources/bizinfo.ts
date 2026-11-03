@@ -299,10 +299,13 @@ export function bizinfoNoticeFiles(
 
 // 사업개요의 HTML 태그를 줄바꿈으로 바꾸고 엔티티를 푼다. 줄 구조는 남긴다.
 function summaryText(raw: string): string {
-  // 사업개요는 HTML이 그대로 오기도 하고 엔티티로 감싸여 오기도 한다. 엔티티를 푼 뒤에 태그를 한 번 더 지운다.
-  const stripTags = (value: string) =>
-    value.replace(/<\s*br\s*\/?>|<\/\s*(p|div|li|tr)\s*>/gi, '\n').replace(/<[^>]*>/g, ' ');
-  return stripTags(stripTags(raw).split('\n').map(cleanText).join('\n'))
+  // 사업개요는 HTML이 그대로 오기도 하고 엔티티로 감싸여 오기도 한다. 엔티티로 감싼 태그(&lt;p&gt; 등)만 태그로
+  // 되돌리고, 엔티티는 한 번만 푼다. 모두 푼 뒤에 태그를 지우면 본문의 부등호(&lt; 10억 &gt;)까지 태그로 지워진다.
+  const escapedTag = /&lt;(\/?[a-z][a-z0-9]*(?:\s(?:[^&<>]|&quot;|&#39;|&amp;)*)?\/?)&gt;/gi;
+  return raw
+    .replace(escapedTag, '<$1>')
+    .replace(/<\s*br\s*\/?>|<\/\s*(p|div|li|tr)\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
     .split('\n')
     .map(cleanText)
     .filter((line) => line !== '')
@@ -566,7 +569,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
 
 export type BizinfoFileFetch = (
   url: string,
-  init: { headers: Record<string, string>; redirect: 'manual'; signal?: AbortSignal },
+  init: { headers: Record<string, string>; redirect: 'manual' | 'follow'; signal?: AbortSignal },
 ) => Promise<{ status: number; arrayBuffer(): Promise<ArrayBuffer> }>;
 
 export type BizinfoFileDownloaderOptions = {
@@ -638,20 +641,17 @@ export function createBizinfoFileDownloader(options: BizinfoFileDownloaderOption
   // 이번 동기화에서 더 받지 않는 이유. null이면 받는다.
   let stopped: string | null = null;
 
-  async function send(url: string) {
+  // 공고 파일은 다른 경로로 넘기는 응답을 따라가지 않는다. 그 경로는 robots.txt와 경로 검사를 거치지 않았다.
+  // robots.txt는 넘김을 따라간다(RFC 9309 2.3.1.2).
+  async function send(url: string, redirect: 'manual' | 'follow') {
     if (requestCount > 0) await sleep(interval);
     requestCount += 1;
-    // 다른 경로로 넘기는 응답은 따라가지 않는다. 그 경로는 robots.txt와 경로 검사를 거치지 않았다.
-    return fetchImpl(url, {
-      headers: { 'User-Agent': userAgent },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    return fetchImpl(url, { headers: { 'User-Agent': userAgent }, redirect, signal: AbortSignal.timeout(timeoutMs) });
   }
 
   async function checkRobots(): Promise<string | null> {
     try {
-      const response = await send(BIZINFO_ROBOTS_URL);
+      const response = await send(BIZINFO_ROBOTS_URL, 'follow');
       if (response.status === 404) return null;
       if (response.status !== 200) return `robots.txt를 확인하지 못했습니다(HTTP ${response.status}).`;
       const robots = new TextDecoder().decode(await response.arrayBuffer());
@@ -694,7 +694,7 @@ export function createBizinfoFileDownloader(options: BizinfoFileDownloaderOption
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       if (attempt > 0 && retryDelayMs > interval) await sleep(retryDelayMs * 2 ** (attempt - 1) - interval);
       try {
-        const response = await send(url.toString());
+        const response = await send(url.toString(), 'manual');
         if (response.status === 403 || response.status === 429) {
           // 차단은 우회하지 않는다. 이번 동기화에서는 더 요청하지 않는다(ADR 0006 3절).
           stopped = `기업마당이 파일 요청을 거부했습니다(HTTP ${response.status}). 이번 동기화에서는 파일을 더 받지 않습니다.`;

@@ -502,6 +502,15 @@ describe('기업마당 공고의 본문 계획', () => {
     expect(product.notice?.files.map((file) => file.name)).toEqual(['', '']);
   });
 
+  // 본문의 부등호(&lt; &gt;)를 태그로 보고 지우면 "연매출 < 10억" 같은 조건이 사라진다.
+  it('keeps escaped comparison signs in a raw HTML summary', () => {
+    const [product] = mapBizinfoItems([item({ bsnsSumryCn: '<p>연매출 &lt; 10억, 업력 &gt; 3년</p>' })], {
+      asOfDate: AS_OF,
+      responseChecksum: CHECKSUM,
+    }).products;
+    expect(product.notice?.inline[0].text).toBe('연매출 < 10억, 업력 > 3년');
+  });
+
   it('reads a summary whose HTML arrives escaped, and does not fail on broken entities', () => {
     const [product] = mapBizinfoItems(
       [item({ bsnsSumryCn: '&lt;p&gt;소상공인 지원&lt;/p&gt;&lt;p&gt;대표자 &amp; 공동대표&lt;/p&gt;&#1114112;&#0;' })],
@@ -616,7 +625,8 @@ describe('기업마당 공고 파일 받기', () => {
       [FILE]: { status: 302 },
     });
     expect(await download(FILE)).toMatchObject({ ok: false, transient: false });
-    expect(calls.map((call) => call.redirect)).toEqual(['manual', 'manual']);
+    // robots.txt는 넘김을 따라간다(RFC 9309 2.3.1.2). 공고 파일은 따라가지 않는다.
+    expect(calls.map((call) => call.redirect)).toEqual(['follow', 'manual']);
   });
 
   it('stops requesting after 403 or 429', async () => {
