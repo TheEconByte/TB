@@ -172,6 +172,25 @@ describe('buildNoticeText', () => {
     expect(result).toEqual({ status: 'INCOMPLETE', reason: expect.stringContaining('HTTP 503') });
   });
 
+  it('records a response that is not the named file type as a type mismatch', async () => {
+    const result = await buildNoticeText(plan([{ kind: 'ATTACHMENT', name: '공고문.pdf', url: fileUrl(1) }]), {
+      download: downloads({ [fileUrl(1)]: new TextEncoder().encode('<html>오류</html>') }),
+      extract: fakeExtract,
+    });
+    if (result.status !== 'COMPLETE') throw new Error(result.status);
+    expect(result.documents[0].status).toBe('TYPE_MISMATCH');
+  });
+
+  // documents는 jsonb라 U+0000을 받지 않는다. 파일 이름과 오류 문장도 정리한다.
+  it('removes control characters from document names and messages', async () => {
+    const result = await buildNoticeText(plan([{ kind: 'ATTACHMENT', name: '공고\u0000문.pdf', url: fileUrl(1) }]), {
+      download: async () => ({ ok: false, transient: false, message: '오류\u0000' }),
+      extract: fakeExtract,
+    });
+    if (result.status !== 'COMPLETE') throw new Error(result.status);
+    expect(result.documents[0]).toMatchObject({ name: '공고문.pdf', message: '오류' });
+  });
+
   it('gives the same text and checksum for the same documents', async () => {
     const files = { [fileUrl(1)]: pdf('본문') };
     const options = { download: downloads(files), extract: fakeExtract };

@@ -92,6 +92,39 @@ describe('resolveNoticeText', () => {
     expect(second).toEqual({ outcome: 'REUSED', textChecksum: first.textChecksum });
   });
 
+  // 받은 응답이 파일이 아니었거나(만료된 토큰의 오류 페이지 등) 받지 못한 파일이 있는 본문은 확정된 본문이 아니다.
+  // 그대로 다시 쓰면 그 파일이 영영 빠진다.
+  it.each([
+    [
+      'an error page instead of the file',
+      async () => ({ ok: true as const, bytes: new TextEncoder().encode('<html>만료</html>') }),
+    ],
+    ['a missing file', async () => ({ ok: false as const, transient: false, message: 'HTTP 404' })],
+  ])('reads the notice again the next day when the stored text lacks %s', async (_, failing) => {
+    const store = memoryStore();
+    const withAttachment: NoticePlan = {
+      ...plan,
+      files: [...plan.files, { kind: 'ATTACHMENT', name: '별표.pdf', url: `${FILE_URL}2` }],
+    };
+    const first = await resolveNoticeText(
+      { productKey: 'bizinfo-pbln-test', plan: withAttachment, previousChecksum: null },
+      {
+        store,
+        download: async (url) => (url === FILE_URL ? { ok: true, bytes: pdfBytes } : failing()),
+        extract,
+        now: () => NOW,
+      },
+    );
+    expect(first.outcome).toBe('STORED');
+    const download = okDownload();
+    const second = await resolveNoticeText(
+      { productKey: 'bizinfo-pbln-test', plan: withAttachment, previousChecksum: first.textChecksum },
+      { store, download, extract, now: () => NOW },
+    );
+    expect(download).toHaveBeenCalledTimes(2);
+    expect(second.outcome).toBe('STORED');
+  });
+
   it('reads the notice again when a document was added or the summary changed', async () => {
     const store = memoryStore();
     const first = await resolveNoticeText(

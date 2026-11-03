@@ -9,6 +9,7 @@ import {
   BIZINFO_SEARCH_COUNT,
   bizinfoRegion,
   createBizinfoAdapter,
+  bizinfoRobotsDisallowFiles,
   createBizinfoFileDownloader,
   mapBizinfoItems,
   parseBizinfoPeriod,
@@ -501,6 +502,36 @@ describe('기업마당 공고의 본문 계획', () => {
     expect(product.notice?.files.map((file) => file.name)).toEqual(['', '']);
   });
 
+  it('reads a summary whose HTML arrives escaped, and does not fail on broken entities', () => {
+    const [product] = mapBizinfoItems(
+      [item({ bsnsSumryCn: '&lt;p&gt;소상공인 지원&lt;/p&gt;&lt;p&gt;대표자 &amp; 공동대표&lt;/p&gt;&#1114112;&#0;' })],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    const text = product.notice?.inline[0].text ?? '';
+    expect(text).toContain('소상공인 지원');
+    expect(text).toContain('대표자 & 공동대표');
+    expect(text).not.toMatch(/<\/?p>/);
+  });
+
+  // 파일 받기는 www.bizinfo.go.kr의 공고 파일 경로만 요청한다. 계획에 다른 주소를 넣으면 날마다 실패로 남아
+  // 본문을 다시 쓰지 못한다.
+  it('plans only Bizinfo file paths, and reads bizinfo.go.kr without www as the same host', () => {
+    const [product] = mapBizinfoItems(
+      [
+        item({
+          printFlpthNm: 'https://bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_1&fileSn=0',
+          printFileNm: '공고문.pdf',
+          flpthNm: 'https://www.bizinfo.go.kr/web/other.do?x=1@https://www.mss.go.kr/file.pdf',
+          fileNm: '다른 페이지.pdf@다른 기관.pdf',
+        }),
+      ],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice?.files.map((file) => file.url)).toEqual([
+      'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_1&fileSn=0',
+    ]);
+  });
+
   it('leaves out file links that are not official Bizinfo addresses', () => {
     const [product] = mapBizinfoItems(
       [item({ printFlpthNm: 'https://example.com/a.pdf', printFileNm: 'a.pdf', flpthNm: '', fileNm: '' })],
@@ -517,7 +548,7 @@ describe('기업마당 공고 파일 받기', () => {
   type Reply = { status: number; body?: string } | Error;
 
   function files(routes: Record<string, Reply | Reply[]>, contact: string | undefined = 'ops@example.com') {
-    const calls: Array<{ url: string; userAgent: string | undefined }> = [];
+    const calls: Array<{ url: string; userAgent: string | undefined; redirect: string | undefined }> = [];
     const sleeps: number[] = [];
     const counts = new Map<string, number>();
     const download = createBizinfoFileDownloader({
@@ -527,7 +558,7 @@ describe('기업마당 공고 파일 받기', () => {
         sleeps.push(ms);
       },
       fetchImpl: async (url, init) => {
-        calls.push({ url, userAgent: init.headers['User-Agent'] });
+        calls.push({ url, userAgent: init.headers['User-Agent'], redirect: init.redirect });
         const route = routes[url] ?? { status: 404 };
         const index = counts.get(url) ?? 0;
         counts.set(url, index + 1);
@@ -566,6 +597,26 @@ describe('기업마당 공고 파일 받기', () => {
       message: expect.stringContaining('robots.txt'),
     });
     expect(calls.map((call) => call.url)).toEqual(['https://www.bizinfo.go.kr/robots.txt']);
+  });
+
+  it.each([
+    ['a wildcard rule', 'User-agent: *\nDisallow: /*.do\n', true],
+    ['a rule for the whole site', 'User-agent: *\nDisallow: /\n', true],
+    ['a longer Allow rule', 'User-agent: *\nDisallow: /cmm/\nAllow: /cmm/fms/\n', false],
+    ['a rule only for another robot', 'User-agent: Googlebot\nDisallow: /\n', false],
+    ['an end-anchored rule that does not match', 'User-agent: *\nDisallow: /cmm/fms/$\n', false],
+  ])('reads robots.txt with %s', (_, robots, blocked) => {
+    expect(bizinfoRobotsDisallowFiles(robots)).toBe(blocked);
+  });
+
+  // 다른 경로로 넘어가는 응답을 따라가지 않는다. 그 경로가 robots.txt에 막혀 있을 수 있다.
+  it('does not follow redirects', async () => {
+    const { download, calls } = files({
+      'https://www.bizinfo.go.kr/robots.txt': { status: 404 },
+      [FILE]: { status: 302 },
+    });
+    expect(await download(FILE)).toMatchObject({ ok: false, transient: false });
+    expect(calls.map((call) => call.redirect)).toEqual(['manual', 'manual']);
   });
 
   it('stops requesting after 403 or 429', async () => {

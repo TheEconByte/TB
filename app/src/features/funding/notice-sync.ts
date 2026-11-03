@@ -3,6 +3,7 @@ import { canonicalJson } from './canonical.ts';
 import { sha256Hex } from '../../lib/checksum.ts';
 import {
   buildNoticeText,
+  isSettledNoticeText,
   normalizeNoticeText,
   type NoticeDocumentRecord,
   type NoticeDownload,
@@ -67,7 +68,12 @@ export async function resolveNoticeText(
   if (previousChecksum !== null) {
     const previous = await deps.store.find(productKey, previousChecksum);
     // 같은 주소의 파일이 바뀌는 경우는 보지 못한다. 기업마당 변경공고는 새 파일 식별자로 올라온다.
-    if (previous !== null && storedSignature(previous.documents) === planSignature(plan)) {
+    // 받지 못한 파일이 있던 본문은 다시 쓰지 않고 새로 읽는다.
+    if (
+      previous !== null &&
+      isSettledNoticeText(previous.documents) &&
+      storedSignature(previous.documents) === planSignature(plan)
+    ) {
       return { outcome: 'REUSED', textChecksum: previousChecksum };
     }
   }

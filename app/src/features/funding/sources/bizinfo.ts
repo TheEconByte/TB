@@ -121,9 +121,11 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 function cleanText(value: string): string {
   return value
     .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-      if (entity.startsWith('#x') || entity.startsWith('#X'))
-        return String.fromCodePoint(parseInt(entity.slice(2), 16));
-      if (entity.startsWith('#')) return String.fromCodePoint(Number(entity.slice(1)));
+      if (entity.startsWith('#')) {
+        const code = entity[1] === 'x' || entity[1] === 'X' ? parseInt(entity.slice(2), 16) : Number(entity.slice(1));
+        // 유니코드 범위 밖이나 NUL은 풀지 않고 지운다. 잘못된 엔티티 하나로 출처 전체가 실패하지 않게 한다.
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+      }
       return ENTITIES[entity.toLowerCase()] ?? match;
     })
     .replace(/\s+/g, ' ')
@@ -250,6 +252,16 @@ function splitFileField(value: string): string[] {
     .filter((part) => part !== '');
 }
 
+// 파일 받기가 요청하는 주소(https www.bizinfo.go.kr의 공고 파일 경로)만 계획에 넣는다. www 없는 주소는 같은
+// 곳으로 읽는다. 다른 주소를 넣으면 받지 못한 파일로 남아 그 공고의 본문을 날마다 새로 읽게 된다.
+function bizinfoFileUrl(raw: string): string | null {
+  const official = noticeUrl(raw);
+  if (official === null) return null;
+  const url = new URL(official);
+  if (url.hostname === 'bizinfo.go.kr') url.hostname = 'www.bizinfo.go.kr';
+  return url.hostname === 'www.bizinfo.go.kr' && url.pathname === BIZINFO_FILE_PATH ? url.toString() : null;
+}
+
 // 파일 주소에는 API 호출 때마다 새로 발급되는 downloadToken이 붙는다. 파일을 알아보고 기록할 때는 뺀다.
 function withoutDownloadToken(url: string): string {
   const parsed = new URL(url);
@@ -271,7 +283,7 @@ export function bizinfoNoticeFiles(
     // 개수가 다르면 어느 이름이 어느 파일인지 알 수 없다. 이름 없이 남겨 형식을 알 수 없는 파일로 기록한다.
     const paired = paths.length === names.length;
     for (const [index, path] of paths.entries()) {
-      const downloadUrl = noticeUrl(path);
+      const downloadUrl = bizinfoFileUrl(path);
       if (downloadUrl === null) continue;
       const url = withoutDownloadToken(downloadUrl);
       files.push({
@@ -287,9 +299,10 @@ export function bizinfoNoticeFiles(
 
 // 사업개요의 HTML 태그를 줄바꿈으로 바꾸고 엔티티를 푼다. 줄 구조는 남긴다.
 function summaryText(raw: string): string {
-  return raw
-    .replace(/<\s*br\s*\/?>|<\/\s*(p|div|li|tr)\s*>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
+  // 사업개요는 HTML이 그대로 오기도 하고 엔티티로 감싸여 오기도 한다. 엔티티를 푼 뒤에 태그를 한 번 더 지운다.
+  const stripTags = (value: string) =>
+    value.replace(/<\s*br\s*\/?>|<\/\s*(p|div|li|tr)\s*>/gi, '\n').replace(/<[^>]*>/g, ' ');
+  return stripTags(stripTags(raw).split('\n').map(cleanText).join('\n'))
     .split('\n')
     .map(cleanText)
     .filter((line) => line !== '')
@@ -553,7 +566,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
 
 export type BizinfoFileFetch = (
   url: string,
-  init: { headers: Record<string, string>; signal?: AbortSignal },
+  init: { headers: Record<string, string>; redirect: 'manual'; signal?: AbortSignal },
 ) => Promise<{ status: number; arrayBuffer(): Promise<ArrayBuffer> }>;
 
 export type BizinfoFileDownloaderOptions = {
@@ -574,9 +587,13 @@ const BIZINFO_FILE_PATH = '/cmm/fms/getImageFile.do';
 const MIN_FILE_REQUEST_INTERVAL_MS = 1000;
 
 // robots.txt에서 모든 로봇(User-agent: *)에 적용되는 Disallow가 파일 경로를 막는지 본다.
+// 규칙은 RFC 9309를 따른다: `*`는 아무 글자, 끝의 `$`는 경로 끝이고, 가장 길게 맞는 규칙이 이기며
+// 길이가 같으면 Allow가 이긴다. 파일 주소는 경로 뒤에 atchFileId 질의가 붙는 모양으로 본다.
 export function bizinfoRobotsDisallowFiles(robots: string): boolean {
+  const path = `${BIZINFO_FILE_PATH}?atchFileId=FILE`;
   let applies = false;
   let inAgents = false;
+  let best: { length: number; allow: boolean } | null = null;
   for (const raw of robots.split(/\r?\n/)) {
     const line = raw.replace(/#.*$/, '').trim();
     const match = /^([a-z-]+)\s*:\s*(.*)$/i.exec(line);
@@ -590,9 +607,19 @@ export function bizinfoRobotsDisallowFiles(robots: string): boolean {
       continue;
     }
     inAgents = false;
-    if (applies && field === 'disallow' && value !== '' && BIZINFO_FILE_PATH.startsWith(value)) return true;
+    if (!applies || (field !== 'allow' && field !== 'disallow') || value === '') continue;
+    const anchored = value.endsWith('$');
+    const pattern = (anchored ? value.slice(0, -1) : value)
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+    if (!new RegExp(`^${pattern}${anchored ? '$' : ''}`).test(path)) continue;
+    const allow = field === 'allow';
+    if (best === null || value.length > best.length || (value.length === best.length && allow)) {
+      best = { length: value.length, allow };
+    }
   }
-  return false;
+  return best !== null && !best.allow;
 }
 
 // 기업마당 공고 파일(본문출력파일·첨부)을 받는다. 동기화 한 번에 하나를 만들어 쓴다:
@@ -614,7 +641,12 @@ export function createBizinfoFileDownloader(options: BizinfoFileDownloaderOption
   async function send(url: string) {
     if (requestCount > 0) await sleep(interval);
     requestCount += 1;
-    return fetchImpl(url, { headers: { 'User-Agent': userAgent }, signal: AbortSignal.timeout(timeoutMs) });
+    // 다른 경로로 넘기는 응답은 따라가지 않는다. 그 경로는 robots.txt와 경로 검사를 거치지 않았다.
+    return fetchImpl(url, {
+      headers: { 'User-Agent': userAgent },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   }
 
   async function checkRobots(): Promise<string | null> {

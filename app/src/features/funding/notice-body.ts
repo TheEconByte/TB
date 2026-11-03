@@ -30,9 +30,12 @@ export type NoticeDocumentStatus =
   | 'DUPLICATE'
   | 'NO_TEXT'
   | 'UNREADABLE'
+  // 이름이 PDF·HWP·HWPX가 아니라 받지 않았다.
   | 'UNSUPPORTED_TYPE'
+  // 받은 내용이 이름의 형식과 다르다(오류 페이지가 온 경우 등). 다음 동기화에서 다시 받는다.
+  | 'TYPE_MISMATCH'
   | 'TOO_LARGE'
-  // 출처가 파일이 없다고 답했다(404 등). 다시 받아도 같다고 보고 본문은 이 파일 없이 만든다.
+  // 출처가 파일을 주지 않았다(404 등). 이번 본문은 이 파일 없이 만들고, 다음 동기화에서 다시 받는다.
   | 'DOWNLOAD_FAILED';
 
 // funding_notice_texts.documents에 남기는 문서 한 건.
@@ -151,7 +154,12 @@ export async function buildNoticeText(
     seen.add(checksum);
     const fileType = noticeFileType(file.name, bytes);
     if (fileType === null) {
-      documents.push({ ...record, checksum, status: 'UNSUPPORTED_TYPE', message: '확장자와 파일 형식이 다릅니다.' });
+      documents.push({
+        ...record,
+        checksum,
+        status: 'TYPE_MISMATCH',
+        message: '받은 내용이 이름의 파일 형식과 다릅니다.',
+      });
       continue;
     }
     const extracted = await options.extract(bytes, fileType);
@@ -163,8 +171,22 @@ export async function buildNoticeText(
     read(file.kind, file.name, normalizeNoticeText(extracted.text));
   }
 
-  if (sections.length === 0) return { status: 'COMPLETE', text: null, checksum: null, documents };
+  // documents는 jsonb라 U+0000을 받지 않는다. 출처가 준 이름과 오류 문장도 정리한다.
+  const cleaned = documents.map((document) => ({
+    ...document,
+    name: normalizeNoticeText(document.name),
+    message: document.message === null ? null : normalizeNoticeText(document.message),
+  }));
+  if (sections.length === 0) return { status: 'COMPLETE', text: null, checksum: null, documents: cleaned };
   // 파일 이름에도 제어 문자가 있을 수 있어 합친 뒤에 한 번 더 정리한다.
   const text = normalizeNoticeText(sections.join('\n\n'));
-  return { status: 'COMPLETE', text, checksum: sha256Hex(text), documents };
+  return { status: 'COMPLETE', text, checksum: sha256Hex(text), documents: cleaned };
+}
+
+// 이 상태의 문서가 있는 본문은 다음 동기화에서 다시 읽는다. 받지 못한 파일이나 이름과 다른 내용(만료된 주소의
+// 오류 페이지 등)은 다시 받으면 읽힐 수 있다. 글자 없음·읽지 못함·너무 큼은 같은 파일이면 결과가 같다.
+const RETRY_STATUSES: ReadonlySet<NoticeDocumentStatus> = new Set(['DOWNLOAD_FAILED', 'TYPE_MISMATCH']);
+
+export function isSettledNoticeText(documents: readonly NoticeDocumentRecord[]): boolean {
+  return documents.every((document) => !RETRY_STATUSES.has(document.status));
 }

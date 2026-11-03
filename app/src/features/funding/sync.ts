@@ -198,6 +198,34 @@ async function collectSource(
     refs.add(refKey);
   }
 
+  // 수집한 상품만으로 카탈로그 검증을 먼저 돌린다. 파서가 필수 항목을 못 찾은 상품이 있으면
+  // 그 출처만 실패로 기록하고, 사람이 관리하는 상품과 다른 출처는 그대로 적재한다.
+  // 공고 파일을 받기 전에 돌려, 실패할 출처를 위해 수십 분씩 파일을 받지 않게 한다. 버전과 본문 checksum은
+  // 규칙 검사에 쓰이지 않아 임시 버전으로 검사한다.
+  const validation = validateFundingCatalog(
+    {
+      catalogKey: context.manual.catalogKey,
+      schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
+      catalogVersion: `${context.asOfDate}.1`,
+      basisDate: context.asOfDate,
+      reviewer: context.manual.reviewer,
+      notes: [],
+      automation: context.manual.automation,
+      // 스키마가 모르는 항목(본문 계획 notice)은 parse가 뺀다.
+      products: collection.products.map((product) =>
+        fundingProductSchema.parse({ ...product, reviewer: AUTO_REVIEWER, version: '0.0.0' }),
+      ),
+    },
+    { asOfDate: context.asOfDate },
+  );
+  if (!validation.ok) {
+    const issues = validation.issues
+      .slice(0, 5)
+      .map((issue) => `[${issue.code}] ${issue.source}: ${issue.detail}`)
+      .join(' / ');
+    throw new SourceSyncFailure(`수집한 상품이 카탈로그 검증을 통과하지 못했습니다: ${issues}`);
+  }
+
   // 공고 본문을 정한다. 본문이 바뀌면 상품 내용(noticeTextChecksum)이 바뀌어 새 상품 버전이 된다.
   const noticeTexts = emptyNoticeCounts();
   const incompleteReasons: string[] = [];
@@ -246,29 +274,6 @@ async function collectSource(
     `출처 ${adapter.source} 공고 본문: 그대로 ${noticeTexts.REUSED}건, 새로 읽음 ${noticeTexts.STORED}건, 읽을 문서 없음 ${noticeTexts.NO_TEXT}건, 파일을 다 받지 못함 ${noticeTexts.INCOMPLETE}건${context.dryRun ? '(dry run이라 저장하지 않음)' : ''}.`,
   );
   for (const reason of incompleteReasons.slice(0, 5)) context.log(`  - ${reason}`);
-
-  // 수집한 상품만으로 카탈로그 검증을 먼저 돌린다. 파서가 필수 항목을 못 찾은 상품이 있으면
-  // 그 출처만 실패로 기록하고, 사람이 관리하는 상품과 다른 출처는 그대로 적재한다.
-  const validation = validateFundingCatalog(
-    {
-      catalogKey: context.manual.catalogKey,
-      schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
-      catalogVersion: `${context.asOfDate}.1`,
-      basisDate: context.asOfDate,
-      reviewer: context.manual.reviewer,
-      notes: [],
-      automation: context.manual.automation,
-      products,
-    },
-    { asOfDate: context.asOfDate },
-  );
-  if (!validation.ok) {
-    const issues = validation.issues
-      .slice(0, 5)
-      .map((issue) => `[${issue.code}] ${issue.source}: ${issue.detail}`)
-      .join(' / ');
-    throw new SourceSyncFailure(`수집한 상품이 카탈로그 검증을 통과하지 못했습니다: ${issues}`);
-  }
   return {
     products,
     fetchedCount: collection.fetchedCount,

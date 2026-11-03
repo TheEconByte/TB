@@ -493,6 +493,55 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(texts.find((row) => row.textChecksum === changed?.noticeTextChecksum)?.text).toContain('업력 7년 이내');
   });
 
+  it('keeps the previous body and still succeeds when a file cannot be downloaded this time', async () => {
+    const FILE = 'https://www.bizinfo.go.kr/cmm/fms/getImageFile.do?atchFileId=FILE_TEST&fileSn=0';
+    const withFile = (asOfDate: string, attachments: number) =>
+      collected('file-notice', asOfDate, {
+        notice: {
+          sourceUrl: OLS_URL,
+          inline: [{ kind: 'NOTICE_PAGE', name: '공지', url: OLS_URL, text: '공지 본문' }],
+          files: Array.from({ length: attachments }, (_, n) => ({
+            kind: 'ATTACHMENT',
+            name: `첨부${n}.pdf`,
+            url: `${FILE}${n}`,
+          })),
+        },
+      });
+    let failing = false;
+    const fileAdapter = (asOfDate: string, attachments: number): FundingSourceAdapter => ({
+      source: 'SEMAS_OLS',
+      collect: async () => collection([withFile(asOfDate, attachments)]),
+      downloadNoticeFile: async () =>
+        failing
+          ? { ok: false, transient: true, message: 'HTTP 503' }
+          : { ok: true, bytes: new TextEncoder().encode('%PDF-1.7 첨부') },
+    });
+    const run = (asOfDate: string, attachments: number) =>
+      runFundingSync({
+        prisma: db(),
+        catalogPath: manualCatalogFile(),
+        adapters: [fileAdapter(asOfDate, attachments)],
+        asOfDate,
+        outputDir: tempDir(),
+        now: () => new Date(`${asOfDate}T01:00:00.000Z`),
+        noticeExtract: async (data) => ({ ok: true, text: new TextDecoder().decode(data) }),
+      });
+    const activeChecksum = async () =>
+      (await findActiveFundingCatalog(db()))?.catalog.products.find(
+        (product) => product.productKey === 'test-sync-file-notice',
+      )?.noticeTextChecksum;
+
+    await run('2026-10-02', 1);
+    const before = await activeChecksum();
+    expect(before).toMatch(/^[0-9a-f]{64}$/);
+
+    // 첨부가 하나 늘었는데 받지 못하면 일부만 읽은 본문을 만들지 않는다.
+    failing = true;
+    const report = await run('2026-10-03', 2);
+    expect(report.sources[0]).toMatchObject({ status: 'SUCCEEDED', noticeTexts: { INCOMPLETE: 1 } });
+    expect(await activeChecksum()).toBe(before);
+  });
+
   it('does not write notice texts in a dry run', async () => {
     const report = await sync({
       asOfDate: '2026-10-01',
