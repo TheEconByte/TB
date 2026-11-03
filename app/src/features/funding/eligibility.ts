@@ -356,7 +356,7 @@ export function assessProductRepayment(product: FundingProduct): ProductRepaymen
       : null,
     reasons: unique,
     note: supported
-      ? '상품 확정 조건으로 상환 부담을 계산할 수 있는 구조입니다. 실제 승인·적용 금리는 심사로 결정됩니다.'
+      ? '금리·기간·상환방식이 모두 확정된 상품입니다. 재무 계획에 자동으로 옮기지 않으며 실제 승인·적용 금리는 심사로 결정됩니다.'
       : '금리·기간·상환방식이 확정되지 않아 상품 조건 기반 상환액을 표시하지 않습니다.',
   };
 }
@@ -402,8 +402,8 @@ function repaymentFor(product: FundingProduct, automation: FundingAutomation): P
     supported: false,
     publicLimitKrw: null,
     terms: null,
-    reasons: ['상환 계산 자동 승격이 꺼져 있어 자동으로 모은 조건으로 상환액을 계산하지 않습니다.'],
-    note: '자동으로 모은 금리·기간·상환방식은 운영자가 상환 계산 자동 승격을 켠 뒤에만 계산에 씁니다.',
+    reasons: ['상환 계산 자동 승격이 꺼져 있어 자동으로 모은 조건을 확정 조건으로 표시하지 않습니다.'],
+    note: '자동으로 모은 금리·기간·상환방식은 운영자가 상환 계산 자동 승격을 켠 뒤에만 확정 조건으로 표시합니다.',
   };
 }
 

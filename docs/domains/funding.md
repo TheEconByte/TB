@@ -17,7 +17,7 @@
 - 실행: `npm --prefix app run funding:validate`, `npm --prefix app run funding:load [-- --catalog <경로>]`. 기본 카탈로그는 `app/catalog/funding/catalog.json`이다.
 - 원문 확인과 카탈로그 편집은 운영자가 수행한다.
 - Zod 스키마가 productKey·version 형식, 필수 필드, 날짜 형식, 금액의 원 단위 정수 문자열, supportType·사업단계·접수 상태·상환방식 열거, 공식 기관 HTTPS 호스트, checksum 형식을 검사한다.
-- 상환 계산은 구조화된 확정 조건 필드(`interestRatePercent`·`repaymentTermMonths`·`repaymentGraceMonths`)만 읽는다. 조건 문장(`interestCondition`·`repaymentCondition`)은 숫자로 해석하지 않는다. 기록 규칙은 카탈로그 README의 "확정 조건과 상환 계산"에 있다.
+- 상환 계산 대상 여부는 구조화된 확정 조건 필드(`interestRatePercent`·`repaymentTermMonths`·`repaymentGraceMonths`)만 읽는다. 조건 문장(`interestCondition`·`repaymentCondition`)은 숫자로 해석하지 않는다. 기록 규칙은 카탈로그 README의 "확정 조건과 상환 계산"에 있다.
 - 규칙 검사 항목:
   - productKey+version 중복
   - 접수기간과 관측 접수 상태의 모순(종료된 공고를 OPEN으로 기록 등)
@@ -242,7 +242,7 @@
 - 그 전에 저장된 `plans.loanAssumptionJson`(상품 키·버전·상품명·카탈로그 키·카탈로그 버전·적용 시각과 그때의 신규 대출 입력)은 그대로 읽고, 계획 화면에 어느 상품 조건인지와 승인 확정이 아님을 함께 보여 준다. 새로 쓰지 않는다.
 - 계획 저장(PUT): 새 `newLoan` 입력이 저장된 출처의 값과 같으면 출처를 유지하고, 다르면 지운다. 상품 조건이 아닌 값을 상품 조건으로 표시하지 않기 위해서다. 출처를 새로 만들지는 않는다.
 - 계산: 계획에 남은 출처를 `plan_results.loanAssumptionJson`으로 복사해, 그 결과에 어떤 상품 조건이 반영됐는지 남긴다. 과거 결과는 다시 계산하지 않는다.
-- `loanAssumptionJson`을 다루는 API는 계획 수정과 계산뿐이다(`loan-assumption.test.ts`가 확인한다).
+- `loanAssumptionJson`을 다루는 API 라우트 파일은 계획 수정과 계산뿐이다(`loan-assumption.test.ts`가 `src/app/api`의 라우트 파일 이름 사용을 검사한다. 두 라우트가 출처를 새로 만들지 않는 것은 같은 파일의 라우트 테스트가 확인한다).
 
 ## 테스트
 

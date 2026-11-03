@@ -63,7 +63,7 @@ const BRANCHES: { branch: FundingBranch; title: string; note: string; hideWhenEm
   {
     branch: 'POLICY_FUND',
     title: '정책자금(대출·보증)',
-    note: '정책 대출과 보증입니다. 대출은 금리·기간·상환방식이 모두 확정된 상품만 상환 계산에 씁니다. 자동으로 모은 공고는 운영자가 자동 승격을 켰을 때만 검토 후보가 됩니다.',
+    note: '정책 대출과 보증입니다. 상품 조건은 재무 계획에 옮기지 않으니 대출 조건은 재무 계획에 직접 입력해 주세요. 자동으로 모은 공고는 운영자가 자동 승격을 켰을 때만 검토 후보가 됩니다.',
     hideWhenEmpty: false,
   },
   {
@@ -464,8 +464,8 @@ function CandidateCard({ evaluation }: { readonly evaluation: FundingCandidateEv
           {repayment.supported && repayment.terms ? (
             <>
               <p className="repayment-ok">
-                상품 확정 조건으로 상환 부담을 계산할 수 있는 구조입니다. 승인 확정이 아니며 실제 승인·적용 금리는
-                심사로 결정됩니다.
+                금리·기간·상환방식이 모두 확정된 상품입니다. 재무 계획에 자동으로 옮기지 않습니다. 승인 확정이 아니며
+                실제 승인·적용 금리는 심사로 결정됩니다.
               </p>
               <dl className="candidate-meta">
                 <div>
