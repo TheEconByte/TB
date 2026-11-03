@@ -17,7 +17,9 @@ export type NoticeDocumentKind =
 
 // 출처가 이미 텍스트로 준 부분. checksum은 그 텍스트의 SHA-256이다.
 export type NoticeInlinePart = { kind: NoticeDocumentKind; name: string; url: string; text: string };
-export type NoticeFilePart = { kind: 'PRINT_FILE' | 'ATTACHMENT'; name: string; url: string };
+// url은 파일을 알아보고 기록하는 주소다. 받을 때만 쓰는 일회용 주소(기업마당 downloadToken)가 따로 있으면
+// downloadUrl에 둔다. downloadUrl은 저장하지 않는다.
+export type NoticeFilePart = { kind: 'PRINT_FILE' | 'ATTACHMENT'; name: string; url: string; downloadUrl?: string };
 
 // 수집기가 만드는 본문 계획. 파일은 아직 받지 않은 상태다.
 export type NoticePlan = { sourceUrl: string; inline: NoticeInlinePart[]; files: NoticeFilePart[] };
@@ -128,7 +130,7 @@ export async function buildNoticeText(
       documents.push({ ...record, status: 'UNSUPPORTED_TYPE' });
       continue;
     }
-    const downloaded = await options.download(file.url);
+    const downloaded = await options.download(file.downloadUrl ?? file.url);
     if (!downloaded.ok) {
       if (downloaded.transient) {
         return { status: 'INCOMPLETE', reason: `${file.name}(${file.url})을 받지 못했습니다: ${downloaded.message}` };

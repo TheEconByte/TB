@@ -460,6 +460,47 @@ describe('기업마당 공고의 본문 계획', () => {
     });
   });
 
+  // 2026-11-03 실제 응답: 여러 파일은 '@'로 잇고, 주소마다 호출 때마다 새로 발급되는 downloadToken이 붙는다.
+  it('splits files joined with @ and keeps the download token out of the stored address', () => {
+    const token = (n: number) =>
+      `${ATTACH.replace('fileSn=0', `fileSn=${n}`)}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.sig${n}`;
+    const [product] = mapBizinfoItems(
+      [
+        item({
+          printFlpthNm: `${PRINT}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.print`,
+          printFileNm: '공고문.pdf',
+          flpthNm: `${token(1)}@${token(2)}`,
+          fileNm: '공고문.hwpx@모집포스터.pdf',
+        }),
+      ],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    expect(product.notice?.files).toEqual([
+      {
+        kind: 'PRINT_FILE',
+        name: '공고문.pdf',
+        url: PRINT,
+        downloadUrl: `${PRINT}&downloadToken=eyJhbGciOiJIUzI1NiJ9.e30.print`,
+      },
+      { kind: 'ATTACHMENT', name: '공고문.hwpx', url: ATTACH.replace('fileSn=0', 'fileSn=1'), downloadUrl: token(1) },
+      {
+        kind: 'ATTACHMENT',
+        name: '모집포스터.pdf',
+        url: ATTACH.replace('fileSn=0', 'fileSn=2'),
+        downloadUrl: token(2),
+      },
+    ]);
+  });
+
+  it('does not pair names with the wrong files when the counts differ', () => {
+    const [product] = mapBizinfoItems(
+      [item({ printFlpthNm: '', printFileNm: '', flpthNm: `${ATTACH}@${PRINT}`, fileNm: '하나뿐인 이름.pdf' })],
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    ).products;
+    // 이름을 믿을 수 없으면 형식을 알 수 없는 파일로 남긴다(받지 않는다).
+    expect(product.notice?.files.map((file) => file.name)).toEqual(['', '']);
+  });
+
   it('leaves out file links that are not official Bizinfo addresses', () => {
     const [product] = mapBizinfoItems(
       [item({ printFlpthNm: 'https://example.com/a.pdf', printFileNm: 'a.pdf', flpthNm: '', fileNm: '' })],

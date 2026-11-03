@@ -70,6 +70,28 @@ describe('resolveNoticeText', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
+  // 기업마당 파일 주소의 downloadToken은 API 호출마다 바뀐다. 파일은 토큰 없는 주소로 알아본다.
+  it('still reuses the text when only the download token changed', async () => {
+    const store = memoryStore();
+    const withToken = (token: string): NoticePlan => ({
+      ...plan,
+      files: [{ ...plan.files[0], downloadUrl: `${FILE_URL}&downloadToken=${token}` }],
+    });
+    const download = okDownload();
+    const first = await resolveNoticeText(
+      { productKey: 'bizinfo-pbln-test', plan: withToken('a'), previousChecksum: null },
+      { store, download, extract, now: () => NOW },
+    );
+    expect(download).toHaveBeenCalledWith(`${FILE_URL}&downloadToken=a`);
+    // 저장하는 주소에는 토큰을 남기지 않는다.
+    expect(JSON.stringify(store.rows[0].documents)).not.toContain('downloadToken');
+    const second = await resolveNoticeText(
+      { productKey: 'bizinfo-pbln-test', plan: withToken('b'), previousChecksum: first.textChecksum },
+      { store, download: okDownload(), extract, now: () => NOW },
+    );
+    expect(second).toEqual({ outcome: 'REUSED', textChecksum: first.textChecksum });
+  });
+
   it('reads the notice again when a document was added or the summary changed', async () => {
     const store = memoryStore();
     const first = await resolveNoticeText(

@@ -242,10 +242,19 @@ function noticeUrl(raw: string): string | null {
   return isOfficialUrl(value) ? value : null;
 }
 
-// 파일 항목 하나에 여러 파일이 올 때의 구분 방식은 실제 응답으로 확인해 정한다(확인 전에는 한 파일로 본다).
+// 파일 항목 하나에 여러 파일이 오면 '@'로 잇는다(2026-11-03 실제 응답 확인). 주소와 이름은 같은 순서다.
 function splitFileField(value: string): string[] {
-  const trimmed = value.trim();
-  return trimmed === '' ? [] : [trimmed];
+  return value
+    .split('@')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
+
+// 파일 주소에는 API 호출 때마다 새로 발급되는 downloadToken이 붙는다. 파일을 알아보고 기록할 때는 뺀다.
+function withoutDownloadToken(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.delete('downloadToken');
+  return parsed.toString();
 }
 
 // 본문출력파일과 첨부. 파일 주소는 공식 기업마당 주소일 때만 쓴다.
@@ -253,14 +262,24 @@ export function bizinfoNoticeFiles(
   item: Pick<BizinfoItem, 'printFlpthNm' | 'printFileNm' | 'flpthNm' | 'fileNm'>,
 ): NoticeFilePart[] {
   const files: NoticeFilePart[] = [];
-  for (const [kind, paths, names] of [
+  for (const [kind, rawPaths, rawNames] of [
     ['PRINT_FILE', item.printFlpthNm, item.printFileNm],
     ['ATTACHMENT', item.flpthNm, item.fileNm],
   ] as const) {
-    for (const [index, path] of splitFileField(paths).entries()) {
-      const url = noticeUrl(path);
-      if (url === null) continue;
-      files.push({ kind, url, name: cleanText(splitFileField(names)[index] ?? '') });
+    const paths = splitFileField(rawPaths);
+    const names = splitFileField(rawNames);
+    // 개수가 다르면 어느 이름이 어느 파일인지 알 수 없다. 이름 없이 남겨 형식을 알 수 없는 파일로 기록한다.
+    const paired = paths.length === names.length;
+    for (const [index, path] of paths.entries()) {
+      const downloadUrl = noticeUrl(path);
+      if (downloadUrl === null) continue;
+      const url = withoutDownloadToken(downloadUrl);
+      files.push({
+        kind,
+        name: paired ? cleanText(names[index]) : '',
+        url,
+        ...(url === downloadUrl ? {} : { downloadUrl }),
+      });
     }
   }
   return files;
