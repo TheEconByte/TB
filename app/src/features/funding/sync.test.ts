@@ -420,12 +420,18 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       now: () => new Date('2026-09-28T01:00:00.000Z'),
     });
     expect(report.load?.outcome).toBe('ACTIVATED');
+    // 지역으로는 거르지 않는다(ADR 0009 §2). 경기 공고도 올리되 지역은 추측하지 않고 UNKNOWN으로 둔다.
     expect(report.sources).toMatchObject([
-      { source: 'BIZINFO', status: 'SUCCEEDED', lastSucceededOn: '2026-09-28', fetchedCount: 2, productCount: 1 },
+      { source: 'BIZINFO', status: 'SUCCEEDED', lastSucceededOn: '2026-09-28', fetchedCount: 2, productCount: 2 },
     ]);
     expect(report.sources[0].addedProducts).toEqual([
       { productKey: 'bizinfo-pbln-test-0001', name: '[서울] 소상공인 경영 개선 지원사업 공고' },
+      { productKey: 'bizinfo-pbln-test-0002', name: '[경기] 소상공인 지원사업 공고' },
     ]);
+    const gyeonggi = await db().fundingProductVersion.findUnique({
+      where: { productKey_version: { productKey: 'bizinfo-pbln-test-0002', version: '1.0.0' } },
+    });
+    expect((gyeonggi?.productJson as { region?: { scope?: string } } | undefined)?.region?.scope).toBe('UNKNOWN');
 
     const stored = await db().fundingProductVersion.findUnique({
       where: { productKey_version: { productKey: 'bizinfo-pbln-test-0001', version: '1.0.0' } },
