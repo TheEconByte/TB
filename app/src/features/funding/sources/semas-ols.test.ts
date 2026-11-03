@@ -696,6 +696,9 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
     });
     expect(disabled?.unsupportedCalculationReasons[0]).toContain('연 금리인지 가산폭인지 모호');
     expect(byName.get('혁신성장촉진자금(직접대출)')?.publicLimit).toBeNull();
+    // 정책자금 카드의 한도 문장은 대출한도 칸을 그대로 옮긴다(ADR 0009 §4). 금액이 여럿이어도 문장은 남는다.
+    expect(disabled?.limitText).toBe('1억원');
+    expect(byName.get('혁신성장촉진자금(직접대출)')?.limitText).toContain('운전 1억원');
   });
 
   it('세부 유형 카드만 있으면 자금 전체를 접수 중으로 보지 않고 확인 항목에 적는다', () => {

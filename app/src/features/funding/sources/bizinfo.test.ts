@@ -383,7 +383,7 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
           reqstBeginEndDe: '예산 소진시까지',
           pldirSportRealmLclasCodeNm: '금융',
         }),
-        item({ pblancId: 'PBLN_H', reqstBeginEndDe: '2026-10-01 ~ 2026-10-31' }),
+        item({ pblancId: 'PBLN_H', reqstBeginEndDe: '2026-10-01 ~ 2026-10-31', pldirSportRealmLclasCodeNm: ' ' }),
       ],
       { asOfDate: AS_OF, responseChecksum: CHECKSUM },
     );
@@ -403,6 +403,10 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
     // 날짜가 없으면 접수 중으로 추측하지 않는다.
     expect(nationwide?.observedApplicationStatus).toBe('UNKNOWN');
     expect(nationwide?.additionalChecks).toContain('기업마당 지원분야 표시: 금융');
+    // 지원분야는 정책자금·지원사업 갈래를 정하는 출처 항목이다(ADR 0009 §1). 값이 없으면 남기지 않는다.
+    expect(nationwide?.sourceCategory).toBe('금융');
+    expect(byId.get('PBLN_F')?.sourceCategory).toBe('경영');
+    expect(byId.get('PBLN_H')).not.toHaveProperty('sourceCategory');
     // 접수 시작 전인 공고도 접수 중이 아니다.
     expect(byId.get('PBLN_H')?.observedApplicationStatus).toBe('UNKNOWN');
 
