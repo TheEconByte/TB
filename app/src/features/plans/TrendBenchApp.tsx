@@ -10,13 +10,7 @@ import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
 import { parsePlanMarketScore } from '@/features/plans/market-score';
 import type { FinanceInput, FinanceResult } from '@/features/finance/types';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
-import {
-  industryCodeIssue,
-  purposeLabel,
-  stageLabel,
-  type FundingCandidateEvaluation,
-  type FundingProfile,
-} from '@/features/funding/eligibility';
+import { industryCodeIssue, purposeLabel, stageLabel, type FundingProfile } from '@/features/funding/eligibility';
 import {
   FundingCandidatesErrorPanel,
   FundingCandidatesPanel,
@@ -265,11 +259,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  // 재무 입력에 저장하지 않은 변경이 있는지와 지금 어느 상품 조건을 적용 중인지.
-  const [financeDirty, setFinanceDirty] = useState(false);
-  const [applyingKey, setApplyingKey] = useState<string | null>(null);
-  // 상품 확정 조건을 적용하면 저장된 입력이 바뀌므로 폼을 그 입력으로 다시 채우는 신호.
-  const [formSyncToken, setFormSyncToken] = useState(0);
   // /markets의 [이 상권으로 재무 계획 시작]이 URL로 넘긴 상권 참조. 화면을 열 때 한 번만 읽는다.
   // next/link로 넘어오면 렌더링 중의 window.location은 아직 이전 화면 주소라 라우터의 검색 파라미터를 읽는다.
   const searchParams = useSearchParams();
@@ -295,12 +284,10 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
         }
         setMarketSource({ handoff: { ...handoff, releaseKey: score.release.releaseKey }, score });
         setFundingForm((current) =>
-          isEmptyFundingForm(current)
-            ? { ...current, districtCode: score.area.districtCode, industryCode: score.industry.code }
-            : current,
+          isEmptyFundingForm(current) ? { ...current, districtCode: score.area.districtCode } : current,
         );
         setMessage(
-          `${score.area.displayName} ${score.industry.displayName} 상권 점수에서 시작합니다. 자치구·업종·월매출을 미리 채웠습니다.`,
+          `${score.area.displayName} ${score.industry.displayName} 상권 점수에서 시작합니다. 자치구·월매출을 미리 채웠습니다.`,
         );
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : '상권 점수를 불러오지 못했습니다.');
@@ -470,43 +457,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     }
   }
 
-  // 상품 확정 조건을 계획의 신규 대출 가정으로 적용한다. 사용자가 명시적으로 누를 때만
-  // 실행하며, 적용 대상 상품과 확정 조건은 서버가 활성 카탈로그에서 다시 확인한다.
-  async function applyLoanAssumption(evaluation: FundingCandidateEvaluation) {
-    if (!plan) return;
-    const key = `${evaluation.productKey}@${evaluation.version}`;
-    setApplyingKey(key);
-    setMessage('');
-    try {
-      const data = await api<{ plan: Omit<PlanDetail, 'results'>; loanAssumption: PlanLoanAssumption }>(
-        `/api/plans/${plan.id}/loan-assumption`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            productKey: evaluation.productKey,
-            version: evaluation.version,
-            revision: plan.revision,
-          }),
-        },
-      );
-      setPlan({ ...data.plan, results: plan.results });
-      setFormSyncToken((token) => token + 1);
-      setMessage(
-        `상품 ${key} 확정 조건을 대출 가정으로 적용하고 초안 revision ${data.plan.revision}으로 저장했습니다. 승인 확정이 아닙니다.`,
-      );
-      await refreshPlans();
-    } catch (error) {
-      const typed = error as Error & { code?: string };
-      setMessage(
-        typed.code === 'REVISION_CONFLICT'
-          ? '다른 화면에서 먼저 수정되었습니다. 계획을 다시 열어 최신 내용을 확인해 주세요.'
-          : typed.message,
-      );
-    } finally {
-      setApplyingKey(null);
-    }
-  }
-
   const storedFundingForm = plan ? fundingFormFromStored(plan.fundingProfileJson) : null;
   const storedHasProfile = plan !== null && plan.fundingProfileJson !== null && plan.fundingProfileJson !== undefined;
   const fundingDirty =
@@ -519,15 +469,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const pendingMarket = plan === null ? marketSource : null;
   const storedMarketScore = plan ? parsePlanMarketScore(plan.marketScoreJson) : null;
   const resultAssumption = parseLoanAssumption(storedResult?.loanAssumptionJson);
-  const canApplyLoanAssumption = plan !== null && !financeDirty && !fundingDirty && !busy;
-  const applyDisabledReason =
-    plan === null
-      ? '새 계획은 먼저 초안을 저장해야 상품 조건을 적용할 수 있습니다.'
-      : financeDirty || fundingDirty
-        ? '저장하지 않은 변경이 있습니다. 초안을 저장한 뒤 적용해 주세요.'
-        : busy
-          ? '다른 작업을 처리하고 있습니다.'
-          : '';
 
   return (
     <main>
@@ -559,11 +500,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                 // 상권에서 넘어온 연결이 남아 있으면 새 계획에 다시 미리 채운다.
                 setFundingForm(
                   marketSource
-                    ? {
-                        ...EMPTY_FUNDING_FORM,
-                        districtCode: marketSource.score.area.districtCode,
-                        industryCode: marketSource.score.industry.code,
-                      }
+                    ? { ...EMPTY_FUNDING_FORM, districtCode: marketSource.score.area.districtCode }
                     : EMPTY_FUNDING_FORM,
                 );
                 setBusinessForm(EMPTY_BUSINESS_PROFILE_FORM);
@@ -662,8 +599,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
               revision={plan?.revision ?? null}
               resultRevision={storedResult?.inputRevision ?? null}
               busy={busy}
-              syncToken={formSyncToken}
-              onDirtyChange={setFinanceDirty}
               revenueNotice={
                 <MarketSourceNotice
                   pending={pendingMarket}
@@ -677,7 +612,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           )}
           <PlanFundingPanel
             plan={plan}
-            principalKrw={plan?.inputJson.newLoan.principal ?? null}
             form={fundingForm}
             onChange={setFundingForm}
             hasStoredProfile={storedHasProfile}
@@ -688,11 +622,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             error={matchesError}
             onQuery={() => void queryPlanFundingMatches()}
             appliedSummary={storedAssumption ? describeLoanAssumption(storedAssumption) : null}
-            appliedKey={storedAssumption ? `${storedAssumption.productKey}@${storedAssumption.version}` : null}
-            applyingKey={applyingKey}
-            canApply={canApplyLoanAssumption}
-            applyDisabledReason={applyDisabledReason}
-            onApply={(evaluation: FundingCandidateEvaluation) => void applyLoanAssumption(evaluation)}
           />
         </div>
       </div>
@@ -755,7 +684,6 @@ function MarketSourceNotice({
 
 function PlanFundingPanel({
   plan,
-  principalKrw,
   form,
   onChange,
   hasStoredProfile,
@@ -766,14 +694,8 @@ function PlanFundingPanel({
   error,
   onQuery,
   appliedSummary,
-  appliedKey,
-  applyingKey,
-  canApply,
-  applyDisabledReason,
-  onApply,
 }: {
   readonly plan: { id: string; revision: number } | null;
-  readonly principalKrw: string | null;
   readonly form: FundingProfileForm;
   readonly onChange: (next: FundingProfileForm) => void;
   readonly hasStoredProfile: boolean;
@@ -783,13 +705,8 @@ function PlanFundingPanel({
   readonly matches: PlanFundingMatchesResponse | null;
   readonly error: FundingLoadError | null;
   readonly onQuery: () => void;
-  // 저장된 대출 가정의 출처와 적용 동작. 계획이 저장되지 않았거나 편집 중이면 막는다.
+  // 적용 기능을 없애기 전(ADR 0009 §5)에 저장된 대출 가정의 출처. 새로 만들지 않고 저장된 것만 보여 준다.
   readonly appliedSummary: string | null;
-  readonly appliedKey: string | null;
-  readonly applyingKey: string | null;
-  readonly canApply: boolean;
-  readonly applyDisabledReason: string;
-  readonly onApply: (evaluation: FundingCandidateEvaluation) => void;
 }) {
   // 프로필 미입력·저장 전 변경·정상 조회를 서로 다른 상태로 보여준다. 조회는 항상
   // 서버에 저장된 조건으로만 하므로 저장하지 않은 변경이 있으면 막는다.
@@ -899,14 +816,6 @@ function PlanFundingPanel({
                 result={matches}
                 profileSummary={fundingProfileSummary(matches.profile)}
                 planLabel={`계획 revision ${matches.plan.revision}에 저장된 조건으로 판정했습니다.`}
-                apply={{
-                  disabled: !canApply,
-                  disabledReason: applyDisabledReason,
-                  applyingKey,
-                  appliedKey,
-                  onApply,
-                  principalKrw,
-                }}
               />
             )}
             {!loading && !error && !matches && (

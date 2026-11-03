@@ -72,15 +72,14 @@ export type ProductRepaymentAvailability = {
   supported: boolean;
   // 공개된 최대 한도다. 실제 신청·승인액이나 사용자의 시뮬레이션 원금이 아니다.
   publicLimitKrw: string | null;
-  // 상품에서 확인한 금리·기간·상환방식. 사용자가 저장한 대출금과 결합하기 전의
-  // 조건이며 지원 대상이 아니면 null이다.
+  // 상품에서 확인한 금리·기간·상환방식. 화면에 보여 주기만 하고 계획에 옮기지 않는다(ADR 0009 §5).
+  // 지원 대상이 아니면 null이다.
   terms: ProductLoanTerms | null;
   reasons: string[];
   note: string;
 };
 
-// 상품 확정 조건에서 그대로 옮길 수 있는 값만 담는다. 계산은 F1 엔진이 하고,
-// 여기서는 계획의 신규 대출 입력으로 바꿀 값만 정한다.
+// 상품 확정 조건에서 그대로 읽은 값만 담는다. 상환 계산 대상인지 보여 주는 데 쓴다.
 export type ProductLoanTerms = {
   annualInterestRatePercent: string;
   totalMonths: number;
@@ -357,7 +356,7 @@ export function assessProductRepayment(product: FundingProduct): ProductRepaymen
       : null,
     reasons: unique,
     note: supported
-      ? '상품 확정 조건으로 상환 부담을 계산할 수 있는 구조입니다. 실제 승인·적용 금리는 심사로 결정됩니다.'
+      ? '금리·기간·상환방식이 모두 확정된 상품입니다. 재무 계획에 자동으로 옮기지 않으며 실제 승인·적용 금리는 심사로 결정됩니다.'
       : '금리·기간·상환방식이 확정되지 않아 상품 조건 기반 상환액을 표시하지 않습니다.',
   };
 }
@@ -403,8 +402,8 @@ function repaymentFor(product: FundingProduct, automation: FundingAutomation): P
     supported: false,
     publicLimitKrw: null,
     terms: null,
-    reasons: ['상환 계산 자동 승격이 꺼져 있어 자동으로 모은 조건으로 상환액을 계산하지 않습니다.'],
-    note: '자동으로 모은 금리·기간·상환방식은 운영자가 상환 계산 자동 승격을 켠 뒤에만 계산에 씁니다.',
+    reasons: ['상환 계산 자동 승격이 꺼져 있어 자동으로 모은 조건을 확정 조건으로 표시하지 않습니다.'],
+    note: '자동으로 모은 금리·기간·상환방식은 운영자가 상환 계산 자동 승격을 켠 뒤에만 확정 조건으로 표시합니다.',
   };
 }
 

@@ -14,7 +14,7 @@ import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 
 // ADR 0009 §4의 맞춰 보기. 기대값의 근거는 각 테스트 옆에 적는다.
 // - "ADR §4": docs/decisions/0009-funding-ai-condition-extraction.md 4절
-// - "사용자 결정": 2026-11-03 5단계 질문의 답(맞아 보임은 여섯 항목 모두 맞음 + 접수 중, 마감은 출처 종료일 우선)
+// - "사용자 결정": 2026-11-03 5단계 질문의 답(맞아 보임은 여섯 항목 모두 맞음 + 접수 중, 마감은 출처·운영자 데이터로만 정함)
 // - "기본값": 5단계 크기 제안에서 사용자에게 알리고 이의가 없던 규칙
 
 const AS_OF = '2026-11-03';
@@ -267,7 +267,7 @@ describe('공고 그룹(ADR §4, 사용자 결정)', () => {
   });
 });
 
-describe('마감(ADR §4, 사용자 결정: 출처 종료일 우선, 없을 때만 AI 종료일)', () => {
+describe('마감(ADR §4, 사용자 결정: 마감은 출처·운영자 데이터로만, AI 종료일은 확인 필요)', () => {
   it('출처가 마감으로 표시하면 조건과 상관없이 마감이다', () => {
     const product = autoProduct('SEMAS_OLS', { observedApplicationStatus: 'CLOSED' });
     const result = match(product, openConditions({ foodBusiness: read('EXCLUDED') }), NO_INPUT);

@@ -31,7 +31,7 @@ npm --prefix app run funding:load
 - `interestCondition`·`repaymentCondition`은 근거를 남기는 문장이며 숫자로 해석하지 않는다.
 - `publicLimit`에는 공고의 공개 한도를 적는다. 대출 원금이 아니라 최대 금액 검증용이다.
 - 상환 계산 대상이 아닌 대출은 그 사유를 `unsupportedCalculationReasons`에 적는다. 계산 엔진이 지원하는 상환방식은 원리금균등·원금균등이다.
-- 이 필드로 상환 계산 대상을 정하는 규칙과 계획의 대출 가정으로 적용하는 절차는 [funding.md](../../../docs/domains/funding.md#판정)에 있다.
+- 이 필드로 상환 계산 대상을 정하는 규칙은 [funding.md](../../../docs/domains/funding.md#판정)에 있다. 상품 조건을 계획의 대출 가정으로 옮기는 기능은 없다([ADR 0009](../../../docs/decisions/0009-funding-ai-condition-extraction.md) §5).
 
 ## 원본 파일
 
