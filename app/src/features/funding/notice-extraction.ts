@@ -12,7 +12,7 @@ import { isRealDate } from './types.ts';
 export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 프롬프트, 출력 스키마, 아래 검증 규칙(verifyConditionOutput) 중 하나라도 바꾸면 올린다. 저장한 fields는
 // 저장할 때의 검증 결과라서, 올리지 않으면 이미 읽은 본문은 옛 규칙의 결과로 남는다.
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v1';
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v2';
 // 이보다 긴 본문은 보내지 않는다(잘라 보내지도 않는다). 요청이 지나치게 커지지 않게 하는 상한이며, 실제 토큰 수는
 // 확인하지 않았다(ADR 0009의 비용 가정은 본문 1만 토큰). 첫 실행의 토큰 합계로 운영자가 확인한다.
 export const MAX_EXTRACTION_TEXT_CHARS = 150_000;
@@ -96,7 +96,7 @@ const SYSTEM_PROMPT = `당신은 한국 정책자금·지원사업 공고문에�
 - businessStage: PRE_STARTUP_ONLY(예비 창업자만), BUSINESS_ONLY(사업자만), BOTH(둘 다, 또는 제한 없음).
 - businessAge: 업력(창업 후 기간), 년 단위. min은 하한, max는 상한입니다. "3년 이상"은 min 3, "3년 이내"·"3년 이하"는 max 3과 maxExclusive false, "7년 미만"은 max 7과 maxExclusive true입니다. "업력 무관"처럼 제한이 없다고 밝히면 min과 max를 null로 둡니다.
 - age: 대표자 만 나이. 같은 방식입니다. "만 39세 이하"는 max 39·maxExclusive false, "40세 미만"은 max 40·maxExclusive true입니다. 청년 기준 나이도 여기에 적습니다.
-- region: scope는 NATIONWIDE(전국), PROVINCES(시·도로 한정, provinces에 "서울"처럼 이름), SEOUL_DISTRICTS(서울 자치구로 한정, districts에 "강남구"처럼 이름)입니다. "○○ 제외"처럼 빼는 지역은 excludedProvinces·excludedDistricts에 적습니다. 해당 없는 목록은 빈 목록입니다.
+- region: scope는 NATIONWIDE(전국), PROVINCES(시·도로 한정, provinces에 "서울"처럼 이름), SEOUL_DISTRICTS(서울 자치구로 한정, districts에 "강남구"처럼 이름)입니다. "○○ 제외"처럼 빼는 지역은 excludedProvinces·excludedDistricts에 적습니다. districts와 excludedDistricts에는 서울의 자치구만 적고, 다른 시·도의 시·군·구는 적지 않습니다. 해당 없는 목록은 빈 목록입니다.
 - foodBusiness: EXCLUDED(음식점·카페·외식업이 제외 업종), NOT_EXCLUDED(지원 업종을 밝혔고 음식점·카페가 빠지지 않음, 또는 업종 제한이 없다고 밝힘). 업종 말이 없으면 mentioned는 false입니다.
 - targetGroups.groups: 신청 대상을 한정하면 YOUTH(청년), WOMEN(여성), DISABLED(장애인), RESTART(재창업자), DAMAGED(재난·피해 소상공인), OTHER(그 밖, note에 이름)입니다. 한정하지 않는다고 밝히면 빈 목록입니다.
 - applicationPeriod: 신청(접수)기간. 날짜는 YYYY-MM-DD로 적고, "예산 소진 시까지"처럼 날짜가 아니면 null로 두고 text에 원문 표기를 적습니다.
@@ -124,14 +124,82 @@ function oneOf<T extends string>(options: readonly T[], value: unknown): value i
   return typeof value === 'string' && (options as readonly string[]).includes(value);
 }
 
+// 시·도 이름. 공고가 쓰는 여러 표기를 짧은 이름 하나로 맞춘다(맞춰 보기는 짧은 이름으로 한다).
+const PROVINCE_NAMES: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ['서울', ['서울특별시', '서울시']],
+  ['부산', ['부산광역시', '부산시']],
+  ['대구', ['대구광역시', '대구시']],
+  ['인천', ['인천광역시', '인천시']],
+  ['광주', ['광주광역시', '광주시']],
+  ['대전', ['대전광역시', '대전시']],
+  ['울산', ['울산광역시', '울산시']],
+  ['세종', ['세종특별자치시', '세종시']],
+  ['경기', ['경기도']],
+  ['강원', ['강원특별자치도', '강원도']],
+  ['충북', ['충청북도']],
+  ['충남', ['충청남도']],
+  ['전북', ['전북특별자치도', '전라북도']],
+  ['전남', ['전라남도']],
+  ['경북', ['경상북도']],
+  ['경남', ['경상남도']],
+  ['제주', ['제주특별자치도', '제주도']],
+];
+const PROVINCES = new Map(PROVINCE_NAMES.flatMap(([short, long]) => [short, ...long].map((name) => [name, short])));
+
+// 범위에 들어갈 값이 없거나 상한·하한이 허용 범위 밖이면 사유를 돌려준다.
 function checkRange(value: z.infer<typeof range>, low: number, high: number, label: string): string | null {
   for (const bound of [value.min, value.max]) {
     if (bound !== null && !(Number.isFinite(bound) && bound >= low && bound <= high)) {
-      return `${label}가 ${low}~${high} 밖입니다.`;
+      return `${label} 값이 ${low}~${high} 밖입니다.`;
     }
   }
-  if (value.min !== null && value.max !== null && value.min > value.max) return `${label} 하한이 상한보다 큽니다.`;
+  const floor = value.min ?? low;
+  if (value.max !== null && (value.maxExclusive ? floor >= value.max : floor > value.max)) {
+    return `${label} 범위에 들어갈 값이 없습니다.`;
+  }
   return null;
+}
+
+// 지역 값을 확인하고 이름을 맞춘다. 자치구 이름은 지역이 서울일 때만 서울 자치구 코드로 바꾼다. '중구'·'강서구'
+// 같은 이름은 다른 시에도 있어, 부산 중구를 서울 중구로 바꾸면 서울 중구 사용자에게 부산 공고가 맞아 보인다.
+function checkRegion(
+  region: ConditionOutput['region']['value'] & object,
+): { ok: true; value: ConditionValues['region'] } | { ok: false; reason: string } {
+  const fail = (reason: string) => ({ ok: false as const, reason });
+  if (!oneOf(REGION_SCOPES, region.scope)) return fail(`지역 범위가 선택지가 아닙니다: ${region.scope}`);
+  const unknownProvinces = [...region.provinces, ...region.excludedProvinces].filter((name) => !PROVINCES.has(name));
+  if (unknownProvinces.length > 0) return fail(`시·도 이름이 아닙니다: ${unknownProvinces.join(', ')}`);
+  const provinces = [...new Set(region.provinces.map((name) => PROVINCES.get(name) as string))];
+  const excludedProvinces = [...new Set(region.excludedProvinces.map((name) => PROVINCES.get(name) as string))];
+  if (region.scope === 'NATIONWIDE' && provinces.length > 0) return fail('전국인데 대상 시·도가 있습니다.');
+  if (region.scope === 'PROVINCES' && provinces.length === 0) return fail('시·도 한정인데 시·도가 없습니다.');
+  if (region.scope === 'SEOUL_DISTRICTS' && region.districts.length === 0)
+    return fail('자치구 한정인데 자치구가 없습니다.');
+  if (region.scope !== 'SEOUL_DISTRICTS' && region.districts.length > 0) {
+    return fail('자치구 한정이 아닌데 대상 자치구가 있습니다.');
+  }
+  const seoul =
+    (region.scope === 'SEOUL_DISTRICTS' &&
+      (provinces.length === 0 || (provinces.length === 1 && provinces[0] === '서울'))) ||
+    (region.scope === 'PROVINCES' && provinces.length === 1 && provinces[0] === '서울');
+  if (!seoul && region.excludedDistricts.length > 0)
+    return fail('서울로 한정하지 않은 공고의 구 이름은 서울 자치구로 볼 수 없습니다.');
+  if (region.scope === 'SEOUL_DISTRICTS' && !seoul) return fail('자치구 한정인데 대상 시·도가 서울이 아닙니다.');
+  const unknownDistricts = [...region.districts, ...region.excludedDistricts].filter(
+    (name) => !DISTRICT_CODES.has(name),
+  );
+  if (unknownDistricts.length > 0) return fail(`서울 자치구 이름이 아닙니다: ${unknownDistricts.join(', ')}`);
+  return {
+    ok: true,
+    value: {
+      ...region,
+      scope: region.scope,
+      provinces,
+      excludedProvinces,
+      districtCodes: region.districts.map((name) => DISTRICT_CODES.get(name) as string),
+      excludedDistrictCodes: region.excludedDistricts.map((name) => DISTRICT_CODES.get(name) as string),
+    },
+  };
 }
 
 // 값이 말이 되는지 본다. 말이 되면 저장할 값을, 안 되면 사유를 돌려준다.
@@ -156,26 +224,8 @@ function checkValue(
       const problem = checkRange(age, 0, 120, '나이');
       return problem === null ? { ok: true, value } : fail(problem);
     }
-    case 'region': {
-      const region = value as ConditionOutput['region']['value'] & object;
-      if (!oneOf(REGION_SCOPES, region.scope)) return fail(`지역 범위가 선택지가 아닙니다: ${region.scope}`);
-      if (region.scope === 'PROVINCES' && region.provinces.length === 0)
-        return fail('시·도 한정인데 시·도가 없습니다.');
-      if (region.scope === 'SEOUL_DISTRICTS' && region.districts.length === 0)
-        return fail('자치구 한정인데 자치구가 없습니다.');
-      const unknown = [...region.districts, ...region.excludedDistricts].filter(
-        (district) => !DISTRICT_CODES.has(district),
-      );
-      if (unknown.length > 0) return fail(`서울 자치구 이름이 아닙니다: ${unknown.join(', ')}`);
-      return {
-        ok: true,
-        value: {
-          ...region,
-          districtCodes: region.districts.map((district) => DISTRICT_CODES.get(district)),
-          excludedDistrictCodes: region.excludedDistricts.map((district) => DISTRICT_CODES.get(district)),
-        },
-      };
-    }
+    case 'region':
+      return checkRegion(value as ConditionOutput['region']['value'] & object);
     case 'targetGroups': {
       const target = value as { groups: string[]; note: string | null };
       const wrong = target.groups.filter((group) => !oneOf(TARGET_GROUPS, group));

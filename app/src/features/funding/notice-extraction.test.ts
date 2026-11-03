@@ -192,6 +192,88 @@ describe('verifyConditionOutput', () => {
       expect(fields[name].status, label).toBe('UNREADABLE');
     }
   });
+
+  // 범위 안에 들어갈 값이 없으면 어떤 사용자도 맞지 않는다. 잘못 읽은 것으로 본다.
+  it('does not keep a range no value can satisfy', () => {
+    const businessAge = (value: Record<string, unknown>) =>
+      verifyConditionOutput(output({ businessAge: { mentioned: true, value, quote: '업력 3년 이내' } }), BODY)
+        .businessAge;
+    expect(businessAge({ min: 3, max: 3, maxExclusive: true })).toMatchObject({
+      status: 'UNREADABLE',
+      reason: expect.stringContaining('없습니다'),
+    });
+    expect(businessAge({ min: null, max: 0, maxExclusive: true }).status).toBe('UNREADABLE');
+    // 정확히 3년(이상이면서 이하)은 들어갈 값이 있다.
+    expect(businessAge({ min: 3, max: 3, maxExclusive: false }).status).toBe('READ');
+    expect(businessAge({ min: null, max: 300, maxExclusive: false })).toMatchObject({
+      reason: '업력 값이 0~100 밖입니다.',
+    });
+  });
+
+  it('matches a quote against full-width digits in the body', () => {
+    const fields = verifyConditionOutput(output(), BODY.replace('만 39세', '만 ３９세'));
+    expect(fields.age.status).toBe('READ');
+  });
+
+  // 서울이 아닌 지역의 '중구'를 서울 중구 코드로 바꾸면, 서울 중구 사용자에게 부산 공고가 맞는 공고로 보인다.
+  it('maps district names to Seoul codes only when the area is Seoul', () => {
+    const body = '신청대상: 부산광역시 중구 소재 소상공인\n지역: 전국(강남구 제외)\n서울특별시 소재 기업(강남구 제외)';
+    const region = (value: Record<string, unknown>, quote: string) =>
+      verifyConditionOutput(
+        output({
+          region: {
+            mentioned: true,
+            value: { provinces: [], districts: [], excludedProvinces: [], excludedDistricts: [], ...value },
+            quote,
+          },
+        }),
+        body,
+      ).region;
+    const seoulOnly = { status: 'UNREADABLE', reason: expect.stringContaining('서울') };
+    // 시·도 한정에 자치구 목록이 함께 오면 어느 쪽인지 알 수 없어 읽지 못함이다(서울 코드로 바꾸지 않는다).
+    expect(
+      region({ scope: 'PROVINCES', provinces: ['부산'], districts: ['중구'] }, '부산광역시 중구 소재'),
+    ).toMatchObject({ status: 'UNREADABLE' });
+    expect(region({ scope: 'NATIONWIDE', excludedDistricts: ['강남구'] }, '전국(강남구 제외)')).toMatchObject(
+      seoulOnly,
+    );
+    expect(
+      region({ scope: 'SEOUL_DISTRICTS', provinces: ['부산'], districts: ['중구'] }, '부산광역시 중구 소재'),
+    ).toMatchObject(seoulOnly);
+    expect(
+      region({ scope: 'PROVINCES', provinces: ['서울특별시'], excludedDistricts: ['강남구'] }, '서울특별시 소재 기업'),
+    ).toMatchObject({
+      status: 'READ',
+      value: { provinces: ['서울'], districtCodes: [], excludedDistrictCodes: ['11680'] },
+    });
+  });
+
+  it('accepts only real province names, and keeps the scope and the lists consistent', () => {
+    const body = '서울특별시·부산광역시 소재 기업, 전국 대상(제주 제외)';
+    const region = (value: Record<string, unknown>) =>
+      verifyConditionOutput(
+        output({
+          region: {
+            mentioned: true,
+            value: { provinces: [], districts: [], excludedProvinces: [], excludedDistricts: [], ...value },
+            quote: '서울특별시·부산광역시 소재 기업',
+          },
+        }),
+        body,
+      ).region;
+    expect(region({ scope: 'PROVINCES', provinces: ['서울특별시', '부산시'] })).toMatchObject({
+      status: 'READ',
+      value: { provinces: ['서울', '부산'] },
+    });
+    expect(region({ scope: 'NATIONWIDE', excludedProvinces: ['제주특별자치도'] })).toMatchObject({
+      status: 'READ',
+      value: { excludedProvinces: ['제주'] },
+    });
+    expect(region({ scope: 'PROVINCES', provinces: ['서울', '아무거나'] }).status).toBe('UNREADABLE');
+    expect(region({ scope: 'NATIONWIDE', excludedProvinces: ['아무거나'] }).status).toBe('UNREADABLE');
+    // 전국인데 시·도 목록이 있으면 어느 쪽인지 알 수 없다.
+    expect(region({ scope: 'NATIONWIDE', provinces: ['서울'] }).status).toBe('UNREADABLE');
+  });
 });
 
 type Saved = Parameters<ConditionExtractionStore['save']>[0];
@@ -291,6 +373,15 @@ describe('extractNoticeConditions', () => {
     expect(report.failures[0]).toContain('connection terminated');
   });
 
+  it('still counts the tokens of a successful call when saving its result fails', async () => {
+    const store = memoryStore({ 'bizinfo-pbln-a': BODY });
+    store.save = async () => {
+      throw new Error('connection terminated');
+    };
+    const report = await extractNoticeConditions(targets, { store, extractor: okExtractor(), now: () => NOW });
+    expect(report).toMatchObject({ counts: { FAILED: 1, EXTRACTED: 0 }, inputTokens: 1200, outputTokens: 300 });
+  });
+
   it('does not call the AI without a key, and does not send bodies over the size limit', async () => {
     const store = memoryStore({ 'bizinfo-pbln-a': BODY });
     expect((await extractNoticeConditions(targets, { store, extractor: null, now: () => NOW })).counts).toMatchObject({
@@ -349,15 +440,16 @@ describe('createClaudeConditionExtractor', () => {
     ]);
   });
 
-  it('fails with the stop reason and the token counts when the answer is cut off', async () => {
-    const { extractor } = client({ stop_reason: 'max_tokens', text: '{"businessStage":' });
-    const error = await extractor(BODY, '청년 창업 지원').catch((reason: unknown) => reason);
+  // 실패한 호출도 비용이 든다. 어떤 실패든 그 호출의 토큰 수를 남긴다(ADR 0009 Consequences의 비용 기록).
+  it.each([
+    ['the answer is cut off', 'max_tokens', '{"businessStage":', 'max_tokens'],
+    ['the answer is not JSON', 'end_turn', '공고를 읽었습니다.', 'JSON이 아닙니다'],
+    ['the answer does not fit the schema', 'end_turn', '{"businessStage":1}', '출력 스키마와 다릅니다'],
+  ])('fails with the reason and the token counts when %s', async (_, stopReason, text, reason) => {
+    const { extractor } = client({ stop_reason: stopReason, text });
+    const error = await extractor(BODY, '청년 창업 지원').catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(ConditionExtractionFailure);
-    expect(error).toMatchObject({
-      message: expect.stringContaining('max_tokens'),
-      inputTokens: 1500,
-      outputTokens: 250,
-    });
+    expect(error).toMatchObject({ message: expect.stringContaining(reason), inputTokens: 1500, outputTokens: 250 });
   });
 
   it('accepts an answer with an unknown option and leaves it to verification', async () => {
