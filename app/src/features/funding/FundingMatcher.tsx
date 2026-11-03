@@ -122,9 +122,8 @@ export default function FundingMatcher() {
 
       <MarketGradeBanner
         onLoaded={(score) => {
-          // 상권에서 넘어오면 비어 있는 자치구·업종만 채운다. 사업 단계와 용도는 사용자가 고른다.
+          // 상권에서 넘어오면 비어 있는 자치구만 채운다(ADR 0009 §6의 ADR 0008 개정). 나머지는 사용자가 고른다.
           setDistrictCode((current) => (current === '' ? score.area.districtCode : current));
-          setIndustryCode((current) => (current.trim() === '' ? score.industry.code : current));
         }}
       />
 

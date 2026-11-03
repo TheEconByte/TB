@@ -17,7 +17,7 @@
 - 실행: `npm --prefix app run funding:validate`, `npm --prefix app run funding:load [-- --catalog <경로>]`. 기본 카탈로그는 `app/catalog/funding/catalog.json`이다.
 - 원문 확인과 카탈로그 편집은 운영자가 수행한다.
 - Zod 스키마가 productKey·version 형식, 필수 필드, 날짜 형식, 금액의 원 단위 정수 문자열, supportType·사업단계·접수 상태·상환방식 열거, 공식 기관 HTTPS 호스트, checksum 형식을 검사한다.
-- 상환 계산은 구조화된 확정 조건 필드(`interestRatePercent`·`repaymentTermMonths`·`repaymentGraceMonths`)만 읽는다. 조건 문장(`interestCondition`·`repaymentCondition`)은 숫자로 해석하지 않는다. 기록 규칙은 카탈로그 README의 "확정 조건과 상환 계산"에 있다.
+- 상환 계산 대상 여부는 구조화된 확정 조건 필드(`interestRatePercent`·`repaymentTermMonths`·`repaymentGraceMonths`)만 읽는다. 조건 문장(`interestCondition`·`repaymentCondition`)은 숫자로 해석하지 않는다. 기록 규칙은 카탈로그 README의 "확정 조건과 상환 계산"에 있다.
 - 규칙 검사 항목:
   - productKey+version 중복
   - 접수기간과 관측 접수 상태의 모순(종료된 공고를 OPEN으로 기록 등)
@@ -200,7 +200,7 @@
 - 대출의 상환 계산 대상 여부:
   - 공개 한도, 확정 금리(`interestRateConfirmed`와 `interestRatePercent`), 상환기간·거치(`repaymentTermMonths`·`repaymentGraceMonths`), 상환방식이 모두 확정되고, 계산 엔진이 지원하는 방식이며, 거치개월이 전체 상환개월보다 작아야 상환 계산 대상이다.
   - 하나라도 어긋나면 상환 계산 대상으로 표시하지 않고 사유를 남긴다.
-  - 상환 계산 대상일 때만 상품 조건을 계획의 대출 가정으로 옮길 수 있다.
+  - 상환 계산 대상이어도 상품 조건을 계획에 옮기지 않는다(아래 저장된 대출 가정).
 
 ## 후보 조회 API
 
@@ -235,27 +235,21 @@
 - 상태 구분: 미로그인 401 `UNAUTHORIZED`, 없거나 타인 소유인 계획 404 `NOT_FOUND`(소유자 불일치를 403으로 구분하지 않는다), 저장된 조건이 없거나 스키마와 다르면 400 `INVALID_INPUT`, 활성 카탈로그 릴리스가 없으면 503 `CATALOG_UNAVAILABLE`.
 - 판정 응답은 후보 조회 응답에 어느 계획·revision의 조건이었는지(`plan.id`, `plan.revision`)를 더한다. 자금 후보는 조회 결과이며 불변 저장 대상이 아니다.
 
-## 상품 확정 조건 → 대출 가정 적용
+## 저장된 대출 가정
 
-- 상품 확정 조건을 계획의 신규 대출 가정으로 옮기는 일은 사용자가 계획 화면에서 명시적으로 실행할 때만 일어난다. 후보 조회·판정·계획 불러오기·초안 저장 시점에는 신규 대출 입력을 자동으로 채우지 않는다. 화면은 상품 확정 조건과 사용자가 입력한 가정을 구분해 표시한다.
-- 적용 대상은 서버가 저장된 계획 조건과 활성 릴리스의 자동화 설정으로 다시 판정한 `CURRENT_CANDIDATE`이면서, 그 판정의 상환 계산 가능(`repayment.supported`)이 true인 대출 상품뿐이다. 그 밖의 상품은 "상환 계산 대상 아님 + 사유"를 유지하며 0원 상환으로 대체하지 않는다.
-- 실행: `POST /api/plans/{planId}/loan-assumption`(본문 `{ productKey, version, revision }`).
-  - 서버가 활성 카탈로그에서 상품 버전과 현재 후보 여부를 다시 확인한다.
-  - 사용자가 초안에 저장한 `newLoan.principal`에 상품의 확정 금리·기간·거치·상환방식만 결합한다.
-  - 저장된 원금이 1원 이상이고 공개 한도 이하인지 확인한다. 공개 한도는 이 검증에만 쓰며 신청·승인 원금으로 자동 대입하지 않는다.
-  - 계산은 재무 계산 엔진(`app/src/features/finance`)을 그대로 쓰며 새 계산기나 별도 상환표를 만들지 않는다.
-- 적용은 계획 입력의 변경이므로 기존 revision·불변 결과 규칙을 따른다. 성공하면 revision이 1 증가하고, 적용 전에 계산해 둔 과거 `plan_results`는 바뀌지 않는다.
-- 출처 보존: 적용 시 `plans.loanAssumptionJson`에 상품 키·버전·상품명·카탈로그 키·카탈로그 버전·적용 시각과 실제 신규 대출 입력을 저장한다. 계산 시 그 값을 `plan_results.loanAssumptionJson`으로 복사해, 그 뒤 카탈로그가 바뀌어도 어떤 상품 조건이 반영된 결과인지 추적할 수 있다.
-- 출처 삭제: 계획 저장(PUT)에서 새 `newLoan` 입력이 저장된 상품 확정 조건과 값까지 같으면 출처를 유지하고, 사용자가 값을 직접 바꾸면 출처를 지운다. 상품 조건이 아닌 값을 상품 조건으로 표시하지 않기 위해서다.
-- 상태 구분: 미로그인 401 `UNAUTHORIZED`, 없거나 타인 소유인 계획 404 `NOT_FOUND`, 잘못된 본문·활성 카탈로그에 없는 상품 버전·상환 계산 대상이 아닌 상품 400 `INVALID_INPUT`, 활성 카탈로그 없음 503 `CATALOG_UNAVAILABLE`, 오래된 revision 409 `REVISION_CONFLICT`.
-- 화면 규칙: 계획이 저장되어 있고 자금 조건·재무 입력에 저장하지 않은 변경이 없을 때만 적용할 수 있다. 적용 뒤에는 어떤 상품 버전·카탈로그의 조건인지와 승인 확정이 아님을 함께 표시한다.
+상품 확정 조건을 계획의 신규 대출 가정으로 옮기던 기능(`POST /api/plans/{planId}/loan-assumption`과 계획 화면의 적용 버튼)은 [ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) §5로 없앴다. 사용자는 대출 조건을 재무 계획에 직접 입력한다.
+
+- 그 전에 저장된 `plans.loanAssumptionJson`(상품 키·버전·상품명·카탈로그 키·카탈로그 버전·적용 시각과 그때의 신규 대출 입력)은 그대로 읽고, 계획 화면에 어느 상품 조건인지와 승인 확정이 아님을 함께 보여 준다. 새로 쓰지 않는다.
+- 계획 저장(PUT): 새 `newLoan` 입력이 저장된 출처의 값과 같으면 출처를 유지하고, 다르면 지운다. 상품 조건이 아닌 값을 상품 조건으로 표시하지 않기 위해서다. 출처를 새로 만들지는 않는다.
+- 계산: 계획에 남은 출처를 `plan_results.loanAssumptionJson`으로 복사해, 그 결과에 어떤 상품 조건이 반영됐는지 남긴다. 과거 결과는 다시 계산하지 않는다.
+- `loanAssumptionJson`을 다루는 API 라우트 파일은 계획 수정과 계산뿐이다(`loan-assumption.test.ts`가 `src/app/api`의 라우트 파일 이름 사용을 검사한다. 두 라우트가 출처를 새로 만들지 않는 것은 같은 파일의 라우트 테스트가 확인한다).
 
 ## 테스트
 
-- DB 없이: 카탈로그 스키마·규칙 위반, 실제 카탈로그 5건의 규칙 통과와 모두 상환 계산 대상이 아님(`supported=false`), 조건 판정, 상환 계산 가능 여부, 상품 조건과 사용자 원금의 결합. 후보 조회·계획 조건 판정·상품 조건 적용 API의 경계(상태 코드)는 Prisma를 mock해 DB 없이 검증한다.
+- DB 없이: 카탈로그 스키마·규칙 위반, 실제 카탈로그 5건의 규칙 통과와 모두 상환 계산 대상이 아님(`supported=false`), 조건 판정, 상환 계산 가능 여부, 저장된 대출 가정의 읽기·유지·삭제·결과 복사. 후보 조회·계획 조건 판정 API의 경계(상태 코드)는 Prisma를 mock해 DB 없이 검증한다.
 - DB 없이: 자동 상품의 최신성·승격 보류·상환 계산 스위치, v1.0.0 릴리스 읽기, 자동 상품 규칙 검사, 동기화의 상품 버전 재사용 규칙, 사업 단계·지원 유형 미확인 상품의 규칙 검사와 판정, 지원 유형별 갈래와 갈래별 개수, 자동 상품의 출처 정보.
 - DB 없이(`sources/bizinfo.test.ts`): 기업마당 신청기간·지역 해석, 수집 범위와 사유별 제외, 만든 상품의 규칙 검사 통과와 추가 확인 판정, 요청 인자, 키 없음·403·429·재시도·JSON 아님·잘린 응답, 오류 문장의 키 가림.
 - DB 없이(`sources/semas-ols.test.ts`, 사이트 원문이 아닌 HTML 조각 fixture): 소진공 접수기간 표기 해석과 모호한 표기 거부, 정책자금 표·홈 화면 접수 표시·공지 목록·공지 상세 해석과 필수 항목 누락 실패, 공지 고르기, 접수 상태 판정(세부 유형 카드, 날짜 모순, 마감 표시, 상시접수, 제외 신호), 모호한 금리·여러 금액 한도를 확정 값으로 옮기지 않음, 만든 상품의 규칙 검사 통과와 스위치·최신성에 따른 판정, 근거별 페이지 checksum, 요청 순서와 1초 이상 간격, 연락처 없음·robots.txt 생김·403·429·자동 입력 방지 화면·재시도·잘린 공지 목록.
 - DB 없이(`notice-text.test.ts`, 직접 만든 PDF·HWP·HWPX fixture와 [만든 방법](../../app/src/features/funding/fixtures/README.md)): 공고 파일의 본문과 표 칸을 읽는 순서대로 추출, 글꼴을 넣지 않은 한글 CID 글꼴 PDF, 글자 없는 파일의 `NO_TEXT`, 깨진·암호·형식이 다른 파일의 `UNREADABLE`, 라이브러리·CMap을 불러오지 못하면 결과 대신 예외. 아직 동기화에 연결하지 않았다([ADR 0009](../decisions/0009-funding-ai-condition-extraction.md) 8절).
-- `TEST_DATABASE_URL` 전용 DB: 카탈로그 적재, 실제 DB에서의 후보 조회·계획 조건 판정·상품 조건 적용, 출처 저장과 과거 결과 불변성. 합성 카탈로그만 만들고 끝나면 지우며 실행 전 ACTIVE 상태를 복원한다.
+- `TEST_DATABASE_URL` 전용 DB: 카탈로그 적재, 실제 DB에서의 후보 조회·계획 조건 판정, 저장된 대출 가정의 읽기와 과거 결과 불변성. 합성 카탈로그만 만들고 끝나면 지우며 실행 전 ACTIVE 상태를 복원한다.
 - `TEST_DATABASE_URL` 전용 DB의 동기화(`sync.test.ts`): 합성 수집기로 적재, 버전 재사용과 새 버전, 출처 실패 시 직전 상품 유지, 빈 응답·급감, 검증 실패, 사람 기록 우선, dry run, 새 공고 목록, 기업마당 수집기(가짜 응답)로 유형 미확인 상품 적재와 추가 확인 판정.
