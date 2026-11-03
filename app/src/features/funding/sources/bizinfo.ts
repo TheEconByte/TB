@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { secretMasker, type FetchLike } from '../../market/seoul-api.ts';
 import { SEOUL_DISTRICTS } from '../districts.ts';
+import type { NoticeDownload, NoticeFilePart } from '../notice-body.ts';
 import type { CollectedFundingProduct, FundingSourceAdapter, FundingSourceCollection } from '../sync.ts';
 import { compareIsoDates, isOfficialUrl, isRealDate } from '../types.ts';
 
@@ -76,6 +77,12 @@ const bizinfoItemSchema = z.object({
   trgetNm: text,
   pldirSportRealmLclasCodeNm: text,
   totCnt: text,
+  // 사업개요, 본문출력파일, 첨부(ADR 0009 §2).
+  bsnsSumryCn: text,
+  printFlpthNm: text,
+  printFileNm: text,
+  flpthNm: text,
+  fileNm: text,
 });
 
 type BizinfoItem = z.infer<typeof bizinfoItemSchema>;
@@ -102,6 +109,8 @@ export type BizinfoAdapterOptions = {
   retries?: number;
   retryDelayMs?: number;
   timeoutMs?: number;
+  // 공고 파일 받기 설정. 동기화마다 새 downloader를 만든다.
+  files?: BizinfoFileDownloaderOptions;
 };
 
 class RetryableBizinfoError extends Error {}
@@ -112,9 +121,11 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 function cleanText(value: string): string {
   return value
     .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-      if (entity.startsWith('#x') || entity.startsWith('#X'))
-        return String.fromCodePoint(parseInt(entity.slice(2), 16));
-      if (entity.startsWith('#')) return String.fromCodePoint(Number(entity.slice(1)));
+      if (entity.startsWith('#')) {
+        const code = entity[1] === 'x' || entity[1] === 'X' ? parseInt(entity.slice(2), 16) : Number(entity.slice(1));
+        // 유니코드 범위 밖이나 NUL은 풀지 않고 지운다. 잘못된 엔티티 하나로 출처 전체가 실패하지 않게 한다.
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+      }
       return ENTITIES[entity.toLowerCase()] ?? match;
     })
     .replace(/\s+/g, ' ')
@@ -231,6 +242,74 @@ function noticeUrl(raw: string): string | null {
   }
   const value = url.toString();
   return isOfficialUrl(value) ? value : null;
+}
+
+// 파일 항목 하나에 여러 파일이 오면 '@'로 잇는다(2026-11-03 실제 응답 확인). 주소와 이름은 같은 순서다.
+function splitFileField(value: string): string[] {
+  return value
+    .split('@')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
+
+// 파일 받기가 요청하는 주소(https www.bizinfo.go.kr의 공고 파일 경로)만 계획에 넣는다. www 없는 주소는 같은
+// 곳으로 읽는다. 다른 주소를 넣으면 받지 못한 파일로 남아 그 공고의 본문을 날마다 새로 읽게 된다.
+function bizinfoFileUrl(raw: string): string | null {
+  const official = noticeUrl(raw);
+  if (official === null) return null;
+  const url = new URL(official);
+  if (url.hostname === 'bizinfo.go.kr') url.hostname = 'www.bizinfo.go.kr';
+  return url.hostname === 'www.bizinfo.go.kr' && url.pathname === BIZINFO_FILE_PATH ? url.toString() : null;
+}
+
+// 파일 주소에는 API 호출 때마다 새로 발급되는 downloadToken이 붙는다. 파일을 알아보고 기록할 때는 뺀다.
+function withoutDownloadToken(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.delete('downloadToken');
+  return parsed.toString();
+}
+
+// 본문출력파일과 첨부. 파일 주소는 공식 기업마당 주소일 때만 쓴다.
+export function bizinfoNoticeFiles(
+  item: Pick<BizinfoItem, 'printFlpthNm' | 'printFileNm' | 'flpthNm' | 'fileNm'>,
+): NoticeFilePart[] {
+  const files: NoticeFilePart[] = [];
+  for (const [kind, rawPaths, rawNames] of [
+    ['PRINT_FILE', item.printFlpthNm, item.printFileNm],
+    ['ATTACHMENT', item.flpthNm, item.fileNm],
+  ] as const) {
+    const paths = splitFileField(rawPaths);
+    const names = splitFileField(rawNames);
+    // 개수가 다르면 어느 이름이 어느 파일인지 알 수 없다. 이름 없이 남겨 형식을 알 수 없는 파일로 기록한다.
+    const paired = paths.length === names.length;
+    for (const [index, path] of paths.entries()) {
+      const downloadUrl = bizinfoFileUrl(path);
+      if (downloadUrl === null) continue;
+      const url = withoutDownloadToken(downloadUrl);
+      files.push({
+        kind,
+        name: paired ? cleanText(names[index]) : '',
+        url,
+        ...(url === downloadUrl ? {} : { downloadUrl }),
+      });
+    }
+  }
+  return files;
+}
+
+// 사업개요의 HTML 태그를 줄바꿈으로 바꾸고 엔티티를 푼다. 줄 구조는 남긴다.
+function summaryText(raw: string): string {
+  // 사업개요는 HTML이 그대로 오기도 하고 엔티티로 감싸여 오기도 한다. 엔티티로 감싼 태그(&lt;p&gt; 등)만 태그로
+  // 되돌리고, 엔티티는 한 번만 푼다. 모두 푼 뒤에 태그를 지우면 본문의 부등호(&lt; 10억 &gt;)까지 태그로 지워진다.
+  const escapedTag = /&lt;(\/?[a-z][a-z0-9]*(?:\s(?:[^&<>]|&quot;|&#39;|&amp;)*)?\/?)&gt;/gi;
+  return raw
+    .replace(escapedTag, '<$1>')
+    .replace(/<\s*br\s*\/?>|<\/\s*(p|div|li|tr)\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .split('\n')
+    .map(cleanText)
+    .filter((line) => line !== '')
+    .join('\n');
 }
 
 function productKeyFor(pblancId: string): string | null {
@@ -389,6 +468,13 @@ export function mapBizinfoItems(
       ],
       evidence,
       sourceRef: { source: 'BIZINFO', externalId: item.pblancId },
+      notice: {
+        sourceUrl: officialUrl,
+        inline: [
+          { kind: 'API_SUMMARY', name: '기업마당 사업개요', url: officialUrl, text: summaryText(item.bsnsSumryCn) },
+        ],
+        files: bizinfoNoticeFiles(item),
+      },
     });
   }
   return { products, skipped };
@@ -403,6 +489,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
   const retries = options.retries ?? 2;
   const retryDelayMs = options.retryDelayMs ?? 2000;
   const timeoutMs = options.timeoutMs ?? 60000;
+  let fileDownloader = createBizinfoFileDownloader(options.files ?? { contact: undefined });
 
   async function request(apiKey: string): Promise<string> {
     const url = new URL(BIZINFO_API_URL);
@@ -434,7 +521,10 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
 
   return {
     source: 'BIZINFO',
+    downloadNoticeFile: (url) => fileDownloader(url),
     async collect({ asOfDate, log }): Promise<FundingSourceCollection> {
+      // robots.txt 확인과 403·429 멈춤은 동기화마다 새로 시작한다.
+      fileDownloader = createBizinfoFileDownloader(options.files ?? { contact: undefined });
       const apiKey = options.apiKey?.trim() ?? '';
       if (apiKey === '') {
         throw new Error('BIZINFO_API_KEY가 없어 기업마당 공고를 받지 못했습니다. 키 값은 Git에 추가하지 마세요.');
@@ -474,6 +564,154 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
         throw new Error(mask(error instanceof Error ? error.message : String(error)));
       }
     },
+  };
+}
+
+export type BizinfoFileFetch = (
+  url: string,
+  init: { headers: Record<string, string>; redirect: 'manual' | 'follow'; signal?: AbortSignal },
+) => Promise<{ status: number; arrayBuffer(): Promise<ArrayBuffer> }>;
+
+export type BizinfoFileDownloaderOptions = {
+  // FUNDING_SYNC_CONTACT. 파일 요청의 User-Agent에 밝힌다. 없으면 파일을 받지 않는다(ADR 0006 3절).
+  contact: string | undefined;
+  fetchImpl?: BizinfoFileFetch;
+  // 요청 사이 간격. 1초보다 짧게 줄 수 없다.
+  requestIntervalMs?: number;
+  retries?: number;
+  retryDelayMs?: number;
+  timeoutMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+const BIZINFO_ROBOTS_URL = `${BIZINFO_ORIGIN}/robots.txt`;
+// 2026-11-02 확인 때 robots.txt가 막지 않은 공고 파일 경로. 이 경로 밖은 요청하지 않는다.
+const BIZINFO_FILE_PATH = '/cmm/fms/getImageFile.do';
+const MIN_FILE_REQUEST_INTERVAL_MS = 1000;
+
+// robots.txt에서 모든 로봇(User-agent: *)에 적용되는 Disallow가 파일 경로를 막는지 본다.
+// 규칙은 RFC 9309를 따른다: `*`는 아무 글자, 끝의 `$`는 경로 끝이고, 가장 길게 맞는 규칙이 이기며
+// 길이가 같으면 Allow가 이긴다. 파일 주소는 경로 뒤에 atchFileId 질의가 붙는 모양으로 본다.
+export function bizinfoRobotsDisallowFiles(robots: string): boolean {
+  const path = `${BIZINFO_FILE_PATH}?atchFileId=FILE`;
+  let applies = false;
+  let inAgents = false;
+  let best: { length: number; allow: boolean } | null = null;
+  for (const raw of robots.split(/\r?\n/)) {
+    const line = raw.replace(/#.*$/, '').trim();
+    const match = /^([a-z-]+)\s*:\s*(.*)$/i.exec(line);
+    if (match === null) continue;
+    const field = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (field === 'user-agent') {
+      // 연달아 오는 User-agent 줄은 한 묶음이다.
+      applies = (inAgents && applies) || value === '*';
+      inAgents = true;
+      continue;
+    }
+    inAgents = false;
+    if (!applies || (field !== 'allow' && field !== 'disallow') || value === '') continue;
+    const anchored = value.endsWith('$');
+    const pattern = (anchored ? value.slice(0, -1) : value)
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+    if (!new RegExp(`^${pattern}${anchored ? '$' : ''}`).test(path)) continue;
+    const allow = field === 'allow';
+    if (best === null || value.length > best.length || (value.length === best.length && allow)) {
+      best = { length: value.length, allow };
+    }
+  }
+  return best !== null && !best.allow;
+}
+
+// 기업마당 공고 파일(본문출력파일·첨부)을 받는다. 동기화 한 번에 하나를 만들어 쓴다:
+// 처음 요청 전에 robots.txt를 한 번 확인하고, 403·429를 만나면 그 뒤로는 요청하지 않는다.
+export function createBizinfoFileDownloader(options: BizinfoFileDownloaderOptions): NoticeDownload {
+  const fetchImpl: BizinfoFileFetch = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const interval = Math.max(MIN_FILE_REQUEST_INTERVAL_MS, options.requestIntervalMs ?? MIN_FILE_REQUEST_INTERVAL_MS);
+  const retries = options.retries ?? 2;
+  const retryDelayMs = options.retryDelayMs ?? 2000;
+  const timeoutMs = options.timeoutMs ?? 60000;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const contact = options.contact?.trim() ?? '';
+  const userAgent = `TrendBench-funding-sync/1.0 (+${contact})`;
+  let requestCount = 0;
+  let robotsChecked = false;
+  // 이번 동기화에서 더 받지 않는 이유. null이면 받는다.
+  let stopped: string | null = null;
+
+  // 공고 파일은 다른 경로로 넘기는 응답을 따라가지 않는다. 그 경로는 robots.txt와 경로 검사를 거치지 않았다.
+  // robots.txt는 넘김을 따라간다(RFC 9309 2.3.1.2).
+  async function send(url: string, redirect: 'manual' | 'follow') {
+    if (requestCount > 0) await sleep(interval);
+    requestCount += 1;
+    return fetchImpl(url, { headers: { 'User-Agent': userAgent }, redirect, signal: AbortSignal.timeout(timeoutMs) });
+  }
+
+  async function checkRobots(): Promise<string | null> {
+    try {
+      const response = await send(BIZINFO_ROBOTS_URL, 'follow');
+      if (response.status === 404) return null;
+      if (response.status !== 200) return `robots.txt를 확인하지 못했습니다(HTTP ${response.status}).`;
+      const robots = new TextDecoder().decode(await response.arrayBuffer());
+      return bizinfoRobotsDisallowFiles(robots)
+        ? `robots.txt가 공고 파일 경로(${BIZINFO_FILE_PATH})를 막습니다.`
+        : null;
+    } catch (error) {
+      return `robots.txt를 확인하지 못했습니다: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  return async (raw) => {
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return { ok: false, transient: false, message: '파일 주소가 아닙니다.' };
+    }
+    if (url.protocol !== 'https:' || url.hostname !== 'www.bizinfo.go.kr' || url.pathname !== BIZINFO_FILE_PATH) {
+      return {
+        ok: false,
+        transient: false,
+        message: `기업마당 공고 파일 경로가 아니어서 받지 않습니다: ${url.origin}${url.pathname}`,
+      };
+    }
+    if (!/^[\x21-\x7e][\x20-\x7e]{0,199}$/.test(contact)) {
+      return {
+        ok: false,
+        transient: true,
+        message: 'FUNDING_SYNC_CONTACT가 없거나 헤더에 쓸 수 없어 공고 파일을 받지 않았습니다(ADR 0006 3절).',
+      };
+    }
+    if (!robotsChecked) {
+      robotsChecked = true;
+      stopped = await checkRobots();
+    }
+    if (stopped !== null) return { ok: false, transient: true, message: stopped };
+
+    let lastError = '';
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      if (attempt > 0 && retryDelayMs > interval) await sleep(retryDelayMs * 2 ** (attempt - 1) - interval);
+      try {
+        const response = await send(url.toString(), 'manual');
+        if (response.status === 403 || response.status === 429) {
+          // 차단은 우회하지 않는다. 이번 동기화에서는 더 요청하지 않는다(ADR 0006 3절).
+          stopped = `기업마당이 파일 요청을 거부했습니다(HTTP ${response.status}). 이번 동기화에서는 파일을 더 받지 않습니다.`;
+          return { ok: false, transient: true, message: stopped };
+        }
+        if (response.status >= 500) {
+          lastError = `HTTP ${response.status}`;
+          continue;
+        }
+        if (response.status !== 200) return { ok: false, transient: false, message: `HTTP ${response.status}` };
+        return { ok: true, bytes: new Uint8Array(await response.arrayBuffer()) };
+      } catch (error) {
+        if (!(error instanceof Error) || !isNetworkError(error)) throw error;
+        lastError = error.message;
+      }
+    }
+    return { ok: false, transient: true, message: `${retries + 1}번 요청이 실패했습니다: ${lastError}` };
   };
 }
 
