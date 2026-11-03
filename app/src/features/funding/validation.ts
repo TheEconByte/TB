@@ -72,7 +72,7 @@ export type FundingCatalogValidation = {
   errorCounts: Record<string, number>;
   warningCounts: Record<string, number>;
   checks: FundingValidationCheck[];
-  // 검토 기한이 지나 현재 후보로 쓸 수 없는 상품. 적재는 막지 않는다.
+  // 다음 검토일(자동 상품은 출처 확인)이 지나 원문을 다시 확인해야 하는 상품. 적재는 막지 않는다.
   reviewOverdue: string[];
 };
 
@@ -179,6 +179,24 @@ function createCollector(): Collector {
 
 function overlap(left: readonly string[], right: readonly string[]): string[] {
   return left.filter((value) => right.includes(value));
+}
+
+// 상품 조건만으로 상환액을 계산할 수 없는 이유. 비어 있으면 상환 계산 대상이며, 적재기가 이 판단을
+// funding_product_versions.repaymentCalculationSupported에 남긴다. 거치가 상환기간 이상인 상품은 규칙 검사가 따로 거부한다.
+export function repaymentCalculationReasons(product: FundingProduct): string[] {
+  if (!REPAYABLE_SUPPORT_TYPES.includes(product.supportType)) {
+    return [`지원 유형 ${product.supportType}은 대출 원금·상환 일정으로 변환하지 않습니다.`];
+  }
+  const reasons: string[] = [];
+  if (product.publicLimit === null) reasons.push('공개 한도가 확인되지 않았습니다.');
+  if (!product.interestRateConfirmed || product.interestRatePercent === null)
+    reasons.push('금리가 확정되지 않았습니다.');
+  if (!isSupportedRepaymentMethod(product.repaymentMethod)) {
+    reasons.push(`상환방식 ${product.repaymentMethod}은(는) 현재 계산 엔진이 지원하지 않습니다.`);
+  }
+  if (product.repaymentTermMonths === null || product.repaymentGraceMonths === null)
+    reasons.push('상환기간·거치 조건이 확인되지 않았습니다.');
+  return reasons;
 }
 
 function checkProduct(
@@ -321,11 +339,7 @@ function checkProduct(
     );
   }
   if (product.reviewedAt === null) {
-    collector.add(
-      'REVIEWED_AT_MISSING',
-      source,
-      'reviewedAt이 없습니다. 검수하지 않은 상품은 현재 후보로 취급하지 않습니다.',
-    );
+    collector.add('REVIEWED_AT_MISSING', source, 'reviewedAt이 없습니다. 원문을 확인한 날을 기록하세요.');
   } else {
     if (compareIsoDates(product.reviewedAt, product.observedAt) < 0) {
       collector.add(
@@ -347,7 +361,7 @@ function checkProduct(
     collector.add(
       'NEXT_REVIEW_AT_MISSING',
       source,
-      'nextReviewAt이 없습니다. 다음 검토일 없는 상품은 현재 후보로 취급하지 않습니다.',
+      'nextReviewAt이 없습니다. 사람이 기록한 상품에는 다음 검토일을 적습니다.',
     );
   } else if (
     product.nextReviewAt !== null &&
@@ -496,19 +510,7 @@ function checkProduct(
   }
 
   // 상환 계산 가능 여부. 불명확한 값을 0원 상환으로 표시하지 않도록 사유를 요구한다.
-  const calculationReasons: string[] = [];
-  if (!repayable) {
-    calculationReasons.push(`지원 유형 ${product.supportType}은 대출 원금·상환 일정으로 변환하지 않습니다.`);
-  } else {
-    if (product.publicLimit === null) calculationReasons.push('공개 한도가 확인되지 않았습니다.');
-    if (!product.interestRateConfirmed || product.interestRatePercent === null)
-      calculationReasons.push('금리가 확정되지 않았습니다.');
-    if (!isSupportedRepaymentMethod(product.repaymentMethod)) {
-      calculationReasons.push(`상환방식 ${product.repaymentMethod}은(는) 현재 계산 엔진이 지원하지 않습니다.`);
-    }
-    if (product.repaymentTermMonths === null || product.repaymentGraceMonths === null)
-      calculationReasons.push('상환기간·거치 조건이 확인되지 않았습니다.');
-  }
+  const calculationReasons = repaymentCalculationReasons(product);
   if (calculationReasons.length > 0 && product.unsupportedCalculationReasons.length === 0) {
     collector.add(
       'CALCULATION_REASON_MISSING',
@@ -543,8 +545,8 @@ function checkProduct(
       'REVIEW_OVERDUE',
       source,
       automated
-        ? `출처의 마지막 성공 동기화가 기준일 ${basisDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없습니다. 현재 후보에서 제외하고 재확인 대상으로만 남깁니다.`
-        : `다음 검토일 ${product.nextReviewAt ?? '없음'}이(가) 기준일 ${basisDate} 이전입니다. 현재 후보에서 제외하고 재확인 대상으로만 남깁니다.`,
+        ? `출처의 마지막 성공 동기화가 기준일 ${basisDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없습니다. 맞춰 보기는 조건이 모두 맞아도 이 상품을 맞아 보임으로 두지 않습니다.`
+        : `다음 검토일 ${product.nextReviewAt ?? '없음'}이(가) 기준일 ${basisDate} 이전입니다. 원문을 다시 확인하세요. 맞춰 보기는 기록일과 다음 검토일을 함께 보여 줍니다.`,
     );
   }
 }

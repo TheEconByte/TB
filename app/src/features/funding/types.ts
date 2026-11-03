@@ -19,7 +19,6 @@ export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
 // 검수자가 아직 지정되지 않은 상품. 카탈로그에 남기고 운영자 명령이 주의로 알린다. 맞춰 보기 화면(ADR 0009 §4)은
 // 검수자·검수 기한을 그룹에 쓰지 않으므로 이 상품도 보여 준다. 사업 단계·지역은 공식 원문 근거가 있을 때만 운영자
 // 확인 값으로 쓰고, 나머지 조건은 다른 상품처럼 AI가 공고문에서 읽은 값으로 맞춰 본다(matching.ts).
-// 예전 판정(eligibility.ts)은 이 상품을 현재 후보로 두지 않았으며, 그 코드는 ADR 0009 6단계에서 지운다.
 export const REVIEWER_UNASSIGNED = 'UNASSIGNED';
 
 // funding:sync가 공식 출처에서 모은 상품의 검수자. 사람 대신 자동 규칙 버전을 적고,
@@ -41,11 +40,7 @@ export const FUNDING_SOURCE_LABELS: Record<FundingSource, string> = {
   BIZINFO: '기업마당 지원사업정보',
 };
 
-// 새 공고를 찾는 데만 쓰는 출처. 사업 단계·지원 유형을 알 수 없어, 이 출처만으로 확인된
-// 상품은 사람이 확인하기 전에는 현재 후보가 되지 않는다(ADR 0006 2절).
-export const DISCOVERY_ONLY_SOURCES: readonly FundingSource[] = ['BIZINFO'];
-
-// 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 현재 후보에서 빠진다.
+// 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 맞춰 보기에서 맞아 보임이 되지 않는다.
 export const SOURCE_FRESHNESS_DAYS = 3;
 
 // UNKNOWN은 원문이 지원 유형을 알려 주지 않는 공고(예: 기업마당 공고)다. 지원금이나
@@ -58,30 +53,14 @@ export type SupportType = (typeof SUPPORT_TYPES)[number];
 // UNKNOWN은 대출인지 알 수 없으므로 상환 계산 대상이 아니다.
 export const REPAYABLE_SUPPORT_TYPES: readonly SupportType[] = ['LOAN'];
 
-// 정책자금 갈래(대출·보증). ADR 0006에 따라 자동 승격은 이 갈래에만 쓴다. 지원금·공간·
-// 프로그램(지원사업)은 자동으로 모아도 사람이 확인해야 현재 후보가 된다.
+// 정책자금 지원 유형(대출·보증). 사람이 등록한 상품의 맞춰 보기 갈래(matching.ts)와 금융 조건 근거 요구에 쓴다.
 export const POLICY_LOAN_SUPPORT_TYPES: readonly SupportType[] = ['LOAN', 'GUARANTEE'];
-
-// 후보 API와 화면의 갈래(ADR 0006 1절). 저장하지 않고 지원 유형에서 정하므로 카탈로그에는 없다.
-// 지원 유형을 모르는 공고는 정책자금·지원사업 어느 쪽으로도 추측하지 않고 따로 둔다.
-export const FUNDING_BRANCHES = ['POLICY_FUND', 'SUPPORT_PROGRAM', 'UNCLASSIFIED'] as const;
-export type FundingBranch = (typeof FUNDING_BRANCHES)[number];
-
-export function fundingBranch(supportType: SupportType): FundingBranch {
-  if (POLICY_LOAN_SUPPORT_TYPES.includes(supportType)) return 'POLICY_FUND';
-  return supportType === 'UNKNOWN' ? 'UNCLASSIFIED' : 'SUPPORT_PROGRAM';
-}
 
 export const BUSINESS_STAGES = ['PRE_REGISTRATION', 'POST_REGISTRATION'] as const;
 export type BusinessStage = (typeof BUSINESS_STAGES)[number];
 
 export const OBSERVED_APPLICATION_STATUSES = ['OPEN', 'CLOSED', 'UNKNOWN'] as const;
 export type ObservedApplicationStatus = (typeof OBSERVED_APPLICATION_STATUSES)[number];
-
-// Eligibility verdicts are separate from the observed application status: a
-// product can be OPEN while a condition remains UNKNOWN.
-export const VERDICTS = ['PASS', 'FAIL', 'UNKNOWN'] as const;
-export type Verdict = (typeof VERDICTS)[number];
 
 export const REPAYMENT_METHODS = [
   'EQUAL_INSTALLMENT',
@@ -118,10 +97,6 @@ export type RegionScope = (typeof REGION_SCOPES)[number];
 
 export const INDUSTRY_SCOPES = ['UNRESTRICTED', 'LISTED', 'UNKNOWN'] as const;
 export type IndustryScope = (typeof INDUSTRY_SCOPES)[number];
-
-// 상권 업종 코드(예: CS100010) 형식. 카탈로그 스키마와 두 화면(자금 후보 조회,
-// 계획 화면)이 같은 규칙을 쓰도록 한 곳에서 정의한다.
-export const INDUSTRY_CODE_PATTERN = /^[A-Z]{2}\d{6}$/;
 
 // Every condition a product version must cite back to a reviewed source.
 export const EVIDENCE_SUBJECTS = [
@@ -257,12 +232,4 @@ export function reviewState(
   if (product.reviewedAt === null || product.nextReviewAt === null) return 'REVIEW_OVERDUE';
   if (compareIsoDates(product.nextReviewAt, asOfDate) < 0) return 'REVIEW_OVERDUE';
   return product.reviewer === REVIEWER_UNASSIGNED ? 'UNREVIEWED' : 'CURRENT';
-}
-
-// FAIL beats UNKNOWN, UNKNOWN beats PASS. An empty condition set is UNKNOWN
-// because nothing was actually verified.
-export function combineVerdicts(verdicts: readonly Verdict[]): Verdict {
-  if (verdicts.includes('FAIL')) return 'FAIL';
-  if (verdicts.includes('UNKNOWN')) return 'UNKNOWN';
-  return verdicts.length > 0 ? 'PASS' : 'UNKNOWN';
 }

@@ -173,8 +173,8 @@ const blockedSourceSchema = sourceRefSchema.extend({
   reason: z.string().trim().min(1, '차단 사유를 입력해 주세요.'),
 });
 
-// 자동 상품의 승격 스위치와 차단 목록, 출처별 동기화 결과(ADR 0006). 스위치는 기본으로
-// 꺼져 있어, 사람이 켜기 전에는 자동 상품이 현재 후보나 상환 계산 가능으로 올라가지 않는다.
+// 자동 상품의 승격 스위치와 차단 목록, 출처별 동기화 결과(ADR 0006). 두 스위치는 저장만 하고 어디에서도
+// 읽지 않는다(ADR 0009 §6). 차단 목록은 맞춰 보기의 운영자 숨김, 동기화 결과는 출처 최신성에 쓴다.
 export const fundingAutomationSchema = z.object({
   policyLoanPromotion: z.boolean(),
   repaymentPromotion: z.boolean(),

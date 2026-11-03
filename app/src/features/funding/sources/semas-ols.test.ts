@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { evaluateProduct } from '../eligibility.ts';
+import { matchCatalog } from '../matching.ts';
 import type { FundingSourceCollection } from '../sync.ts';
 import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from '../types.ts';
 import { validateFundingCatalog } from '../validation.ts';
@@ -323,13 +323,6 @@ function mapDefault(options: { cards?: readonly string[]; asOfDate?: string; ove
   return { mapping, byName };
 }
 
-const POST_REGISTRATION_PROFILE = {
-  businessStage: 'POST_REGISTRATION',
-  districtCode: '11140',
-  industryCode: 'CS100010',
-  purpose: 'OPERATING_FUNDS',
-} as const;
-
 describe('소진공 접수기간 해석', () => {
   it('종료일 없는 접수, 날짜 두 개, 하루 접수를 읽는다', () => {
     expect(parseSemasPeriod('2026. 10. 6.(화) 10:00 ~ 예산소진 시까지')).toEqual({
@@ -577,8 +570,9 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
       productKey: semasFundProductKey({ section: '대리대출', name: '소공인특화자금' }),
       organization: '소상공인시장진흥공단',
       supportType: 'LOAN',
-      eligibleBusinessStages: ['POST_REGISTRATION'],
-      region: { scope: 'NATIONWIDE', districtCodes: [], note: null },
+      // 사업 단계·지역은 공통 지원자격에서 추측해 적지 않는다. 본문에서 AI가 읽는다(ADR 0009 §7).
+      eligibleBusinessStages: [],
+      region: { scope: 'UNKNOWN', districtCodes: [] },
       purpose: { included: [], excluded: [] },
       industryConditions: { scope: 'UNKNOWN', included: [], excluded: [] },
       applicationPeriod: { start: '2026-01-05', end: null, note: '2026-01-05 ~ 자금소진시까지' },
@@ -607,8 +601,6 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
     expect(product?.evidence.map((entry) => [entry.id, entry.subject, entry.retrievalMethod, entry.checksum])).toEqual([
       ['semas-identity', 'IDENTITY', 'OFFICIAL_WEB_PAGE', overviewChecksum],
       ['semas-financial', 'FINANCIAL_CONDITION', 'OFFICIAL_WEB_PAGE', overviewChecksum],
-      ['semas-stage', 'BUSINESS_STAGE', 'OFFICIAL_WEB_PAGE', overviewChecksum],
-      ['semas-region', 'REGION', 'OFFICIAL_WEB_PAGE', overviewChecksum],
       ['semas-eligibility', 'ELIGIBILITY_CONDITION', 'OFFICIAL_WEB_PAGE', overviewChecksum],
       ['semas-period-home', 'APPLICATION_PERIOD', 'OFFICIAL_WEB_PAGE', homeChecksum],
       ['semas-period-notice', 'APPLICATION_PERIOD', 'OFFICIAL_WEB_PAGE', sha256(DETAILS[326])],
@@ -620,70 +612,41 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
     });
   });
 
-  it('만든 상품은 카탈로그 검사를 통과하고, 예비 창업자에게는 사업자등록 이후 후보다', () => {
+  it('만든 상품은 카탈로그 검사를 통과하고, 맞춰 보기의 정책자금이며 마감·보류는 출처 데이터로 정한다', () => {
     const { mapping } = mapDefault();
     const versions = mapping.products.map((product) => ({ ...product, version: '1.0.0', reviewer: AUTO_REVIEWER }));
-    const validation = validateFundingCatalog(catalogWith(versions), { asOfDate: AS_OF });
-    expect(validation.issues).toEqual([]);
-    const catalog = validation.catalog;
-    if (catalog === null) throw new Error('카탈로그 검증에 실패했습니다.');
-    const product = catalog.products.find((entry) => entry.name === '소공인특화자금(대리대출)');
-    if (product === undefined) throw new Error('상품이 없습니다.');
-    const preFounder = evaluateProduct(
-      product,
-      { ...POST_REGISTRATION_PROFILE, businessStage: 'PRE_REGISTRATION' },
-      { asOfDate: AS_OF, automation: catalog.automation },
-    );
-    expect(preFounder.candidateStatus).toBe('POST_REGISTRATION');
-    expect(preFounder.branch).toBe('POLICY_FUND');
-    expect(preFounder.automation).toMatchObject({ source: 'SEMAS_OLS', lastSucceededOn: AS_OF });
-  });
+    const noInput = { businessStatus: null, openedYearMonth: null, districtCode: null, age: null, targetGroups: null };
+    const matched = (automation: Record<string, unknown> = {}) => {
+      const validation = validateFundingCatalog(catalogWith(versions, automation), { asOfDate: AS_OF });
+      expect(validation.issues).toEqual([]);
+      if (validation.catalog === null) throw new Error('카탈로그 검증에 실패했습니다.');
+      const list = matchCatalog(validation.catalog, new Map(), noInput, { asOfDate: AS_OF });
+      // 소진공 자금은 모두 정책자금 갈래다(ADR 0009 §1).
+      expect(list.tabs.SUPPORT_PROGRAM.products).toEqual([]);
+      return new Map(list.tabs.POLICY_FUND.products.map((entry) => [entry.name, entry]));
+    };
 
-  it('정책자금 자동 승격이 꺼져 있으면 추가 확인이고, 켜면 접수 중인 자금만 현재 후보가 된다', () => {
-    const { mapping } = mapDefault();
-    const versions = mapping.products.map((product) => ({ ...product, version: '1.0.0', reviewer: AUTO_REVIEWER }));
-    for (const promotion of [false, true]) {
-      const validation = validateFundingCatalog(
-        catalogWith(versions, { policyLoanPromotion: promotion, repaymentPromotion: promotion }),
-        { asOfDate: AS_OF },
-      );
-      const catalog = validation.catalog;
-      if (catalog === null) throw new Error('카탈로그 검증에 실패했습니다.');
-      const statuses = Object.fromEntries(
-        catalog.products.map((product) => {
-          const evaluation = evaluateProduct(product, POST_REGISTRATION_PROFILE, {
-            asOfDate: AS_OF,
-            automation: catalog.automation,
-          });
-          // 변동·모호한 금리와 상환방식이 없어 스위치를 켜도 상환 계산 대상이 아니다.
-          expect(evaluation.repayment.supported).toBe(false);
-          return [product.name, evaluation.candidateStatus];
-        }),
-      );
-      expect(statuses).toEqual({
-        // 최근 공지의 하루 접수(8. 10.)가 끝났다. 세부 유형 접수는 확인 항목에 남는다.
-        '혁신성장촉진자금(직접대출)': 'CLOSED',
-        '일시적경영애로자금(직접대출)': 'NEEDS_CONFIRMATION',
-        '일반경영안정자금(대리대출)': 'NEEDS_CONFIRMATION',
-        '소공인특화자금(대리대출)': promotion ? 'CURRENT_CANDIDATE' : 'NEEDS_CONFIRMATION',
-        '장애인기업지원자금(대리대출)': 'NEEDS_CONFIRMATION',
-        '대환대출(대리대출)': promotion ? 'CURRENT_CANDIDATE' : 'NEEDS_CONFIRMATION',
-      });
-    }
-    // 출처 확인이 3일 넘게 끊기면 스위치를 켜도 현재 후보에서 빠진다.
-    const stale = validateFundingCatalog(
-      catalogWith(versions, {
-        policyLoanPromotion: true,
-        sourceSyncs: [{ ...FRESH_SYNC, lastSucceededOn: '2026-09-25' }],
-      }),
-      { asOfDate: AS_OF },
-    ).catalog;
-    if (stale === null) throw new Error('카탈로그 검증에 실패했습니다.');
-    const evaluation = evaluateProduct(stale.products[3], POST_REGISTRATION_PROFILE, {
-      asOfDate: AS_OF,
-      automation: stale.automation,
+    const fresh = matched();
+    // 예전 판정의 회귀 테스트가 정한 접수 상태를 잇는다: 접수 중은 소공인특화자금·대환대출 둘, 혁신성장촉진자금은
+    // 최근 공지의 하루 접수(8. 10.)가 끝나 마감이다. 조건은 읽지 않았으므로(추출 결과 없음) 맞아 보임은 없다.
+    expect(Object.fromEntries([...fresh].map(([name, entry]) => [name, [entry.group, ...entry.holds]]))).toEqual({
+      '혁신성장촉진자금(직접대출)': ['CLOSED'],
+      '일시적경영애로자금(직접대출)': ['NEEDS_CHECK', 'STATUS_NOT_OPEN'],
+      '일반경영안정자금(대리대출)': ['NEEDS_CHECK', 'STATUS_NOT_OPEN'],
+      '소공인특화자금(대리대출)': ['NEEDS_CHECK'],
+      '장애인기업지원자금(대리대출)': ['NEEDS_CHECK', 'STATUS_NOT_OPEN'],
+      '대환대출(대리대출)': ['NEEDS_CHECK'],
     });
-    expect(evaluation.candidateStatus).toBe('REVIEW_OVERDUE');
+    expect(fresh.get('혁신성장촉진자금(직접대출)')?.application.closedBy).toBe('SOURCE_END_DATE');
+    expect(fresh.get('소공인특화자금(대리대출)')?.automation).toMatchObject({
+      source: 'SEMAS_OLS',
+      lastSucceededOn: AS_OF,
+      fresh: true,
+    });
+
+    // 출처 확인이 3일 넘게 끊기면 보류 이유가 붙는다(ADR 0006 3일 최신성).
+    const stale = matched({ sourceSyncs: [{ ...FRESH_SYNC, lastSucceededOn: '2026-09-25' }] });
+    expect(stale.get('소공인특화자금(대리대출)')?.holds).toEqual(['SOURCE_STALE']);
   });
 
   it("'고정금리(2.0%P)'처럼 모호한 금리와 여러 금액이 적힌 한도는 확정 값으로 옮기지 않는다", () => {
