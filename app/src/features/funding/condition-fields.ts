@@ -7,7 +7,8 @@ import { z } from 'zod';
 export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 프롬프트, 출력 스키마, 검증 규칙(notice-extraction.ts의 verifyConditionOutput) 중 하나라도 바꾸면 올린다. 저장한 fields는
 // 저장할 때의 검증 결과라서, 올리지 않으면 이미 읽은 본문은 옛 규칙의 결과로 남는다.
-// v3(2026-11-03): 음식점·카페 제외의 뜻을 밝혔다(유흥주점 등만 빼면 제외 아님, 지원 업종 목록에 음식점·카페가 없으면 제외).
+// v3(2026-11-03): 음식점·카페 제외의 뜻을 밝혔다(유흥주점 등만 빼면 제외 아님, 지원 업종 목록에 음식점·카페가 없으면 제외 업종
+// 문장과 상관없이 제외).
 export const CONDITION_PROMPT_VERSION = 'funding-conditions-v3';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;

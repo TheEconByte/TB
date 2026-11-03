@@ -83,7 +83,7 @@ const SYSTEM_PROMPT = `당신은 한국 정책자금·지원사업 공고문에�
 - businessAge: 업력(창업 후 기간), 년 단위. min은 하한, max는 상한입니다. "3년 이상"은 min 3, "3년 이내"·"3년 이하"는 max 3과 maxExclusive false, "7년 미만"은 max 7과 maxExclusive true입니다. "업력 무관"처럼 제한이 없다고 밝히면 min과 max를 null로 둡니다.
 - age: 대표자 만 나이. 같은 방식입니다. "만 39세 이하"는 max 39·maxExclusive false, "40세 미만"은 max 40·maxExclusive true입니다. 청년 기준 나이도 여기에 적습니다.
 - region: scope는 NATIONWIDE(전국), PROVINCES(시·도로 한정, provinces에 "서울"처럼 이름), SEOUL_DISTRICTS(서울 자치구로 한정, districts에 "강남구"처럼 이름)입니다. "○○ 제외"처럼 빼는 지역은 excludedProvinces·excludedDistricts에 적습니다. districts와 excludedDistricts에는 서울의 자치구만 적고, 다른 시·도의 시·군·구는 적지 않습니다. 해당 없는 목록은 빈 목록입니다.
-- foodBusiness: 일반 음식점·카페(한식·분식·커피전문점 등)가 신청할 수 있는지입니다. EXCLUDED는 음식점·카페·외식업을 제외 업종으로 밝혔거나, 지원 업종을 나열했는데 그 목록에 음식점·카페가 없는 경우입니다. NOT_EXCLUDED는 업종 제한이 없다고 밝혔거나, 지원 업종 목록에 음식점·카페가 있거나, 제외 업종을 밝혔는데 일반 음식점·카페는 빠지지 않은 경우입니다(유흥주점·무도장·사행성 업종만 빼는 경우는 NOT_EXCLUDED). 업종 말이 없으면 mentioned는 false입니다.
+- foodBusiness: 일반 음식점·카페(한식·분식·커피전문점 등)가 신청할 수 있는지입니다. EXCLUDED는 음식점·카페·외식업을 제외 업종으로 밝혔거나, 지원 업종을 나열했는데 그 목록에 음식점·카페가 없는 경우입니다. NOT_EXCLUDED는 업종 제한이 없다고 밝혔거나, 지원 업종 목록에 음식점·카페가 있거나, 제외 업종을 밝혔는데 일반 음식점·카페는 빠지지 않은 경우입니다(유흥주점·무도장·사행성 업종만 빼는 경우는 NOT_EXCLUDED). 지원 업종 목록이 있으면 그 목록으로 정합니다. 목록에 음식점·카페가 없으면 제외 업종 문장과 상관없이 EXCLUDED입니다. 업종 말이 없으면 mentioned는 false입니다.
 - targetGroups.groups: 신청 대상을 한정하면 YOUTH(청년), WOMEN(여성), DISABLED(장애인), RESTART(재창업자), DAMAGED(재난·피해 소상공인), OTHER(그 밖, note에 이름)입니다. 한정하지 않는다고 밝히면 빈 목록입니다.
 - applicationPeriod: 신청(접수)기간. 날짜는 YYYY-MM-DD로 적고, "예산 소진 시까지"처럼 날짜가 아니면 null로 두고 text에 원문 표기를 적습니다.
 - supportTypes: 지원 방식 하나 이상. LOAN(대출), GUARANTEE(보증), GRANT(지원금), SPACE(공간), PROGRAM(교육·컨설팅 등 프로그램), OTHER.

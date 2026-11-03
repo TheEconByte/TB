@@ -94,9 +94,9 @@ describe('findConditionExtractions', () => {
     const [checksumA, checksumB] = [sha256Hex('A 본문'), sha256Hex('B 본문')];
     const read = { status: 'READ', value: 'EXCLUDED', quote: '음식점업 제외' };
     const findMany = vi.fn().mockResolvedValue([
-      { productKey: 'product-a', textChecksum: checksumA, fields: { foodBusiness: read } },
-      // A에 B 본문의 행이 있어도(같은 본문을 공유하는 경우 등) A의 지금 본문이 아니므로 쓰지 않는다.
+      // A에 B 본문의 행이 있어도(같은 본문을 공유하는 경우 등) A의 지금 본문이 아니므로 쓰지 않는다. 먼저 와도 마찬가지다.
       { productKey: 'product-a', textChecksum: checksumB, fields: { foodBusiness: { status: 'NOT_MENTIONED' } } },
+      { productKey: 'product-a', textChecksum: checksumA, fields: { foodBusiness: read } },
     ]);
     const prisma = { fundingConditionExtraction: { findMany } } as unknown as Parameters<
       typeof findConditionExtractions

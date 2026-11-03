@@ -284,25 +284,26 @@ describe('마감(ADR §4, 사용자 결정: 출처 종료일 우선, 없을 때�
     expect(match(today, openConditions(), NO_INPUT).group).toBe('MATCHING');
   });
 
-  // 사용자 결정(2026-11-03 리뷰 뒤): 출처가 접수 중으로 확인한 상품도 AI 종료일로 마감하지 않는다. 소진공은 다른 회차 공지의
-  // 날짜를 일부러 쓰지 않는데, AI는 그 공지 본문에서 지난 종료일을 읽을 수 있다.
-  it('출처가 접수 상태도 종료일도 알려 주지 않을 때만 AI가 인용과 함께 읽은 종료일로 마감한다', () => {
+  // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 마감(기본으로 숨김)은 출처·운영자 데이터로만
+  // 정하고, AI가 읽은 종료일이 지났으면 확인 필요로 둔다. 소진공은 다른 회차 공지의 날짜를 쓰지 않는데 AI는 그 날짜를 읽을 수 있다.
+  it('AI가 읽은 종료일이 지나도 마감하지 않고 확인 필요로 둔다', () => {
     const aiEnded = openConditions({ applicationPeriod: read({ start: '2026-01-02', end: '2026-10-31', text: null }) });
     const noEnd = { start: '2026-01-02', end: null, note: '자금 소진 시까지' };
-    const unknownStatus = autoProduct('SEMAS_OLS', { applicationPeriod: noEnd, observedApplicationStatus: 'UNKNOWN' });
-    const result = match(unknownStatus, aiEnded, NO_INPUT);
-    expect(result.group).toBe('CLOSED');
-    expect(result.application.closedBy).toBe('AI_END_DATE');
-    expect(result.application.aiPeriod).toMatchObject({ status: 'READ', quote: '공고문에 적힌 조건 문장' });
-
-    // 출처가 접수 중이면 종료일이 없어도 AI 종료일로 마감하지 않는다.
-    const openWithoutEnd = autoProduct('SEMAS_OLS', { applicationPeriod: noEnd, observedApplicationStatus: 'OPEN' });
-    expect(match(openWithoutEnd, aiEnded, NO_INPUT).application.closedBy).toBeNull();
-    expect(match(openWithoutEnd, aiEnded, NO_INPUT).group).toBe('MATCHING');
-
-    // 출처 종료일이 남아 있으면 AI가 더 이른 종료일을 읽었어도 마감이 아니다.
-    const sourceEndAhead = autoProduct('SEMAS_OLS', { observedApplicationStatus: 'UNKNOWN' });
-    expect(match(sourceEndAhead, aiEnded, NO_INPUT).application.closedBy).toBeNull();
+    for (const product of [
+      autoProduct('SEMAS_OLS', { applicationPeriod: noEnd, observedApplicationStatus: 'UNKNOWN' }),
+      autoProduct('SEMAS_OLS', { applicationPeriod: noEnd, observedApplicationStatus: 'OPEN' }),
+      // 출처 종료일이 남아 있어도 AI가 더 이른 종료일을 읽었으면 확인할 거리다.
+      autoProduct('SEMAS_OLS'),
+    ]) {
+      const result = match(product, aiEnded, NO_INPUT);
+      expect(result.application.closedBy).toBeNull();
+      expect(result.group).toBe('NEEDS_CHECK');
+      expect(result.holds).toContain('AI_END_DATE_PASSED');
+      expect(result.application.aiPeriod).toMatchObject({ status: 'READ', quote: '공고문에 적힌 조건 문장' });
+    }
+    // AI 종료일이 남아 있으면 보류하지 않는다.
+    const aiOpen = openConditions({ applicationPeriod: read({ start: '2026-01-02', end: AS_OF, text: null }) });
+    expect(match(autoProduct('SEMAS_OLS'), aiOpen, NO_INPUT).group).toBe('MATCHING');
   });
 });
 
@@ -488,19 +489,22 @@ describe('대상 한정(ADR §4: 어느 것에도 해당하지 않으면 안 맞
     ).toBe('MATCH');
   });
 
-  // 사용자 결정(2026-11-03 리뷰 뒤): 재난 피해 대상 공고는 범위 밖이라 피해 소상공인을 입력받지 않는다. 다른 대상과 함께
-  // 한정한 공고는 남기고, 피해 소상공인으로는 해당할 수 없는 것으로 본다.
-  it('피해 소상공인은 다른 대상과 함께 한정됐을 때 해당하지 않는 것으로 본다', () => {
+  // 사용자 결정(2026-11-03): 재난 피해 대상 공고는 범위 밖이라 피해 소상공인을 입력받지 않는다. 피해 소상공인으로는 해당할
+  // 수 없는 것으로 보아, 피해 소상공인만 한정한 공고는 안 맞음이고 다른 대상과 함께 한정한 공고는 그 대상으로 맞춰 본다.
+  it('피해 소상공인으로는 해당하지 않는 것으로 본다', () => {
+    expect(verdictOf(groups('DAMAGED'), NO_INPUT, 'targetGroups').verdict).toBe('MISMATCH');
     expect(verdictOf(groups('DAMAGED', 'WOMEN'), profile({ targetGroups: [] }), 'targetGroups').verdict).toBe(
       'MISMATCH',
     );
     expect(verdictOf(groups('DAMAGED', 'WOMEN'), profile({ targetGroups: ['WOMEN'] }), 'targetGroups').verdict).toBe(
       'MATCH',
     );
-    expect(verdictOf(groups('DAMAGED', 'WOMEN'), NO_INPUT, 'targetGroups')).toEqual({
-      verdict: 'CHECK',
-      checkReason: 'INPUT_MISSING',
-    });
+    // 대상 한정을 답하지 않아도 피해 소상공인 쪽은 해당 없음이다. 남은 청년이 나이로 안 맞으면 안 맞음이다.
+    const damagedOrYouth = {
+      ...groups('DAMAGED', 'YOUTH'),
+      age: read({ min: null, max: 39, maxExclusive: false }),
+    } as VerifiedConditions;
+    expect(verdictOf(damagedOrYouth, profile({ age: 45 }), 'targetGroups').verdict).toBe('MISMATCH');
   });
 
   it('입력으로 알 수 없는 그 밖의 대상은 확인 필요다', () => {
@@ -540,16 +544,17 @@ describe('대상 한정(ADR §4: 어느 것에도 해당하지 않으면 안 맞
     expect(verdictOf(withWomen, profile({ age: 55, targetGroups: [] }), 'targetGroups').verdict).toBe('CHECK');
   });
 
-  // "청년 또는 여성"이면 나이 상한은 청년에만 걸릴 수 있다. 나이만으로 안 맞음이라고 하지 않는다.
-  it('청년과 다른 대상을 함께 한정하면 나이 상한을 넘어도 안 맞음으로 단정하지 않는다', () => {
+  // 알려진 한계(사용자 결정 2026-11-03 단순화): 나이 항목은 대상과 묶지 않는다. "청년 또는 여성"의 나이 상한이 청년에만
+  // 걸려도 나이로 안 맞음이 되고, 공고는 접어 둔 안 맞아 보임에 남아 보인다.
+  it('나이 상한은 대상 한정과 상관없이 적용한다', () => {
     const conditions = {
       ...groups('YOUTH', 'WOMEN'),
       age: read({ min: null, max: 39, maxExclusive: false }),
     } as VerifiedConditions;
     const result = match(autoProduct('BIZINFO'), conditions, profile({ age: 45, targetGroups: ['WOMEN'] }));
     expect(condition(result, 'targetGroups').verdict).toBe('MATCH');
-    expect(condition(result, 'age')).toMatchObject({ verdict: 'CHECK', checkReason: 'UNCERTAIN' });
-    expect(result.group).toBe('NEEDS_CHECK');
+    expect(condition(result, 'age').verdict).toBe('MISMATCH');
+    expect(result.group).toBe('NOT_MATCHING');
   });
 });
 
@@ -676,32 +681,22 @@ describe('카탈로그 전체 맞춰 보기', () => {
     expect(keys).toEqual(['semas-ols-agency-abc']);
   });
 
-  // 사용자 결정(2026-11-03 리뷰 뒤): 대상이 재난·피해 소상공인뿐인 공고는 범위 밖이라 보여 주지 않는다.
-  it('대상을 피해 소상공인으로만 한정한 공고는 보여 주지 않는다', () => {
+  // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 피해 소상공인만 한정했다고 읽은 공고도 접어 둔
+  // 안 맞아 보임에 남는다. 잘못 읽혀도(예: 경영애로 자금) 사라지지 않는다.
+  it('피해 소상공인만 한정한 공고는 숨기지 않고 안 맞아 보임에 둔다', () => {
     const disasterOnly = autoProduct('BIZINFO', {
       productKey: 'bizinfo-disaster',
       sourceRef: { source: 'BIZINFO', externalId: 'DISASTER' },
     });
-    const mixed = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-mixed',
-      sourceRef: { source: 'BIZINFO', externalId: 'MIXED' },
+    const conditions = openConditions({
+      targetGroups: read({ groups: ['DAMAGED'], note: null }) as VerifiedConditions['targetGroups'],
     });
-    const notRead = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-unread',
-      sourceRef: { source: 'BIZINFO', externalId: 'UNREAD' },
+    const list = matchCatalog(catalogOf([disasterOnly]), new Map([['bizinfo-disaster', conditions]]), NO_INPUT, {
+      asOfDate: AS_OF,
     });
-    const target = (...list: string[]) =>
-      openConditions({ targetGroups: read({ groups: list, note: null }) as VerifiedConditions['targetGroups'] });
-    const list = matchCatalog(
-      catalogOf([disasterOnly, mixed, notRead]),
-      new Map([
-        ['bizinfo-disaster', target('DAMAGED')],
-        ['bizinfo-mixed', target('DAMAGED', 'WOMEN')],
-      ]),
-      NO_INPUT,
-      { asOfDate: AS_OF },
-    );
-    expect(list.tabs.SUPPORT_PROGRAM.products.map((p) => p.productKey)).toEqual(['bizinfo-mixed', 'bizinfo-unread']);
+    expect(list.tabs.SUPPORT_PROGRAM.products.map((p) => [p.productKey, p.group])).toEqual([
+      ['bizinfo-disaster', 'NOT_MATCHING'],
+    ]);
   });
 
   it('갈래마다 그룹 순서(맞아 보임 → 확인 필요 → 안 맞아 보임 → 마감)로 놓고 그룹별 수를 센다', () => {
@@ -740,7 +735,6 @@ describe('카탈로그 전체 맞춰 보기', () => {
     expect(list.tabs.POLICY_FUND.counts).toEqual({ MATCHING: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 });
   });
 
-  // ADR §4 정책자금 탭: 한도 문장을 보여 준다. 소진공은 대출한도 칸, 사람 등록 상품은 공개 한도다.
   // 지금 본문이 없는 상품(본문을 읽지 못함)에는 같은 키로 넘어온 결과가 있어도 붙이지 않는다.
   it('본문 checksum이 없는 상품은 추출 결과를 쓰지 않는다', () => {
     const product = autoProduct('BIZINFO', { noticeTextChecksum: undefined });
@@ -751,6 +745,7 @@ describe('카탈로그 전체 맞춰 보기', () => {
     expect(only.conditions.map((entry) => entry.checkReason)).toEqual(Array(6).fill('NOT_READ'));
   });
 
+  // ADR §4 정책자금 탭: 한도 문장을 보여 준다. 소진공은 대출한도 칸, 사람 등록 상품은 공개 한도다.
   it('정책자금 카드에 출처의 한도 문장과 공개 한도를 함께 담는다', () => {
     const semas = autoProduct('SEMAS_OLS', { limitText: '7천만원', publicLimit: '70000000' });
     const result = match(semas, null, NO_INPUT);
