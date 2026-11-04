@@ -33,8 +33,6 @@ function product(productKey: string): Record<string, unknown> {
     applicationPeriod: { start: '2026-09-01', end: '2026-12-31', note: null },
     observedApplicationStatus: 'OPEN',
     observedAt: TEST_DATE,
-    reviewedAt: TEST_DATE,
-    nextReviewAt: '2026-10-20',
     officialUrl: OFFICIAL_URL,
     sourceDocumentName: '테스트 공고문',
     sourceDocumentRetrieved: false,
@@ -46,7 +44,7 @@ function product(productKey: string): Record<string, unknown> {
     repaymentMethod: 'UNKNOWN',
     unsupportedCalculationReasons: ['금리가 확정되지 않았습니다.'],
     additionalChecks: [],
-    reviewer: 'test-reviewer',
+    origin: 'OPERATOR',
     evidence: [
       evidence('identity', 'IDENTITY'),
       evidence('period', 'APPLICATION_PERIOD'),
@@ -55,6 +53,18 @@ function product(productKey: string): Record<string, unknown> {
       evidence('region', 'REGION'),
     ],
   };
+}
+
+// v1.4.0까지의 상품 JSON. 출처 구분(origin) 대신 검수자(reviewer)와 검수일·다음 검토일이 있었다. funding:sync가 만든 상품은
+// 검수자에 자동 규칙 버전(AUTO:funding-auto-v1)을 적었다(ADR 0006 2절).
+function legacyProduct(
+  productKey: string,
+  reviewer: string,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const json = product(productKey);
+  delete json.origin;
+  return { ...json, reviewer, reviewedAt: TEST_DATE, nextReviewAt: null, ...extra };
 }
 
 type StubMembership = { position: number; productVersion: { productJson: unknown } };
@@ -70,9 +80,7 @@ function stubPrisma(release: { schemaVersion?: string; automation?: unknown; pro
           catalogVersion: '2026-09-20.1',
           schemaVersion: release.schemaVersion ?? FUNDING_CATALOG_SCHEMA_VERSION,
           basisDate: new Date(`${TEST_DATE}T00:00:00.000Z`),
-          reviewedAt: new Date(`${TEST_DATE}T00:00:00.000Z`),
           activatedAt: new Date('2026-09-20T03:00:00.000Z'),
-          reviewer: 'test-reviewer',
           automation: release.automation ?? null,
           products: release.products,
         },
@@ -106,9 +114,7 @@ describe('활성 카탈로그 읽기', () => {
       catalogKey: 'test-catalog',
       catalogVersion: '2026-09-20.1',
       basisDate: TEST_DATE,
-      reviewedAt: TEST_DATE,
       activatedAt: '2026-09-20T03:00:00.000Z',
-      reviewer: 'test-reviewer',
       productCount: 1,
     });
     expect(active?.catalog).toMatchObject({
@@ -118,25 +124,71 @@ describe('활성 카탈로그 읽기', () => {
     });
   });
 
-  // v1.0.0에는 자동화 설정이 없었다. 그 릴리스는 모두 꺼진 기본값으로 읽는다(docs/domains/funding.md 카탈로그).
+  // v1.0.0에는 자동화 설정이 없었다. 그 릴리스는 차단 목록·동기화 결과가 빈 기본값으로 읽는다(docs/domains/funding.md 카탈로그).
   it('v1.0.0 스키마로 적재된 릴리스도 자동화 설정 없이 읽는다', async () => {
     const active = await findActiveFundingCatalog(
-      stubPrisma({ schemaVersion: 'funding-catalog-v1.0.0', products: [membership('test-loan', 0)] }),
+      stubPrisma({
+        schemaVersion: 'funding-catalog-v1.0.0',
+        products: [{ position: 0, productVersion: { productJson: legacyProduct('test-loan', 'UNASSIGNED') } }],
+      }),
     );
     expect(active?.schemaVersion).toBe('funding-catalog-v1.0.0');
     expect(active?.catalog.products).toHaveLength(1);
-    expect(active?.automation).toEqual({
-      policyLoanPromotion: false,
-      repaymentPromotion: false,
-      blockedSources: [],
-      sourceSyncs: [],
-    });
+    expect(active?.automation).toEqual({ blockedSources: [], sourceSyncs: [] });
+  });
+
+  // ADR 0009 §7로 검수자·검수 기한·스위치를 없앴다(v1.5.0). 그 전 릴리스는 다시 적재하지 않고 그대로 서비스되므로, 맞춰 보기가
+  // 자동/사람 상품을 가르는 값(갈래·운영자 확인 값·출처 최신성·운영자 숨김)을 예전 검수자에서 정해 읽어야 결과가 바뀌지 않는다.
+  it('v1.4.0 이하 릴리스의 상품은 예전 검수자로 자동/사람 상품을 정해 읽는다', async () => {
+    const sourceRef = { source: 'BIZINFO', externalId: 'PBLN_TEST' };
+    const active = await findActiveFundingCatalog(
+      stubPrisma({
+        schemaVersion: 'funding-catalog-v1.4.0',
+        automation: { policyLoanPromotion: true, repaymentPromotion: false, blockedSources: [], sourceSyncs: [] },
+        products: [
+          {
+            position: 0,
+            productVersion: { productJson: legacyProduct('test-auto', 'AUTO:funding-auto-v1', { sourceRef }) },
+          },
+          { position: 1, productVersion: { productJson: legacyProduct('test-unassigned', 'UNASSIGNED') } },
+          // 사람 검수자 이름이 적힌 상품도 사람 상품이다. 같은 공고(sourceRef)를 가리켜도 자동 상품이 되지 않는다.
+          { position: 2, productVersion: { productJson: legacyProduct('test-named', 'jhjh0512', { sourceRef }) } },
+        ],
+      }),
+    );
+    expect(active?.catalog.products.map((entry) => [entry.productKey, entry.origin])).toEqual([
+      ['test-auto', 'SYNC'],
+      ['test-unassigned', 'OPERATOR'],
+      ['test-named', 'OPERATOR'],
+    ]);
+    for (const entry of active?.catalog.products ?? []) {
+      expect(entry).not.toHaveProperty('reviewer');
+      expect(entry).not.toHaveProperty('reviewedAt');
+      expect(entry).not.toHaveProperty('nextReviewAt');
+    }
+    // 저장만 하고 읽는 곳이 없던 스위치 두 개는 읽지 않는다.
+    expect(active?.automation).toEqual({ blockedSources: [], sourceSyncs: [] });
+  });
+
+  // 출처 구분을 알 수 없는 상품을 사람 상품이나 자동 상품으로 짐작하지 않는다(AGENTS.md §3의 2번). 그런 릴리스는 빈 결과로
+  // 속이지 않고 읽기를 실패시킨다.
+  it('출처 구분도 예전 검수자도 없는 상품은 읽지 않는다', async () => {
+    const withoutOrigin = product('test-unknown');
+    delete withoutOrigin.origin;
+    await expect(
+      findActiveFundingCatalog(
+        stubPrisma({ products: [{ position: 0, productVersion: { productJson: withoutOrigin } }] }),
+      ),
+    ).rejects.toThrow();
   });
 
   // v1.4.0은 기업마당 지원분야·소진공 대출한도 문장(선택 필드)만 더했다. 그 전 릴리스는 그 필드 없이 읽는다.
   it('v1.3.0 스키마로 적재된 릴리스도 읽는다', async () => {
     const active = await findActiveFundingCatalog(
-      stubPrisma({ schemaVersion: 'funding-catalog-v1.3.0', products: [membership('test-loan', 0)] }),
+      stubPrisma({
+        schemaVersion: 'funding-catalog-v1.3.0',
+        products: [{ position: 0, productVersion: { productJson: legacyProduct('test-loan', 'UNASSIGNED') } }],
+      }),
     );
     expect(active?.schemaVersion).toBe('funding-catalog-v1.3.0');
     expect(active?.catalog.products.map((entry) => entry.productKey)).toEqual(['test-loan']);

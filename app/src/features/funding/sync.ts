@@ -24,14 +24,14 @@ import {
   type FundingSourceRef,
   type FundingSourceSync,
 } from './schema.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION, isAutoReviewer, type FundingSource } from './types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION, type FundingSource } from './types.ts';
 import { FundingCatalogError, validateFundingCatalog } from './validation.ts';
 
-// 출처별 수집기가 만든 상품. 상품 버전과 검수자는 동기화가 정한다(ADR 0006 2절).
+// 출처별 수집기가 만든 상품. 상품 버전과 출처 구분(origin SYNC)은 동기화가 정한다(ADR 0006 2절).
 // notice는 공고 본문을 모을 계획이다. 동기화가 본문을 정해 noticeTextChecksum으로 바꾼다(ADR 0009 §2).
 export type CollectedFundingProduct = Omit<
   FundingProduct,
-  'version' | 'reviewer' | 'sourceRef' | 'noticeTextChecksum'
+  'version' | 'origin' | 'sourceRef' | 'noticeTextChecksum'
 > & {
   sourceRef: FundingSourceRef;
   notice?: NoticePlan;
@@ -109,8 +109,6 @@ export function productContentFingerprint(product: Omit<FundingProduct, 'version
   const content: Record<string, unknown> = { ...product };
   delete content.version;
   delete content.observedAt;
-  delete content.reviewedAt;
-  delete content.nextReviewAt;
   content.evidence = product.evidence.map((entry) => {
     const stable: Record<string, unknown> = { ...entry };
     delete stable.observedAt;
@@ -215,22 +213,18 @@ async function collectSource(
   // 그 출처만 실패로 기록하고, 사람이 관리하는 상품과 다른 출처는 그대로 적재한다.
   // 공고 파일을 받기 전에 돌려, 실패할 출처를 위해 수십 분씩 파일을 받지 않게 한다. 버전과 본문 checksum은
   // 규칙 검사에 쓰이지 않아 임시 버전으로 검사한다.
-  const validation = validateFundingCatalog(
-    {
-      catalogKey: context.manual.catalogKey,
-      schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
-      catalogVersion: `${context.asOfDate}.1`,
-      basisDate: context.asOfDate,
-      reviewer: context.manual.reviewer,
-      notes: [],
-      automation: context.manual.automation,
-      // 스키마가 모르는 항목(본문 계획 notice)은 parse가 뺀다.
-      products: collection.products.map((product) =>
-        fundingProductSchema.parse({ ...product, reviewer: AUTO_REVIEWER, version: '0.0.0' }),
-      ),
-    },
-    { asOfDate: context.asOfDate },
-  );
+  const validation = validateFundingCatalog({
+    catalogKey: context.manual.catalogKey,
+    schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
+    catalogVersion: `${context.asOfDate}.1`,
+    basisDate: context.asOfDate,
+    notes: [],
+    automation: context.manual.automation,
+    // 스키마가 모르는 항목(본문 계획 notice)은 parse가 뺀다.
+    products: collection.products.map((product) =>
+      fundingProductSchema.parse({ ...product, origin: 'SYNC', version: '0.0.0' }),
+    ),
+  });
   if (!validation.ok) {
     const issues = validation.issues
       .slice(0, 5)
@@ -278,7 +272,7 @@ async function collectSource(
     products.push(
       await assignVersion(context.prisma, {
         ...product,
-        reviewer: AUTO_REVIEWER,
+        origin: 'SYNC',
         ...(noticeTextChecksum === null ? {} : { noticeTextChecksum }),
       }),
     );
@@ -304,11 +298,11 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
   const { prisma, asOfDate } = options;
 
   const manual = readFundingCatalogFile(options.catalogPath, asOfDate).catalog;
-  const automatedInManual = manual.products.filter((product) => isAutoReviewer(product.reviewer));
+  const automatedInManual = manual.products.filter((product) => product.origin === 'SYNC');
   if (automatedInManual.length > 0) {
     throw new FundingCatalogError(
       'MANUAL_CATALOG_HAS_AUTOMATED_PRODUCT',
-      `사람이 관리하는 카탈로그에 자동 검수자 상품이 있습니다: ${automatedInManual.map((product) => product.productKey).join(', ')}. 자동 상품은 funding:sync만 만듭니다.`,
+      `사람이 관리하는 카탈로그에 자동 상품(origin SYNC)이 있습니다: ${automatedInManual.map((product) => product.productKey).join(', ')}. 자동 상품은 funding:sync만 만듭니다.`,
     );
   }
   const seenSources = new Set<FundingSource>();
@@ -329,7 +323,7 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
     const previousSync = previous?.automation.sourceSyncs.find((entry) => entry.source === adapter.source) ?? null;
     const attemptedAt = now().toISOString();
     const previousProducts = (previous?.catalog.products ?? []).filter(
-      (product) => isAutoReviewer(product.reviewer) && product.sourceRef?.source === adapter.source,
+      (product) => product.origin === 'SYNC' && product.sourceRef?.source === adapter.source,
     );
     try {
       const collected = await collectSource(adapter, {
@@ -368,7 +362,9 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
         `출처 ${adapter.source}: 공고 ${collected.fetchedCount}건을 받아 상품 ${collected.products.length}건을 만들었습니다.`,
       );
     } catch (error) {
-      automatedProducts.push(...previousProducts);
+      // 직전 상품을 그대로 가져오되 버전은 내용으로 다시 정한다. 지금 모양 버전은 그 버전을 그대로 다시 쓴다. v1.4.0까지의
+      // 예전 모양 버전은 읽을 때 출처 구분을 채워(read.ts) 저장된 원문과 달라 불변 검사(loader.ts)에 걸리므로 새 버전이 된다.
+      for (const product of previousProducts) automatedProducts.push(await assignVersion(prisma, product));
       sources.push({
         source: adapter.source,
         status: 'FAILED',
@@ -410,7 +406,6 @@ export async function runFundingSync(options: FundingSyncOptions): Promise<Fundi
     schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion,
     basisDate: asOfDate,
-    reviewer: manual.reviewer,
     notes: [
       ...manual.notes,
       `funding:sync가 ${asOfDate}에 사람이 관리하는 카탈로그 ${manual.catalogVersion}과 자동 상품 ${keptAutomated.length}건을 합쳤습니다.`,

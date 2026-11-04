@@ -17,7 +17,7 @@ const NO_INPUT: FundingMatchProfile = {
 
 const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json', import.meta.url));
 
-const USAGE = `검수된 자금 공고 카탈로그를 DB 없이 검사합니다.
+const USAGE = `운영자가 관리하는 자금 공고 카탈로그를 DB 없이 검사합니다.
 
 사용법:
   npm run funding:validate -- [옵션]
@@ -33,7 +33,6 @@ const USAGE = `검수된 자금 공고 카탈로그를 DB 없이 검사합니다
   - 날짜와 접수기간 모순, 접수 상태(OPEN/CLOSED/UNKNOWN) 모순
   - 지원 유형과 금리·상환 조건 모순
   - checksum 형식과 원문 미확보 상태
-  - 검수 기한 경과
   - 금리·기간·상환방식이 미확정인 상품의 상환 계산 사유 누락
   - 조건별 공식 원문 근거 누락
 
@@ -73,7 +72,7 @@ function main() {
   const asOfDate = todayInKst();
   const bytes = readFileSync(options.catalogPath);
   const raw: unknown = JSON.parse(bytes.toString('utf8'));
-  const validation = validateFundingCatalog(raw, { asOfDate });
+  const validation = validateFundingCatalog(raw);
 
   console.log(`카탈로그: ${options.catalogPath}`);
   console.log(`판정 기준일(한국 시간): ${asOfDate}`);
@@ -116,9 +115,6 @@ function main() {
   }
   console.log(`  지원 유형: ${[...byType].map(([type, count]) => `${type} ${count}`).join(', ')}`);
   console.log(`  접수 상태(관측): ${[...byStatus].map(([status, count]) => `${status} ${count}`).join(', ')}`);
-  console.log(
-    `  검수 기한 경과: ${validation.reviewOverdue.length === 0 ? '없음' : validation.reviewOverdue.join(', ')}`,
-  );
 
   // 맞춰 보기의 갈래와 마감이다(ADR 0009 §4). 사용자 입력과 AI가 읽은 조건 없이 본 것이라 맞아 보임은 나오지 않는다.
   // 마감은 출처·운영자의 접수 상태와 신청 종료일로만 정한다.

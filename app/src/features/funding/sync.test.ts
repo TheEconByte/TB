@@ -15,7 +15,7 @@ import {
   type FundingSourceAdapter,
   type FundingSourceCollection,
 } from './sync.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 import { FundingCatalogError } from './validation.ts';
 
 const CREATED_DIRS: string[] = [];
@@ -42,7 +42,7 @@ function evidence(id: string, subject: string, observedAt: string): Record<strin
   };
 }
 
-// 수집기가 만드는 모양 그대로의 정책자금 상품. 버전과 검수자는 동기화가 정한다.
+// 수집기가 만드는 모양 그대로의 정책자금 상품. 버전과 출처 구분(origin)은 동기화가 정한다.
 function collected(externalId: string, observedAt: string, overrides: Record<string, unknown> = {}) {
   return {
     productKey: `test-sync-${externalId}`,
@@ -56,8 +56,6 @@ function collected(externalId: string, observedAt: string, overrides: Record<str
     applicationPeriod: { start: null, end: null, note: '예산 소진 시까지 접수합니다.' },
     observedApplicationStatus: 'OPEN',
     observedAt,
-    reviewedAt: observedAt,
-    nextReviewAt: null,
     officialUrl: OLS_URL,
     sourceDocumentName: '정책자금 한눈에 보기',
     sourceDocumentRetrieved: false,
@@ -103,9 +101,8 @@ function manualCatalogFile(products: Record<string, unknown>[] = [manualProduct(
       schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
       catalogVersion: '2026-09-20.1',
       basisDate: '2026-09-20',
-      reviewer: 'tester',
       notes: [],
-      automation: { policyLoanPromotion: true, repaymentPromotion: false, blockedSources: [], sourceSyncs: [] },
+      automation: { blockedSources: [], sourceSyncs: [] },
       products,
     }),
     'utf8',
@@ -120,9 +117,8 @@ function manualProduct(overrides: Record<string, unknown> = {}): Record<string, 
     ...product,
     productKey: 'test-sync-manual',
     version: '1.0.0',
-    name: '사람이 검수한 테스트 상품',
-    reviewer: 'tester',
-    nextReviewAt: '2099-01-01',
+    name: '사람이 기록한 테스트 상품',
+    origin: 'OPERATOR',
     ...overrides,
   };
 }
@@ -144,12 +140,12 @@ describe('상품 버전 재사용 규칙', () => {
         evidence('financial', 'FINANCIAL_CONDITION', '2026-09-21'),
       ],
     });
-    expect(productContentFingerprint({ ...first, reviewer: AUTO_REVIEWER })).toBe(
-      productContentFingerprint({ ...later, reviewer: AUTO_REVIEWER }),
+    expect(productContentFingerprint({ ...first, origin: 'SYNC' })).toBe(
+      productContentFingerprint({ ...later, origin: 'SYNC' }),
     );
     const changed = collected('fund-a', '2026-09-20', { publicLimit: '50000000' });
-    expect(productContentFingerprint({ ...changed, reviewer: AUTO_REVIEWER })).not.toBe(
-      productContentFingerprint({ ...first, reviewer: AUTO_REVIEWER }),
+    expect(productContentFingerprint({ ...changed, origin: 'SYNC' })).not.toBe(
+      productContentFingerprint({ ...first, origin: 'SYNC' }),
     );
   });
 
@@ -262,8 +258,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       'test-sync-fund-a@1.0.0',
       'test-sync-fund-b@1.0.0',
     ]);
-    expect(active?.catalog.products[1].reviewer).toBe(AUTO_REVIEWER);
-    expect(active?.automation.policyLoanPromotion).toBe(true);
+    expect(active?.catalog.products.map((product) => product.origin)).toEqual(['OPERATOR', 'SYNC', 'SYNC']);
     expect(active?.automation.sourceSyncs).toMatchObject([
       { source: 'SEMAS_OLS', status: 'SUCCEEDED', lastSucceededOn: '2026-09-20', failureReason: null },
     ]);
@@ -452,13 +447,12 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(bizinfo).toMatchObject({ supportType: 'UNKNOWN', group: 'NEEDS_CHECK' });
   });
 
-  it('사람이 관리하는 카탈로그에 자동 검수자 상품이 있으면 거부한다', async () => {
+  it('사람이 관리하는 카탈로그에 자동 상품(origin SYNC)이 있으면 거부한다', async () => {
     const catalogPath = manualCatalogFile([
       manualProduct(),
       manualProduct({
         productKey: 'test-sync-manual-auto',
-        reviewer: AUTO_REVIEWER,
-        nextReviewAt: null,
+        origin: 'SYNC',
         sourceRef: { source: 'SEMAS_OLS', externalId: 'fund-z' },
       }),
     ]);
@@ -647,5 +641,102 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     });
     expect(report.sources[0].noticeTexts).toMatchObject({ STORED: 1 });
     expect(await db().fundingNoticeText.count({ where: { productKey: 'test-sync-dry-notice' } })).toBe(0);
+  });
+
+  // v1.4.0까지 funding:sync가 저장한 상품 버전의 JSON. 출처 구분(origin) 대신 자동 검수자와 검수일이 있다(ADR 0006 2절).
+  const legacyVersion = async (externalId: string, observedAt: string) => {
+    const product = collected(externalId, observedAt);
+    const productJson = {
+      ...product,
+      version: '1.0.0',
+      reviewer: 'AUTO:funding-auto-v1',
+      reviewedAt: observedAt,
+      nextReviewAt: null,
+    };
+    return db().fundingProductVersion.create({
+      data: {
+        productKey: product.productKey,
+        version: '1.0.0',
+        name: product.name,
+        organization: product.organization,
+        supportType: 'LOAN',
+        observedApplicationStatus: 'OPEN',
+        observedAt: new Date(`${observedAt}T00:00:00.000Z`),
+        officialUrl: product.officialUrl,
+        publicLimit: product.publicLimit,
+        productJson,
+      },
+    });
+  };
+
+  // ADR 0009 §7로 검수자·검수 기한을 없앴다(v1.5.0). 상품 버전은 불변이고 적재기는 저장된 JSON 원문과 비교한다(docs/domains/funding.md
+  // 릴리스와 상품 버전). 예전 모양 버전을 그대로 다시 쓰면 지금 모양과 달라 PRODUCT_VERSION_IMMUTABLE로 동기화가 멈춘다.
+  // 출처가 실패해 직전 릴리스의 상품을 가져오는 경로도 마찬가지라, 가져올 때 새 버전으로 적재해야 한다.
+  it('직전 v1.4.0 릴리스의 예전 모양 자동 상품은 출처가 실패해 그대로 가져올 때 새 버전으로 적재한다', async () => {
+    const legacy = await legacyVersion('legacy', '2026-10-02');
+    await db().fundingCatalogRelease.updateMany({ where: { status: 'ACTIVE' }, data: { status: 'SUPERSEDED' } });
+    await db().fundingCatalogRelease.create({
+      data: {
+        // 앞 테스트가 같은 날 적재한 릴리스(test-sync-catalog@2026-10-02.1)와 겹치지 않게 다른 키를 쓴다.
+        catalogKey: 'test-sync-legacy-catalog',
+        catalogVersion: '2026-10-02.1',
+        catalogChecksum: 'c'.repeat(64),
+        status: 'ACTIVE',
+        schemaVersion: 'funding-catalog-v1.4.0',
+        basisDate: new Date('2026-10-02T00:00:00.000Z'),
+        sourceDocuments: [],
+        productVersions: ['test-sync-legacy@1.0.0'],
+        automation: {
+          policyLoanPromotion: false,
+          repaymentPromotion: false,
+          blockedSources: [],
+          sourceSyncs: [
+            {
+              source: 'SEMAS_OLS',
+              status: 'SUCCEEDED',
+              attemptedAt: '2026-10-02T01:00:00.000Z',
+              lastSucceededOn: '2026-10-02',
+              fetchedCount: 1,
+              responseChecksum: null,
+              failureReason: null,
+            },
+          ],
+        },
+        validationSummary: {},
+        productCount: 1,
+        activatedAt: new Date('2026-10-02T01:00:00.000Z'),
+        products: { create: [{ productVersionId: legacy.id, position: 0 }] },
+      },
+    });
+
+    const report = await sync({
+      asOfDate: '2026-10-03',
+      result: () => {
+        throw new Error('출처 응답 403');
+      },
+    });
+    expect(report.load?.outcome).toBe('ACTIVATED');
+    expect(report.sources[0]).toMatchObject({ status: 'FAILED', carriedOver: true, lastSucceededOn: '2026-10-02' });
+    const active = await findActiveFundingCatalog(db());
+    const carried = active?.catalog.products.find((product) => product.productKey === 'test-sync-legacy');
+    expect(carried).toMatchObject({ version: '1.0.1', origin: 'SYNC', sourceRef: { source: 'SEMAS_OLS' } });
+    // 예전 버전은 덮어쓰지 않는다.
+    const old = await db().fundingProductVersion.findUnique({ where: { id: legacy.id } });
+    expect((old?.productJson as { reviewer?: string }).reviewer).toBe('AUTO:funding-auto-v1');
+  });
+
+  // 앞 테스트에 기대지 않는다. 지금 모양 버전을 다시 쓰는 규칙은 위 '내용이 같은 상품은 버전을 재사용' 테스트가 본다.
+  it('예전 모양으로 저장된 상품 버전은 출처가 성공해도 내용이 같으면 다시 쓰지 않고 새 버전을 만든다', async () => {
+    await legacyVersion('legacy-b', '2026-10-04');
+    const report = await sync({
+      asOfDate: '2026-10-04',
+      // 공고 수는 앞 테스트들과 같은 10건으로 둬 직전 성공 대비 급감 판정에 걸리지 않게 한다.
+      result: () => collection([collected('legacy-b', '2026-10-04')], 10),
+    });
+    expect(report.load?.outcome).toBe('ACTIVATED');
+    expect(report.sources[0].status).toBe('SUCCEEDED');
+    const active = await findActiveFundingCatalog(db());
+    const legacyB = active?.catalog.products.find((product) => product.productKey === 'test-sync-legacy-b');
+    expect(legacyB).toMatchObject({ version: '1.0.1', origin: 'SYNC' });
   });
 });

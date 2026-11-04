@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
 import { loadFundingCatalog, readFundingCatalogFile } from './loader.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 import {
   FundingCatalogError,
   repaymentCalculationReasons,
@@ -57,8 +57,6 @@ const BASE_PRODUCT: Record<string, unknown> = {
   applicationPeriod: { start: '2026-09-01', end: '2026-12-31', note: null },
   observedApplicationStatus: 'OPEN',
   observedAt: REVIEW_DATE,
-  reviewedAt: REVIEW_DATE,
-  nextReviewAt: '2026-10-20',
   officialUrl: OFFICIAL_URL,
   sourceDocumentName: '테스트 공고문',
   sourceDocumentRetrieved: false,
@@ -70,7 +68,7 @@ const BASE_PRODUCT: Record<string, unknown> = {
   repaymentMethod: 'UNKNOWN',
   unsupportedCalculationReasons: ['금리가 확정되지 않았습니다.'],
   additionalChecks: [],
-  reviewer: 'tester',
+  origin: 'OPERATOR',
   evidence: [
     evidence('identity', 'IDENTITY'),
     evidence('period', 'APPLICATION_PERIOD'),
@@ -95,15 +93,14 @@ function catalog(
     schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion: '2026-09-20.1',
     basisDate: REVIEW_DATE,
-    reviewer: 'tester',
     notes: [],
     products,
     ...overrides,
   };
 }
 
-function validate(raw: unknown, asOfDate = REVIEW_DATE): FundingCatalogValidation {
-  return validateFundingCatalog(raw, { asOfDate });
+function validate(raw: unknown): FundingCatalogValidation {
+  return validateFundingCatalog(raw);
 }
 
 function issueCodes(validation: FundingCatalogValidation): string[] {
@@ -119,27 +116,16 @@ function catalogFrom(validation: FundingCatalogValidation): FundingCatalog {
   return validation.catalog;
 }
 
-function testCatalogFile(catalogKey: string, productPrefix: string, reviewer: string | null): string {
+// 실제 카탈로그를 테스트 키로 복사한다. 테스트 DB에서 지울 수 있게 catalogKey와 productKey 앞에 test-를 붙인다.
+function copiedCatalogFile(): string {
   const source = JSON.parse(readFileSync(REAL_CATALOG_PATH, 'utf8')) as {
-    catalogKey: string;
-    catalogVersion: string;
-    reviewer: string;
-    products: Array<Record<string, unknown> & { productKey: string; reviewer: string }>;
+    products: Array<Record<string, unknown> & { productKey: string }>;
   };
   return writeCatalogFile({
     ...source,
-    catalogKey,
-    reviewer: reviewer ?? source.reviewer,
-    products: source.products.map((entry) => ({
-      ...entry,
-      productKey: `${productPrefix}${entry.productKey}`,
-      reviewer: reviewer ?? entry.reviewer,
-    })),
+    catalogKey: 'test-copied-catalog',
+    products: source.products.map((entry) => ({ ...entry, productKey: `test-${entry.productKey}` })),
   });
-}
-
-function reviewedCatalogFile(): string {
-  return testCatalogFile('test-reviewed-catalog', 'test-', 'test-reviewer');
 }
 
 function firstProduct(validation: FundingCatalogValidation, productKey = 'test-loan') {
@@ -266,23 +252,15 @@ describe('funding catalog schema and rules', () => {
     expect(issueCodes(validation)).toContain('MISSING_EVIDENCE');
   });
 
-  it('records an overdue review instead of treating it as current', () => {
-    const overdue = product({ observedAt: '2026-09-10', reviewedAt: '2026-09-10', nextReviewAt: '2026-09-16' });
-    const validation = validate(catalog([overdue]));
-    expect(validation.ok).toBe(true);
-    expect(warningCodes(validation)).toContain('REVIEW_OVERDUE');
-    expect(validation.reviewOverdue).toEqual(['test-loan@1.0.0']);
-
-    const onTime = validate(
-      catalog([product({ observedAt: '2026-09-10', reviewedAt: '2026-09-10', nextReviewAt: '2026-09-20' })]),
-    );
-    expect(onTime.reviewOverdue).toEqual([]);
-  });
-
-  it('rejects a catalog without review dates', () => {
-    const validation = validate(catalog([product({ reviewedAt: null, nextReviewAt: null })]));
-    expect(issueCodes(validation)).toContain('REVIEWED_AT_MISSING');
-    expect(issueCodes(validation)).toContain('NEXT_REVIEW_AT_MISSING');
+  // 맞춰 보기는 자동/사람 상품을 이 값으로 가른다(갈래·운영자 확인 값·출처 최신성·운영자 숨김). 빠진 값을 사람 상품으로
+  // 짐작하지 않는다(AGENTS.md §3의 2번).
+  it('rejects a product that does not say whether funding:sync or an operator recorded it', () => {
+    const withoutOrigin = product();
+    delete withoutOrigin.origin;
+    const validation = validate(catalog([withoutOrigin]));
+    expect(validation.ok).toBe(false);
+    expect(issueCodes(validation)).toContain('SCHEMA_INVALID');
+    expect(validate(catalog([product({ origin: 'REVIEWER' })])).ok).toBe(false);
   });
 
   it('rejects an application period that ends before it starts', () => {
@@ -344,29 +322,18 @@ describe('automated products in the catalog (ADR 0006)', () => {
     failureReason: null,
   };
   const automation = (overrides: Record<string, unknown> = {}) => ({
-    policyLoanPromotion: false,
-    repaymentPromotion: false,
     blockedSources: [],
     sourceSyncs: [succeededSync],
     ...overrides,
   });
 
-  it('checks an automated product against source freshness instead of a next review date', () => {
-    const validation = validate(
-      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null })], { automation: automation() }),
-    );
-    expect(issueCodes(validation)).not.toContain('NEXT_REVIEW_AT_MISSING');
-    expect(validation.ok).toBe(true);
-    expect(validation.reviewOverdue).toEqual([]);
-
+  // 출처 최신성은 맞춰 보기가 보류 이유(출처 확인 끊김)로 보여 준다(matching.test.ts). 규칙 검사는 적재를 막거나 주의로 알리지 않는다.
+  it('loads a synced product whose source has no recent successful sync', () => {
     const stale = validate(
-      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null })], {
-        automation: automation({ sourceSyncs: [] }),
-      }),
+      catalog([product({ origin: 'SYNC', sourceRef })], { automation: automation({ sourceSyncs: [] }) }),
     );
     expect(stale.ok).toBe(true);
-    expect(warningCodes(stale)).toContain('REVIEW_OVERDUE');
-    expect(stale.reviewOverdue).toEqual(['test-loan@1.0.0']);
+    expect(stale.warnings).toEqual([]);
   });
 
   it('lets an automated product keep the checksum of a crawled web page, but not a manual product', () => {
@@ -375,7 +342,7 @@ describe('automated products in the catalog (ADR 0006)', () => {
       checksum: 'a'.repeat(64),
     }));
     const automated = validate(
-      catalog([product({ reviewer: AUTO_REVIEWER, sourceRef, nextReviewAt: null, evidence: crawled })], {
+      catalog([product({ origin: 'SYNC', sourceRef, evidence: crawled })], {
         automation: automation(),
       }),
     );
@@ -386,9 +353,10 @@ describe('automated products in the catalog (ADR 0006)', () => {
     expect(issueCodes(manual)).toContain('EVIDENCE_CHECKSUM_NOT_APPLICABLE');
   });
 
-  it('rejects an automated reviewer without a source reference', () => {
-    const validation = validate(catalog([product({ reviewer: AUTO_REVIEWER, nextReviewAt: null })]));
-    expect(issueCodes(validation)).toContain('AUTO_REVIEWER_WITHOUT_SOURCE');
+  // 출처 식별자가 없으면 출처 최신성과 운영자 숨김(차단 목록)을 적용할 수 없다(ADR 0009 §6).
+  it('rejects a synced product without a source reference', () => {
+    const validation = validate(catalog([product({ origin: 'SYNC' })]));
+    expect(issueCodes(validation)).toContain('SYNCED_PRODUCT_WITHOUT_SOURCE');
   });
 
   it('rejects two products that point at the same source notice', () => {
@@ -405,14 +373,9 @@ describe('automated products in the catalog (ADR 0006)', () => {
     expect(issueCodes(validation)).toContain('DUPLICATE_SOURCE_SYNC');
   });
 
-  it('defaults a catalog without an automation block to every switch off', () => {
+  it('defaults a catalog without an automation block to no blocked notices and no sync results', () => {
     const parsed = catalogFrom(validate(catalog([product()])));
-    expect(parsed.automation).toEqual({
-      policyLoanPromotion: false,
-      repaymentPromotion: false,
-      blockedSources: [],
-      sourceSyncs: [],
-    });
+    expect(parsed.automation).toEqual({ blockedSources: [], sourceSyncs: [] });
   });
 });
 
@@ -478,24 +441,20 @@ describe('notices whose business stage or support type is unknown', () => {
 });
 
 describe('the reviewed 2026-09-20 catalog', () => {
-  it('passes every rule check and reports the review state of each product', () => {
+  it('passes every rule check as operator-recorded products', () => {
     const validation = validate(REAL_CATALOG);
     expect(validation.ok).toBe(true);
     expect(validation.checks.some((check) => check.status === 'FAIL')).toBe(false);
     const parsed = catalogFrom(validation);
     expect(parsed.products).toHaveLength(5);
     expect(parsed.basisDate).toBe(REVIEW_DATE);
-    expect(validation.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.1']);
+    // catalog.json에는 사람이 기록한 상품만 있다. 자동 상품은 funding:sync만 만든다(docs/domains/funding.md 동기화).
+    expect(parsed.products.every((entry) => entry.origin === 'OPERATOR')).toBe(true);
 
     const byStatus = parsed.products.map((entry) => entry.observedApplicationStatus);
     expect(byStatus.filter((status) => status === 'CLOSED')).toHaveLength(1);
     expect(byStatus.filter((status) => status === 'UNKNOWN')).toHaveLength(4);
     expect(byStatus.filter((status) => status === 'OPEN')).toHaveLength(0);
-  });
-
-  it('accepts the catalog for loading while reviewers are unassigned', () => {
-    expect(validate(REAL_CATALOG).ok).toBe(true);
-    expect(readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE).catalog.reviewer).toBe('UNASSIGNED');
   });
 
   it('keeps all five reviewed products out of repayment calculation', () => {
@@ -566,8 +525,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   let client: PrismaClient | null = null;
   let startedAt = new Date(0);
   let previousActiveId: string | null = null;
-  const REAL_VERSION = '2026-11-03.2';
-  const REVIEWED_CATALOG_PATH = reviewedCatalogFile();
+  // catalog.json의 catalogVersion. v1.5.0으로 올리며 2026-11-04.1이 됐다(catalog.json notes).
+  const REAL_VERSION = '2026-11-04.1';
+  const COPIED_CATALOG_PATH = copiedCatalogFile();
 
   const db = (): PrismaClient => {
     if (!client) throw new Error('PrismaClient가 초기화되지 않았습니다.');
@@ -617,25 +577,22 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
     return db().fundingCatalogRelease.findFirst({ where: { status: 'ACTIVE' } });
   }
 
-  it('activates the reviewed catalog and stores immutable product versions', async () => {
+  it('activates the copied catalog and stores immutable product versions', async () => {
     const report = await loadFundingCatalog({
-      catalogPath: REVIEWED_CATALOG_PATH,
+      catalogPath: COPIED_CATALOG_PATH,
       prisma: db(),
       asOfDate: REVIEW_DATE,
       log: () => {},
     });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.productCount).toBe(5);
-    expect(report.reviewOverdue).toEqual(['test-gangbuk-startup-center-2026-h2-residency@1.0.1']);
     expect(report.catalogChecksum).toHaveLength(64);
 
     const stored = await db().fundingCatalogRelease.findUnique({ where: { catalogChecksum: report.catalogChecksum } });
     expect(stored?.status).toBe('ACTIVE');
     expect(stored?.catalogVersion).toBe(REAL_VERSION);
     expect(stored?.basisDate.toISOString().slice(0, 10)).toBe(REVIEW_DATE);
-    expect(stored?.reviewedAt?.toISOString().slice(0, 10)).toBe(REVIEW_DATE);
     expect(stored?.productCount).toBe(5);
-    expect(stored?.reviewer).toBe('test-reviewer');
 
     const versions = await db().fundingProductVersion.findMany({
       where: { productKey: { startsWith: 'test-' } },
@@ -649,7 +606,6 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
     const loan = versions.find((version) => version.productKey === 'test-seoul-fund-2026-startup-company');
     expect(loan?.publicLimit?.toString()).toBe('100000000');
     expect(loan?.observedApplicationStatus).toBe('UNKNOWN');
-    expect(loan?.nextReviewAt?.toISOString().slice(0, 10)).toBe('2026-10-20');
     expect(await db().fundingCatalogRelease.count({ where: { status: 'ACTIVE' } })).toBe(1);
   });
 
@@ -657,7 +613,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
     const before = await db().fundingProductVersion.count();
     const beforeReleases = await db().fundingCatalogRelease.count();
     const report = await loadFundingCatalog({
-      catalogPath: REVIEWED_CATALOG_PATH,
+      catalogPath: COPIED_CATALOG_PATH,
       prisma: db(),
       asOfDate: REVIEW_DATE,
       log: () => {},
@@ -670,7 +626,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
 
   it('rejects a changed body for an already stored product version', async () => {
     const stored = await activeRelease();
-    const changed = JSON.parse(readFileSync(REVIEWED_CATALOG_PATH, 'utf8')) as {
+    const changed = JSON.parse(readFileSync(COPIED_CATALOG_PATH, 'utf8')) as {
       catalogVersion: string;
       products: Record<string, unknown>[];
     };
@@ -729,7 +685,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
   });
 
   it('refuses a different body under an already used catalogKey + catalogVersion', async () => {
-    const changed = JSON.parse(readFileSync(REVIEWED_CATALOG_PATH, 'utf8')) as { notes: string[] };
+    const changed = JSON.parse(readFileSync(COPIED_CATALOG_PATH, 'utf8')) as { notes: string[] };
     changed.notes = [...changed.notes, '설명만 바꾼 카탈로그'];
     const path = writeCatalogFile(changed);
     await expect(
@@ -739,8 +695,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
 
   it('validates a catalog file before it can be loaded', () => {
     const parsed = readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE);
-    expect(parsed.reviewOverdue).toEqual(['gangbuk-startup-center-2026-h2-residency@1.0.1']);
-    expect(parsed.catalog.products.map(productVersionKey)).toContain('seoul-fund-2026-inclusive-finance@1.0.1');
+    // v1.5.0으로 상품 모양이 바뀌어 1.0.1에서 1.0.2로 올렸다. 1.0.1은 이미 적재된 불변 버전이라 다시 쓸 수 없다(catalog.json notes).
+    expect(parsed.catalog.products.map(productVersionKey)).toContain('seoul-fund-2026-inclusive-finance@1.0.2');
   });
 
   it('links reused immutable product versions to a later catalog release', async () => {
@@ -749,7 +705,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
       where: { catalogReleaseId: firstRelease?.id },
       orderBy: { position: 'asc' },
     });
-    const next = JSON.parse(readFileSync(REVIEWED_CATALOG_PATH, 'utf8')) as {
+    const next = JSON.parse(readFileSync(COPIED_CATALOG_PATH, 'utf8')) as {
       catalogVersion: string;
       notes: string[];
     };
@@ -773,19 +729,6 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
       firstMemberships.map((entry) => entry.productVersionId),
     );
     expect(await db().fundingProductVersion.count({ where: { productKey: { startsWith: 'test-' } } })).toBe(5);
-  });
-
-  it('activates a catalog whose reviewers are still UNASSIGNED', async () => {
-    const report = await loadFundingCatalog({
-      catalogPath: testCatalogFile('test-unassigned-catalog', 'test-unassigned-', null),
-      prisma: db(),
-      asOfDate: REVIEW_DATE,
-      log: () => {},
-    });
-    expect(report.outcome).toBe('ACTIVATED');
-    const stored = await db().fundingCatalogRelease.findUnique({ where: { id: report.releaseId } });
-    expect(stored?.status).toBe('ACTIVE');
-    expect(stored?.reviewer).toBe('UNASSIGNED');
   });
 
   // 확정 조건이 모두 있는 대출만 상환 계산 대상으로 저장한다(docs/domains/funding.md 카탈로그, catalog README).

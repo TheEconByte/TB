@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { FundingSourceCollection } from '../sync.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from '../types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION } from '../types.ts';
 import { validateFundingCatalog } from '../validation.ts';
 import {
   BIZINFO_API_URL,
@@ -65,9 +65,8 @@ function catalogWith(products: unknown[], sourceSyncs: unknown[] = []) {
     schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion: `${AS_OF}.1`,
     basisDate: AS_OF,
-    reviewer: 'tester',
     notes: [],
-    automation: { policyLoanPromotion: true, repaymentPromotion: true, blockedSources: [], sourceSyncs },
+    automation: { blockedSources: [], sourceSyncs },
     products,
   };
 }
@@ -102,8 +101,6 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
       applicationPeriod: { start: '2026-09-01', end: '2026-10-31', note: null },
       observedApplicationStatus: 'OPEN',
       observedAt: AS_OF,
-      reviewedAt: AS_OF,
-      nextReviewAt: null,
       officialUrl: 'https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_000000000112345',
       repaymentMethod: 'UNKNOWN',
       publicLimit: null,
@@ -116,8 +113,8 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
       ['APPLICATION_PERIOD', 'OFFICIAL_API', CHECKSUM],
     ]);
 
-    const version = { ...product, version: '1.0.0', reviewer: AUTO_REVIEWER };
-    const validation = validateFundingCatalog(catalogWith([version]), { asOfDate: AS_OF });
+    const version = { ...product, version: '1.0.0', origin: 'SYNC' };
+    const validation = validateFundingCatalog(catalogWith([version]));
     expect(validation.issues).toEqual([]);
     expect(validation.ok).toBe(true);
   });
@@ -172,8 +169,8 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
     // 접수 시작 전인 공고도 접수 중이 아니다.
     expect(byId.get('PBLN_H')?.observedApplicationStatus).toBe('UNKNOWN');
 
-    const versions = products.map((product) => ({ ...product, version: '1.0.0', reviewer: AUTO_REVIEWER }));
-    const validation = validateFundingCatalog(catalogWith(versions), { asOfDate: AS_OF });
+    const versions = products.map((product) => ({ ...product, version: '1.0.0', origin: 'SYNC' }));
+    const validation = validateFundingCatalog(catalogWith(versions));
     expect(validation.issues).toEqual([]);
   });
 

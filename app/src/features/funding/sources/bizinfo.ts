@@ -295,8 +295,6 @@ export function mapBizinfoItems(
           : { start: period.start, end: period.end, note: null },
       observedApplicationStatus: open ? 'OPEN' : 'UNKNOWN',
       observedAt: context.asOfDate,
-      reviewedAt: context.asOfDate,
-      nextReviewAt: null,
       officialUrl,
       sourceDocumentName: '기업마당 지원사업 공고',
       sourceDocumentRetrieved: false,

@@ -29,10 +29,8 @@ export type FundingLoadReport = {
   catalogVersion: string;
   catalogChecksum: string;
   basisDate: string;
-  reviewedAt: string | null;
   productCount: number;
   products: string[];
-  reviewOverdue: string[];
   warnings: FundingIssue[];
 };
 
@@ -40,7 +38,6 @@ export type ParsedFundingCatalogFile = {
   catalog: FundingCatalog;
   catalogChecksum: string;
   asOfDate: string;
-  reviewOverdue: string[];
   warnings: FundingIssue[];
   checks: FundingValidationCheck[];
 };
@@ -63,7 +60,7 @@ export function readFundingCatalogFile(catalogPath: string, asOfDate: string): P
       `카탈로그 JSON을 해석하지 못했습니다: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const validation = requireValidFundingCatalog(raw, { asOfDate });
+  const validation = requireValidFundingCatalog(raw);
   const catalog = validation.catalog;
   if (catalog === null) {
     throw new FundingCatalogError('CATALOG_VALIDATION_FAILED', '카탈로그 검증 결과가 비어 있습니다.');
@@ -72,7 +69,6 @@ export function readFundingCatalogFile(catalogPath: string, asOfDate: string): P
     catalog,
     catalogChecksum: sha256Hex(bytes),
     asOfDate,
-    reviewOverdue: validation.reviewOverdue,
     warnings: validation.warnings,
     checks: validation.checks,
   };
@@ -87,23 +83,12 @@ function productRows(catalog: FundingCatalog) {
     supportType: product.supportType,
     observedApplicationStatus: product.observedApplicationStatus,
     observedAt: toDate(product.observedAt),
-    reviewedAt: product.reviewedAt === null ? null : toDate(product.reviewedAt),
-    nextReviewAt: product.nextReviewAt === null ? null : toDate(product.nextReviewAt),
     officialUrl: product.officialUrl,
     publicLimit: product.publicLimit,
     // 적재하는 카탈로그는 규칙 검사를 통과했으므로 거치가 상환기간보다 짧다.
     repaymentCalculationSupported: repaymentCalculationReasons(product).length === 0,
     productJson: product,
   }));
-}
-
-// 릴리스 검수일은 카탈로그 안 상품 검수일 중 가장 늦은 날짜다.
-function latestReviewDate(catalog: FundingCatalog): string | null {
-  const dates = catalog.products
-    .map((product) => product.reviewedAt)
-    .filter((value): value is string => value !== null);
-  if (dates.length === 0) return null;
-  return dates.reduce((latest, value) => (value > latest ? value : latest));
 }
 
 export async function loadFundingCatalog(options: FundingLoadOptions): Promise<FundingLoadReport> {
@@ -115,13 +100,8 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       '판정 기준일(asOfDate)이 필요합니다. 명령은 서버의 한국 시간 날짜를 넘깁니다.',
     );
   }
-  // 검수 기능은 아직 없다. 검수자가 UNASSIGNED여도 적재한다. 맞춰 보기는 검수자를 그룹에 쓰지 않는다(ADR 0009 §4).
-  const { catalog, catalogChecksum, reviewOverdue, warnings, checks } = readFundingCatalogFile(
-    options.catalogPath,
-    options.asOfDate,
-  );
+  const { catalog, catalogChecksum, warnings, checks } = readFundingCatalogFile(options.catalogPath, options.asOfDate);
   const products = catalog.products.map(productVersionKey);
-  const releaseReviewedAt = latestReviewDate(catalog);
 
   const existing = await prisma.fundingCatalogRelease.findUnique({ where: { catalogChecksum } });
   const sameVersion = await prisma.fundingCatalogRelease.findUnique({
@@ -142,10 +122,8 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       catalogVersion: existing.catalogVersion,
       catalogChecksum: existing.catalogChecksum,
       basisDate: fromDate(existing.basisDate),
-      reviewedAt: existing.reviewedAt === null ? null : fromDate(existing.reviewedAt),
       productCount: existing.productCount,
       products,
-      reviewOverdue,
       warnings,
     };
   }
@@ -165,8 +143,6 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       status: 'PENDING',
       schemaVersion: catalog.schemaVersion,
       basisDate: toDate(catalog.basisDate),
-      reviewedAt: releaseReviewedAt === null ? null : toDate(releaseReviewedAt),
-      reviewer: catalog.reviewer,
       sourceDocuments: catalog.products.flatMap((product) =>
         product.evidence.map((entry) => ({
           productKey: product.productKey,
@@ -182,7 +158,7 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       ),
       productVersions: products,
       automation: catalog.automation,
-      validationSummary: { checks, warnings, reviewOverdue, asOfDate: options.asOfDate, productCount: products.length },
+      validationSummary: { checks, warnings, asOfDate: options.asOfDate, productCount: products.length },
       productCount: products.length,
     },
   });
@@ -281,10 +257,8 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
     catalogVersion: catalog.catalogVersion,
     catalogChecksum,
     basisDate: catalog.basisDate,
-    reviewedAt: releaseReviewedAt,
     productCount: products.length,
     products,
-    reviewOverdue,
     warnings,
   };
 }

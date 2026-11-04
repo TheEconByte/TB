@@ -2,34 +2,26 @@
 // stored as-is in the JSON catalog and mirrored by the Prisma enums, so a name
 // change here is a catalog schema change too.
 
-export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.4.0';
+export const FUNDING_CATALOG_SCHEMA_VERSION = 'funding-catalog-v1.5.0';
 
 // 이미 적재된 릴리스를 읽을 수 있는 스키마 버전. v1.1.0은 v1.0.0에 출처 식별자와
 // 자동화 설정을, v1.2.0은 지원 유형 UNKNOWN과 사업 단계 미확인(빈 배열)을, v1.3.0은 공고 본문
 // checksum(noticeTextChecksum)을, v1.4.0은 출처의 지원분야(sourceCategory)와 한도 문장(limitText)을 더했을 뿐이라
-// 이전 릴리스도 그대로 읽는다.
+// 이전 릴리스도 그대로 읽는다. v1.5.0은 검수자·검수 기한·스위치를 없애고 상품의 출처 구분(origin)을 더했다(ADR 0009 §7).
+// 그 전 릴리스의 상품은 예전 검수자로 출처 구분을 정해 읽는다(read.ts).
 export const READABLE_FUNDING_CATALOG_SCHEMA_VERSIONS: readonly string[] = [
   'funding-catalog-v1.0.0',
   'funding-catalog-v1.1.0',
   'funding-catalog-v1.2.0',
   'funding-catalog-v1.3.0',
+  'funding-catalog-v1.4.0',
   FUNDING_CATALOG_SCHEMA_VERSION,
 ];
 
-// 검수자가 아직 지정되지 않은 상품. 카탈로그에 남기고 운영자 명령이 주의로 알린다. 맞춰 보기 화면(ADR 0009 §4)은
-// 검수자·검수 기한을 그룹에 쓰지 않으므로 이 상품도 보여 준다. 사업 단계·지역은 공식 원문 근거가 있을 때만 운영자
-// 확인 값으로 쓰고, 나머지 조건은 다른 상품처럼 AI가 공고문에서 읽은 값으로 맞춰 본다(matching.ts).
-export const REVIEWER_UNASSIGNED = 'UNASSIGNED';
-
-// funding:sync가 공식 출처에서 모은 상품의 검수자. 사람 대신 자동 규칙 버전을 적고,
-// 규칙을 바꾸면 버전을 올린다(ADR 0006).
-export const AUTO_REVIEWER_PREFIX = 'AUTO:';
-export const FUNDING_AUTOMATION_RULES_VERSION = 'funding-auto-v1';
-export const AUTO_REVIEWER = `${AUTO_REVIEWER_PREFIX}${FUNDING_AUTOMATION_RULES_VERSION}`;
-
-export function isAutoReviewer(reviewer: string): boolean {
-  return reviewer.startsWith(AUTO_REVIEWER_PREFIX);
-}
+// 상품을 누가 기록했는지. SYNC는 funding:sync가 공식 출처에서 모은 상품, OPERATOR는 운영자가 catalog.json에 기록한
+// 상품이다. 맞춰 보기의 갈래·운영자 확인 값·출처 최신성·운영자 숨김이 이 값으로 갈린다(matching.ts).
+export const FUNDING_PRODUCT_ORIGINS = ['SYNC', 'OPERATOR'] as const;
+export type FundingProductOrigin = (typeof FUNDING_PRODUCT_ORIGINS)[number];
 
 // funding:sync가 상품을 모으는 공식 출처.
 export const FUNDING_SOURCES = ['SEMAS_OLS', 'BIZINFO'] as const;
@@ -196,9 +188,7 @@ export function addDaysToIsoDate(isoDate: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-export type ReviewState = 'CURRENT' | 'UNREVIEWED' | 'REVIEW_OVERDUE';
-
-// 출처별 마지막 성공 동기화일. 자동 상품의 최신성은 사람이 정한 다음 검토일 대신 이 날짜로 판단한다.
+// 출처별 마지막 성공 동기화일. 자동 상품의 최신성은 이 날짜로 판단한다.
 export type SourceFreshness = { source: FundingSource; lastSucceededOn: string | null };
 
 // 자동 상품은 출처의 마지막 성공 동기화가 SOURCE_FRESHNESS_DAYS 안이어야 최신이다.
@@ -211,25 +201,4 @@ export function isSourceFresh(
   const sync = sourceSyncs.find((entry) => entry.source === source);
   if (!sync || sync.lastSucceededOn === null) return false;
   return compareIsoDates(addDaysToIsoDate(sync.lastSucceededOn, SOURCE_FRESHNESS_DAYS), asOfDate) >= 0;
-}
-
-// A product with no review date at all is treated as overdue: it can never be
-// presented as currently applicable. 자동 상품은 다음 검토일 대신 출처 최신성으로 판단한다.
-export function reviewState(
-  product: {
-    reviewer: string;
-    reviewedAt: string | null;
-    nextReviewAt: string | null;
-    sourceRef?: { source: FundingSource } | undefined;
-  },
-  asOfDate: string,
-  sourceSyncs: readonly SourceFreshness[] = [],
-): ReviewState {
-  if (isAutoReviewer(product.reviewer)) {
-    if (product.reviewedAt === null || product.sourceRef === undefined) return 'REVIEW_OVERDUE';
-    return isSourceFresh(product.sourceRef.source, sourceSyncs, asOfDate) ? 'CURRENT' : 'REVIEW_OVERDUE';
-  }
-  if (product.reviewedAt === null || product.nextReviewAt === null) return 'REVIEW_OVERDUE';
-  if (compareIsoDates(product.nextReviewAt, asOfDate) < 0) return 'REVIEW_OVERDUE';
-  return product.reviewer === REVIEWER_UNASSIGNED ? 'UNREVIEWED' : 'CURRENT';
 }

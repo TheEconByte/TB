@@ -13,7 +13,6 @@ import {
   FUNDING_SOURCE_LABELS,
   POLICY_LOAN_SUPPORT_TYPES,
   compareIsoDates,
-  isAutoReviewer,
   isPrimaryRetrievalMethod,
   isSourceFresh,
   type EvidenceSubject,
@@ -118,9 +117,9 @@ export type ProductMatch = {
   limit: { publicLimitKrw: string | null; limitText: string | null };
   // 사람이 등록한 상품에 운영자가 적은 지역 메모. 자동 상품의 지역 필드는 수집기의 추측이라 null이다.
   operatorRegionNote: string | null;
-  // 사람이 등록한 상품의 기록일과 다음 검토일. 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 보여 준다.
-  // 그룹에는 쓰지 않는다(검수자·검수 기한은 그룹에 쓰지 않는다). 자동 상품은 null이다.
-  operatorRecord: { observedAt: string; nextReviewAt: string | null } | null;
+  // 사람이 등록한 상품의 기록일. 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 보여 준다.
+  // 그룹에는 쓰지 않는다. 자동 상품은 null이다.
+  operatorRecord: { observedAt: string } | null;
 };
 
 export type FundingMatchList = {
@@ -134,7 +133,7 @@ export type FundingMatchList = {
 const BIZINFO_FINANCE_CATEGORY = '금융';
 
 export function fundingTab(product: FundingProduct): FundingTab {
-  if (isAutoReviewer(product.reviewer)) {
+  if (product.origin === 'SYNC') {
     if (product.sourceRef?.source === 'SEMAS_OLS') return 'POLICY_FUND';
     if (product.sourceRef?.source === 'BIZINFO' && product.sourceCategory === BIZINFO_FINANCE_CATEGORY)
       return 'POLICY_FUND';
@@ -206,7 +205,7 @@ export function readProductConditions(product: FundingProduct, extraction: Verif
       fromExtraction(extraction?.[name] as VerifiedField<ConditionValues[typeof name]> | undefined),
     ]),
   ) as Readings;
-  if (isAutoReviewer(product.reviewer)) return readings;
+  if (product.origin === 'SYNC') return readings;
   const stage = operatorStage(product);
   const stageEvidence = operatorEvidence(product, 'BUSINESS_STAGE');
   if (stage !== null && stageEvidence !== null) {
@@ -414,7 +413,7 @@ export function matchProduct(
 ): ProductMatch {
   const readings = readProductConditions(product, extraction);
   const conditions = matchConditions(readings, profile, context.asOfDate);
-  const auto = isAutoReviewer(product.reviewer);
+  const auto = product.origin === 'SYNC';
   const source = auto ? product.sourceRef?.source : undefined;
   const fresh =
     !auto || (source !== undefined && isSourceFresh(source, context.automation.sourceSyncs, context.asOfDate));
@@ -465,7 +464,7 @@ export function matchProduct(
     supportTypes: readings.supportTypes,
     limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
     operatorRegionNote: auto ? null : product.region.note,
-    operatorRecord: auto ? null : { observedAt: product.observedAt, nextReviewAt: product.nextReviewAt },
+    operatorRecord: auto ? null : { observedAt: product.observedAt },
   };
 }
 
@@ -485,9 +484,7 @@ export function matchCatalog(
   let hiddenCount = 0;
   const matches = catalog.products.flatMap((product) => {
     const hidden =
-      isAutoReviewer(product.reviewer) &&
-      product.sourceRef !== undefined &&
-      blocked.has(sourceRefKey(product.sourceRef));
+      product.origin === 'SYNC' && product.sourceRef !== undefined && blocked.has(sourceRefKey(product.sourceRef));
     const extraction = product.noticeTextChecksum === undefined ? null : (extractions.get(product.productKey) ?? null);
     if (hidden) {
       hiddenCount += 1;

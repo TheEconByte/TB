@@ -1,16 +1,11 @@
 import { ZodError } from 'zod';
 import {
   REPAYABLE_SUPPORT_TYPES,
-  REVIEWER_UNASSIGNED,
-  SOURCE_FRESHNESS_DAYS,
   compareIsoDates,
-  isAutoReviewer,
   isSupportedRepaymentMethod,
   isPrimaryRetrievalMethod,
   requiredEvidenceSubjects,
-  reviewState,
   type EvidenceSubject,
-  type SourceFreshness,
 } from './types.ts';
 import {
   fundingCatalogSchema,
@@ -36,14 +31,7 @@ export type FundingIssueCode =
   | 'OBSERVED_OPEN_AFTER_PERIOD_END'
   | 'OBSERVED_OPEN_BEFORE_PERIOD_START'
   | 'OBSERVED_AT_AFTER_BASIS_DATE'
-  | 'REVIEWED_AT_MISSING'
-  | 'NEXT_REVIEW_AT_MISSING'
-  | 'REVIEWED_AT_BEFORE_OBSERVED_AT'
-  | 'REVIEWED_AT_AFTER_BASIS_DATE'
-  | 'REVIEW_PERIOD_CONTRADICTION'
-  | 'REVIEW_OVERDUE'
-  | 'REVIEWER_UNASSIGNED'
-  | 'AUTO_REVIEWER_WITHOUT_SOURCE'
+  | 'SYNCED_PRODUCT_WITHOUT_SOURCE'
   | 'DUPLICATE_SOURCE_REF'
   | 'DUPLICATE_SOURCE_SYNC'
   | 'REGION_DISTRICT_CONTRADICTION'
@@ -72,11 +60,9 @@ export type FundingCatalogValidation = {
   errorCounts: Record<string, number>;
   warningCounts: Record<string, number>;
   checks: FundingValidationCheck[];
-  // 다음 검토일(자동 상품은 출처 확인)이 지나 원문을 다시 확인해야 하는 상품. 적재는 막지 않는다.
-  reviewOverdue: string[];
 };
 
-type CheckCategory = 'schema' | 'duplicates' | 'evidence' | 'dates' | 'support' | 'checksum' | 'review' | 'calculation';
+type CheckCategory = 'schema' | 'duplicates' | 'evidence' | 'dates' | 'support' | 'checksum' | 'calculation';
 
 const CATEGORY_LABELS: Record<CheckCategory, string> = {
   schema: 'JSON 스키마',
@@ -85,7 +71,6 @@ const CATEGORY_LABELS: Record<CheckCategory, string> = {
   dates: '날짜·접수기간',
   support: '지원 유형·금융 조건',
   checksum: 'checksum',
-  review: '검수 기한',
   calculation: '상환 계산 조건',
 };
 
@@ -105,14 +90,7 @@ const CATEGORY_BY_CODE: Record<FundingIssueCode, CheckCategory> = {
   OBSERVED_OPEN_AFTER_PERIOD_END: 'dates',
   OBSERVED_OPEN_BEFORE_PERIOD_START: 'dates',
   OBSERVED_AT_AFTER_BASIS_DATE: 'dates',
-  REVIEWED_AT_MISSING: 'review',
-  NEXT_REVIEW_AT_MISSING: 'review',
-  REVIEWED_AT_BEFORE_OBSERVED_AT: 'dates',
-  REVIEWED_AT_AFTER_BASIS_DATE: 'dates',
-  REVIEW_PERIOD_CONTRADICTION: 'review',
-  REVIEW_OVERDUE: 'review',
-  REVIEWER_UNASSIGNED: 'review',
-  AUTO_REVIEWER_WITHOUT_SOURCE: 'review',
+  SYNCED_PRODUCT_WITHOUT_SOURCE: 'evidence',
   DUPLICATE_SOURCE_REF: 'duplicates',
   DUPLICATE_SOURCE_SYNC: 'duplicates',
   REGION_DISTRICT_CONTRADICTION: 'support',
@@ -199,14 +177,9 @@ export function repaymentCalculationReasons(product: FundingProduct): string[] {
   return reasons;
 }
 
-function checkProduct(
-  product: FundingProduct,
-  basisDate: string,
-  sourceSyncs: readonly SourceFreshness[],
-  collector: Collector,
-): void {
+function checkProduct(product: FundingProduct, basisDate: string, collector: Collector): void {
   const source = productVersionKey(product);
-  const automated = isAutoReviewer(product.reviewer);
+  const synced = product.origin === 'SYNC';
   const { applicationPeriod, evidence } = product;
 
   // 근거: 근거 id 중복, 필수 근거 주제 누락, 근거 관측일.
@@ -227,7 +200,7 @@ function checkProduct(
     // 내려받은 파일이 없으므로 checksum이 null이어야 한다. 자동 상품의 웹 페이지 근거는
     // funding:sync가 실제로 받은 응답이라 그 페이지의 checksum을 남길 수 있다(ADR 0006 2절).
     const fileBacked = entry.retrievalMethod === 'OFFICIAL_ATTACHMENT' || entry.retrievalMethod === 'OFFICIAL_API';
-    const crawledPage = automated && entry.retrievalMethod === 'OFFICIAL_WEB_PAGE';
+    const crawledPage = synced && entry.retrievalMethod === 'OFFICIAL_WEB_PAGE';
     if (!fileBacked && !crawledPage && entry.checksum !== null) {
       collector.add(
         'EVIDENCE_CHECKSUM_NOT_APPLICABLE',
@@ -246,7 +219,7 @@ function checkProduct(
       collector.warn(
         'EVIDENCE_NOT_PRIMARY',
         source,
-        `근거 '${entry.id}'은 ${entry.retrievalMethod}로 기록되었습니다. 공식 원문 페이지·첨부를 직접 확인해 다시 검수해야 합니다.`,
+        `근거 '${entry.id}'은 ${entry.retrievalMethod}로 기록되었습니다. 공식 원문 페이지·첨부를 직접 다시 확인해야 합니다.`,
       );
     }
   }
@@ -330,48 +303,12 @@ function checkProduct(
     );
   }
 
-  // 확인일·검수일.
+  // 확인일.
   if (compareIsoDates(product.observedAt, basisDate) > 0) {
     collector.add(
       'OBSERVED_AT_AFTER_BASIS_DATE',
       source,
       `접수 상태 확인일 ${product.observedAt}이(가) 기준일 ${basisDate} 이후입니다.`,
-    );
-  }
-  if (product.reviewedAt === null) {
-    collector.add('REVIEWED_AT_MISSING', source, 'reviewedAt이 없습니다. 원문을 확인한 날을 기록하세요.');
-  } else {
-    if (compareIsoDates(product.reviewedAt, product.observedAt) < 0) {
-      collector.add(
-        'REVIEWED_AT_BEFORE_OBSERVED_AT',
-        source,
-        `검수일 ${product.reviewedAt}이(가) 확인일 ${product.observedAt}보다 앞섭니다.`,
-      );
-    }
-    if (compareIsoDates(product.reviewedAt, basisDate) > 0) {
-      collector.add(
-        'REVIEWED_AT_AFTER_BASIS_DATE',
-        source,
-        `검수일 ${product.reviewedAt}이(가) 기준일 ${basisDate} 이후입니다.`,
-      );
-    }
-  }
-  // 자동 상품은 다음 검토일 대신 출처의 마지막 성공 동기화로 최신성을 판단한다.
-  if (product.nextReviewAt === null && !automated) {
-    collector.add(
-      'NEXT_REVIEW_AT_MISSING',
-      source,
-      'nextReviewAt이 없습니다. 사람이 기록한 상품에는 다음 검토일을 적습니다.',
-    );
-  } else if (
-    product.nextReviewAt !== null &&
-    product.reviewedAt !== null &&
-    compareIsoDates(product.nextReviewAt, product.reviewedAt) < 0
-  ) {
-    collector.add(
-      'REVIEW_PERIOD_CONTRADICTION',
-      source,
-      `다음 검토일 ${product.nextReviewAt}이(가) 검수일 ${product.reviewedAt}보다 앞섭니다.`,
     );
   }
 
@@ -526,32 +463,17 @@ function checkProduct(
     );
   }
 
-  if (product.reviewer === REVIEWER_UNASSIGNED) {
-    collector.warn(
-      'REVIEWER_UNASSIGNED',
-      source,
-      '검수자가 지정되지 않았습니다(UNASSIGNED). 운영 공개 전에 실제 검수자를 지정해야 합니다.',
-    );
-  }
-  if (automated && product.sourceRef === undefined) {
+  // 출처 식별자가 없으면 맞춰 보기가 출처 최신성과 운영자 숨김(차단 목록)을 적용할 수 없다(ADR 0009 §6).
+  if (synced && product.sourceRef === undefined) {
     collector.add(
-      'AUTO_REVIEWER_WITHOUT_SOURCE',
+      'SYNCED_PRODUCT_WITHOUT_SOURCE',
       source,
-      `자동 검수자(${product.reviewer})는 funding:sync가 모은 상품에만 씁니다. 출처 식별자(sourceRef)가 없습니다.`,
-    );
-  }
-  if (reviewState(product, basisDate, sourceSyncs) === 'REVIEW_OVERDUE') {
-    collector.warn(
-      'REVIEW_OVERDUE',
-      source,
-      automated
-        ? `출처의 마지막 성공 동기화가 기준일 ${basisDate}보다 ${SOURCE_FRESHNESS_DAYS}일 넘게 지났거나 없습니다. 맞춰 보기는 조건이 모두 맞아도 이 상품을 맞아 보임으로 두지 않습니다.`
-        : `다음 검토일 ${product.nextReviewAt ?? '없음'}이(가) 기준일 ${basisDate} 이전입니다. 원문을 다시 확인하세요. 맞춰 보기는 기록일과 다음 검토일을 함께 보여 줍니다.`,
+      'funding:sync가 모은 상품(origin SYNC)에 출처 식별자(sourceRef)가 없습니다.',
     );
   }
 }
 
-export function validateFundingCatalog(raw: unknown, options: { asOfDate: string }): FundingCatalogValidation {
+export function validateFundingCatalog(raw: unknown): FundingCatalogValidation {
   const collector = createCollector();
   const parsed = fundingCatalogSchema.safeParse(raw);
 
@@ -574,7 +496,6 @@ export function validateFundingCatalog(raw: unknown, options: { asOfDate: string
       errorCounts: collector.errorCounts,
       warningCounts: collector.warningCounts,
       checks: buildChecks(collector),
-      reviewOverdue: [],
     };
   }
 
@@ -582,7 +503,6 @@ export function validateFundingCatalog(raw: unknown, options: { asOfDate: string
   const { sourceSyncs } = catalog.automation;
   const seen = new Set<string>();
   const seenSourceRefs = new Set<string>();
-  const reviewOverdue: string[] = [];
   const syncedSources = new Set<string>();
   for (const sync of sourceSyncs) {
     if (syncedSources.has(sync.source)) {
@@ -612,11 +532,7 @@ export function validateFundingCatalog(raw: unknown, options: { asOfDate: string
       }
       seenSourceRefs.add(refKey);
     }
-    checkProduct(product, catalog.basisDate, sourceSyncs, collector);
-    if (reviewState(product, options.asOfDate, sourceSyncs) === 'REVIEW_OVERDUE') reviewOverdue.push(key);
-  }
-  if (catalog.reviewer === REVIEWER_UNASSIGNED) {
-    collector.warn('REVIEWER_UNASSIGNED', 'catalog', '카탈로그 검수자가 지정되지 않았습니다(UNASSIGNED).');
+    checkProduct(product, catalog.basisDate, collector);
   }
 
   return {
@@ -627,7 +543,6 @@ export function validateFundingCatalog(raw: unknown, options: { asOfDate: string
     errorCounts: collector.errorCounts,
     warningCounts: collector.warningCounts,
     checks: buildChecks(collector),
-    reviewOverdue,
   };
 }
 
@@ -648,8 +563,8 @@ function buildChecks(collector: Collector): FundingValidationCheck[] {
 
 // The commands and the loader always validate first; a failing catalog never
 // reaches the database.
-export function requireValidFundingCatalog(raw: unknown, options: { asOfDate: string }): FundingCatalogValidation {
-  const validation = validateFundingCatalog(raw, options);
+export function requireValidFundingCatalog(raw: unknown): FundingCatalogValidation {
+  const validation = validateFundingCatalog(raw);
   if (!validation.ok) {
     const summary = Object.entries(validation.errorCounts)
       .map(([code, count]) => `${code} ${count}건`)
