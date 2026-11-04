@@ -3,9 +3,17 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex } from '../src/lib/checksum.ts';
 import { todayInKst } from '../src/features/funding/dates.ts';
-import { evaluateCandidates, UNKNOWN_FUNDING_PROFILE } from '../src/features/funding/eligibility.ts';
+import { FUNDING_TAB_LABELS } from '../src/features/funding/match-text.ts';
+import { FUNDING_TABS, matchCatalog, type FundingMatchProfile } from '../src/features/funding/matching.ts';
 import { validateFundingCatalog, type FundingValidationCheck } from '../src/features/funding/validation.ts';
-import { REVIEWER_UNASSIGNED } from '../src/features/funding/types.ts';
+
+const NO_INPUT: FundingMatchProfile = {
+  businessStatus: null,
+  openedYearMonth: null,
+  districtCode: null,
+  age: null,
+  targetGroups: null,
+};
 
 const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json', import.meta.url));
 
@@ -112,26 +120,17 @@ function main() {
     `  검수 기한 경과: ${validation.reviewOverdue.length === 0 ? '없음' : validation.reviewOverdue.join(', ')}`,
   );
 
-  // 입력 정보가 없는 기준의 상태 분포다. 사용자별 매칭 결과가 아니다.
-  const candidates = evaluateCandidates(catalog, UNKNOWN_FUNDING_PROFILE, { asOfDate });
-  console.log('  후보 상태(입력 정보 없음 기준):');
-  for (const [status, count] of Object.entries(candidates.summary)) {
-    if (status === 'total') continue;
-    console.log(`    ${status} ${count}`);
+  // 맞춰 보기의 갈래와 마감이다(ADR 0009 §4). 사용자 입력과 AI가 읽은 조건 없이 본 것이라 맞아 보임은 나오지 않는다.
+  // 마감은 출처·운영자의 접수 상태와 신청 종료일로만 정한다.
+  const matches = matchCatalog(catalog, new Map(), NO_INPUT, { asOfDate });
+  console.log('  맞춰 보기 갈래(사용자 입력·AI 추출 결과 없음 기준):');
+  for (const tab of FUNDING_TABS) {
+    const { counts, products } = matches.tabs[tab];
+    console.log(`    ${FUNDING_TAB_LABELS[tab]} ${products.length}건 (마감 ${counts.CLOSED})`);
   }
+  if (matches.hiddenCount > 0) console.log(`    차단 목록이라 보여 주지 않는 자동 상품 ${matches.hiddenCount}건`);
   console.log('');
-  const reviewerAssigned =
-    catalog.reviewer !== REVIEWER_UNASSIGNED &&
-    catalog.products.every((product) => product.reviewer !== REVIEWER_UNASSIGNED);
-  if (reviewerAssigned) {
-    console.log(
-      `통과: 상품 ${catalog.products.length}건을 운영 적재할 수 있는 상태입니다(주의 ${validation.warnings.length}건).`,
-    );
-  } else {
-    console.log(
-      `통과: 상품 ${catalog.products.length}건을 적재할 수 있습니다. 검수자가 지정되지 않은 상품은 현재 후보로 판정되지 않습니다(주의 ${validation.warnings.length}건).`,
-    );
-  }
+  console.log(`통과: 상품 ${catalog.products.length}건을 적재할 수 있습니다(주의 ${validation.warnings.length}건).`);
 }
 
 try {

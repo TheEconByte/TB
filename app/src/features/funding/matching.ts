@@ -149,7 +149,7 @@ function fromExtraction<T>(field: VerifiedField<T> | undefined): ConditionReadin
   return field;
 }
 
-// 사람이 공식 원문에서 직접 확인한 근거. 검색 결과 요약만 있으면 확인한 값으로 보지 않는다(예전 판정 규칙을 잇는다).
+// 사람이 공식 원문에서 직접 확인한 근거. 검색 결과 요약만 있으면 확인한 값으로 보지 않는다.
 function operatorEvidence(product: FundingProduct, subject: EvidenceSubject): string[] | null {
   const summaries = product.evidence
     .filter((entry) => entry.subject === subject && isPrimaryRetrievalMethod(entry.retrievalMethod))

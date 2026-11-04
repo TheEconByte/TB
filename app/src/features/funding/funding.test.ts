@@ -5,17 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
-import {
-  UNKNOWN_FUNDING_PROFILE,
-  assessProductRepayment,
-  evaluateCandidates,
-  evaluateProduct,
-  industryCodeIssue,
-} from './eligibility.ts';
 import { loadFundingCatalog, readFundingCatalogFile } from './loader.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION, combineVerdicts, type Verdict } from './types.ts';
-import { FundingCatalogError, validateFundingCatalog, type FundingCatalogValidation } from './validation.ts';
+import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import {
+  FundingCatalogError,
+  repaymentCalculationReasons,
+  validateFundingCatalog,
+  type FundingCatalogValidation,
+} from './validation.ts';
 
 const REAL_CATALOG_PATH = fileURLToPath(new URL('../../../catalog/funding/catalog.json', import.meta.url));
 const REAL_CATALOG = JSON.parse(readFileSync(REAL_CATALOG_PATH, 'utf8')) as unknown;
@@ -257,16 +255,7 @@ describe('funding catalog schema and rules', () => {
       ]),
     );
     expect(validation.ok).toBe(true);
-    expect(assessProductRepayment(firstProduct(validation))).toMatchObject({
-      supported: true,
-      publicLimitKrw: '50000000',
-      terms: {
-        annualInterestRatePercent: '4.5',
-        totalMonths: 60,
-        graceMonths: 6,
-        repaymentMethod: 'EQUAL_PRINCIPAL',
-      },
-    });
+    expect(repaymentCalculationReasons(firstProduct(validation))).toEqual([]);
   });
 
   it('requires official evidence for the identity, period and stage claims', () => {
@@ -425,49 +414,9 @@ describe('automated products in the catalog (ADR 0006)', () => {
       sourceSyncs: [],
     });
   });
-
-  it('keeps a notice found only through Bizinfo out of current candidates even when every switch is on', () => {
-    const bizinfoSync = { ...succeededSync, source: 'BIZINFO' };
-    const parsed = catalogFrom(
-      validate(
-        catalog(
-          [
-            product({
-              reviewer: AUTO_REVIEWER,
-              nextReviewAt: null,
-              sourceRef: { source: 'BIZINFO', externalId: 'PBLN_TEST' },
-              industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 미확인' },
-            }),
-          ],
-          {
-            automation: automation({ policyLoanPromotion: true, repaymentPromotion: true, sourceSyncs: [bizinfoSync] }),
-          },
-        ),
-      ),
-    );
-    const evaluation = evaluateProduct(
-      parsed.products[0],
-      {
-        businessStage: 'PRE_REGISTRATION',
-        districtCode: '11200',
-        industryCode: 'CS100010',
-        purpose: 'OPERATING_FUNDS',
-      },
-      { asOfDate: REVIEW_DATE, automation: parsed.automation },
-    );
-    expect(evaluation.reviewState).toBe('CURRENT');
-    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(evaluation.candidateReason).toContain('기업마당 지원사업정보에서 찾은 공고');
-  });
 });
 
 describe('notices whose business stage or support type is unknown', () => {
-  const preProfile = {
-    businessStage: 'PRE_REGISTRATION',
-    districtCode: '11200',
-    industryCode: 'CS100010',
-    purpose: 'OPERATING_FUNDS',
-  } as const;
   const unknownType = (overrides: Record<string, unknown> = {}) =>
     product({
       supportType: 'UNKNOWN',
@@ -485,7 +434,7 @@ describe('notices whose business stage or support type is unknown', () => {
       ...overrides,
     });
 
-  it('accepts an empty stage list without stage evidence and keeps the stage unconfirmed', () => {
+  it('accepts an empty stage list without stage evidence', () => {
     const validation = validate(
       catalog([
         product({
@@ -502,20 +451,14 @@ describe('notices whose business stage or support type is unknown', () => {
       ]),
     );
     expect(validation.issues).toEqual([]);
-    const evaluation = evaluateProduct(catalogFrom(validation).products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.audience).toBe('UNKNOWN');
-    expect(evaluation.primaryEvidenceVerified).toBe(true);
-    expect(evaluation.conditions.find((condition) => condition.key === 'BUSINESS_STAGE')?.verdict).toBe('UNKNOWN');
-    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(evaluation.candidateReason).toContain('사업 단계를 확인하지 못했습니다');
+    expect(catalogFrom(validation).products[0].eligibleBusinessStages).toEqual([]);
   });
 
   it('accepts an unknown support type without financial evidence and never calculates its repayment', () => {
     const validation = validate(catalog([unknownType()]));
     expect(validation.issues).toEqual([]);
-    const repayment = assessProductRepayment(catalogFrom(validation).products[0]);
-    expect(repayment).toMatchObject({ supported: false, publicLimitKrw: null, terms: null });
-    expect(repayment.note).toContain('지원 유형이 확인되지 않은');
+    // 유형 미확인 공고는 대출 원금·상환 일정으로 바꾸지 않는다(docs/domains/funding.md 카탈로그).
+    expect(repaymentCalculationReasons(catalogFrom(validation).products[0]).join(' ')).toContain('대출 원금');
   });
 
   it('rejects an unknown support type recorded as not repayable or with confirmed lending terms', () => {
@@ -531,121 +474,6 @@ describe('notices whose business stage or support type is unknown', () => {
         ),
       ),
     ).toContain('SUPPORT_TYPE_FINANCIAL_CONTRADICTION');
-  });
-});
-
-describe('policy fund and support program branches (ADR 0006)', () => {
-  const grant = (overrides: Record<string, unknown> = {}) =>
-    product({
-      productKey: 'test-grant',
-      supportType: 'GRANT',
-      publicLimit: null,
-      repaymentMethod: 'NOT_APPLICABLE',
-      unsupportedCalculationReasons: ['지원금은 상환하지 않습니다.'],
-      evidence: [
-        evidence('identity', 'IDENTITY'),
-        evidence('period', 'APPLICATION_PERIOD'),
-        evidence('stage', 'BUSINESS_STAGE'),
-        evidence('region', 'REGION'),
-        evidence('purpose', 'PURPOSE'),
-        evidence('industry', 'INDUSTRY'),
-      ],
-      ...overrides,
-    });
-  const unknownType = product({
-    productKey: 'test-unknown-type',
-    supportType: 'UNKNOWN',
-    publicLimit: null,
-    repaymentMethod: 'UNKNOWN',
-    unsupportedCalculationReasons: ['지원 유형이 확인되지 않았습니다.'],
-    evidence: [
-      evidence('identity', 'IDENTITY'),
-      evidence('period', 'APPLICATION_PERIOD'),
-      evidence('stage', 'BUSINESS_STAGE'),
-      evidence('region', 'REGION'),
-      evidence('purpose', 'PURPOSE'),
-      evidence('industry', 'INDUSTRY'),
-    ],
-  });
-
-  it('derives the branch from the support type and counts each branch separately', () => {
-    const parsed = catalogFrom(
-      validate(
-        catalog([
-          product(),
-          product({ productKey: 'test-guarantee', supportType: 'GUARANTEE', repaymentMethod: 'NOT_APPLICABLE' }),
-          grant(),
-          grant({ productKey: 'test-space', supportType: 'SPACE' }),
-          grant({ productKey: 'test-program', supportType: 'PROGRAM' }),
-          unknownType,
-        ]),
-      ),
-    );
-    const list = evaluateCandidates(parsed, UNKNOWN_FUNDING_PROFILE, { asOfDate: REVIEW_DATE });
-    expect(
-      Object.fromEntries(list.evaluations.map((evaluation) => [evaluation.productKey, evaluation.branch])),
-    ).toEqual({
-      'test-loan': 'POLICY_FUND',
-      'test-guarantee': 'POLICY_FUND',
-      'test-grant': 'SUPPORT_PROGRAM',
-      'test-space': 'SUPPORT_PROGRAM',
-      'test-program': 'SUPPORT_PROGRAM',
-      'test-unknown-type': 'UNCLASSIFIED',
-    });
-    expect(list.summaryByBranch.POLICY_FUND.total).toBe(2);
-    expect(list.summaryByBranch.SUPPORT_PROGRAM.total).toBe(3);
-    expect(list.summaryByBranch.UNCLASSIFIED.total).toBe(1);
-    for (const status of Object.keys(list.summary) as Array<keyof typeof list.summary>) {
-      expect(
-        list.summaryByBranch.POLICY_FUND[status] +
-          list.summaryByBranch.SUPPORT_PROGRAM[status] +
-          list.summaryByBranch.UNCLASSIFIED[status],
-      ).toBe(list.summary[status]);
-    }
-  });
-
-  it('shows the source and last confirmation only for automatically collected products', () => {
-    const parsed = catalogFrom(
-      validate(
-        catalog(
-          [
-            product(),
-            product({
-              productKey: 'test-auto-loan',
-              reviewer: AUTO_REVIEWER,
-              nextReviewAt: null,
-              sourceRef: { source: 'SEMAS_OLS', externalId: 'test-fund' },
-            }),
-          ],
-          {
-            automation: {
-              policyLoanPromotion: false,
-              repaymentPromotion: false,
-              blockedSources: [],
-              sourceSyncs: [
-                {
-                  source: 'SEMAS_OLS',
-                  status: 'FAILED',
-                  attemptedAt: '2026-09-20T01:00:00.000Z',
-                  lastSucceededOn: '2026-09-19',
-                  fetchedCount: 1,
-                  responseChecksum: null,
-                  failureReason: '출처 응답 500',
-                },
-              ],
-            },
-          },
-        ),
-      ),
-    );
-    const list = evaluateCandidates(parsed, UNKNOWN_FUNDING_PROFILE, { asOfDate: REVIEW_DATE });
-    const byKey = new Map(list.evaluations.map((evaluation) => [evaluation.productKey, evaluation]));
-    expect(byKey.get('test-loan')?.automation).toBeNull();
-    expect(byKey.get('test-auto-loan')?.automation).toEqual({
-      source: 'SEMAS_OLS',
-      sourceLabel: '소상공인시장진흥공단 정책자금 사이트',
-      lastSucceededOn: '2026-09-19',
-    });
   });
 });
 
@@ -665,204 +493,30 @@ describe('the reviewed 2026-09-20 catalog', () => {
     expect(byStatus.filter((status) => status === 'OPEN')).toHaveLength(0);
   });
 
-  it('separates pre-registration, post-registration, closed and overdue products', () => {
-    const parsed = catalogFrom(validate(REAL_CATALOG));
-    const pre = evaluateCandidates(
-      parsed,
-      { businessStage: 'PRE_REGISTRATION', districtCode: '11200', industryCode: 'CS100010', purpose: 'STARTUP_COST' },
-      { asOfDate: REVIEW_DATE },
-    );
-    expect(pre.summary.CURRENT_CANDIDATE).toBe(0);
-    expect(pre.summary.NEEDS_CONFIRMATION).toBe(3);
-    expect(pre.summary.POST_REGISTRATION).toBe(0);
-    expect(pre.summary.CLOSED).toBe(1);
-    expect(pre.summary.REVIEW_OVERDUE).toBe(1);
-
-    const post = evaluateCandidates(
-      parsed,
-      {
-        businessStage: 'POST_REGISTRATION',
-        districtCode: '11200',
-        industryCode: 'CS100010',
-        purpose: 'OPERATING_FUNDS',
-      },
-      { asOfDate: REVIEW_DATE },
-    );
-    expect(post.summary.POST_REGISTRATION).toBe(0);
-    expect(post.summary.CURRENT_CANDIDATE).toBe(0);
-  });
-
-  it('never exposes a grant or space product as a loan repayment target', () => {
-    const parsed = catalogFrom(validate(REAL_CATALOG));
-    const nonLoans = parsed.products.filter((entry) => entry.supportType !== 'LOAN');
-    expect(nonLoans.length).toBeGreaterThan(0);
-    for (const entry of nonLoans) {
-      const repayment = assessProductRepayment(entry);
-      expect(repayment.supported).toBe(false);
-      expect(repayment.publicLimitKrw).toBeNull();
-      expect(repayment.reasons.join(' ')).toMatch(/대출 원금|상환 일정/);
-    }
-  });
-
   it('accepts the catalog for loading while reviewers are unassigned', () => {
     expect(validate(REAL_CATALOG).ok).toBe(true);
     expect(readFundingCatalogFile(REAL_CATALOG_PATH, REVIEW_DATE).catalog.reviewer).toBe('UNASSIGNED');
   });
 
-  it('keeps every loan uncalculated while the rate and repayment method are unknown', () => {
-    const parsed = catalogFrom(validate(REAL_CATALOG));
-    const loans = parsed.products.filter((entry) => entry.supportType === 'LOAN');
-    expect(loans).toHaveLength(3);
-    for (const loan of loans) {
-      const repayment = assessProductRepayment(loan);
-      expect(repayment.supported).toBe(false);
-      expect(repayment.publicLimitKrw).toBeNull();
-      expect(repayment.reasons.join(' ')).toMatch(/금리/);
-    }
-  });
-
-  it('never exposes any of the five reviewed products as a repayment assumption', () => {
+  it('keeps all five reviewed products out of repayment calculation', () => {
     const parsed = catalogFrom(validate(REAL_CATALOG));
     expect(parsed.products).toHaveLength(5);
+    expect(parsed.products.filter((entry) => entry.supportType === 'LOAN')).toHaveLength(3);
     for (const entry of parsed.products) {
-      const repayment = assessProductRepayment(entry);
-      expect(repayment.supported).toBe(false);
-      expect(repayment.publicLimitKrw).toBeNull();
-      expect(repayment.terms).toBeNull();
-      expect(repayment.reasons.length).toBeGreaterThan(0);
+      // 대출 3건은 금리가 확정되지 않았고, 지원금·공간은 대출 원금·상환 일정으로 바꾸지 않는다(catalog README).
+      expect(repaymentCalculationReasons(entry).join(' '), entry.productKey).toMatch(
+        entry.supportType === 'LOAN' ? /금리/ : /대출 원금/,
+      );
     }
   });
 });
 
-describe('condition verdicts and candidate status', () => {
-  const preProfile = {
-    businessStage: 'PRE_REGISTRATION',
-    districtCode: '11200',
-    industryCode: 'CS100010',
-    purpose: 'OPERATING_FUNDS',
-  } as const;
-
-  it('combines FAIL and UNKNOWN into FAIL and UNKNOWN alone into UNKNOWN', () => {
-    expect(combineVerdicts(['PASS', 'UNKNOWN', 'FAIL'])).toBe('FAIL');
-    expect(combineVerdicts(['PASS', 'UNKNOWN'])).toBe('UNKNOWN');
-    expect(combineVerdicts(['PASS', 'PASS'])).toBe('PASS');
-    expect(combineVerdicts([])).toBe('UNKNOWN');
-  });
-
-  it('flags an industry code that the stored profile schema would reject', () => {
-    expect(industryCodeIssue('')).toBeNull();
-    expect(industryCodeIssue(' cs100010 ')).toBeNull();
-    expect(industryCodeIssue('CS10001')).not.toBeNull();
-    expect(industryCodeIssue('CS1000100')).not.toBeNull();
-    expect(industryCodeIssue('A1000010')).not.toBeNull();
-  });
-
-  it('returns FAIL when one condition fails and another is unknown', () => {
-    const failing = product({
-      region: { scope: 'DISTRICTS', districtCodes: ['11110'], note: null },
-      industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 매핑 미검수' },
-    });
-    const parsed = catalogFrom(validate(catalog([failing])));
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    const verdicts = new Map(evaluation.conditions.map((condition) => [condition.key, condition.verdict]));
-    expect(verdicts.get('REGION')).toBe('FAIL');
-    expect(verdicts.get('INDUSTRY')).toBe('UNKNOWN');
-    expect(evaluation.eligibilityVerdict).toBe<Verdict>('FAIL');
-    expect(evaluation.candidateStatus).toBe('NOT_ELIGIBLE');
-  });
-
-  it('keeps an unknown industry as a pre-application check instead of blocking the candidate', () => {
-    const unknownScope = product({
-      industryConditions: { scope: 'UNKNOWN', included: [], excluded: [], note: '업종 매핑 미검수' },
-    });
-    const parsed = catalogFrom(validate(catalog([unknownScope])));
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.eligibilityVerdict).toBe<Verdict>('UNKNOWN');
-    expect(evaluation.candidateStatus).toBe('CURRENT_CANDIDATE');
-    expect(evaluation.manualChecks).toContain('업종: 업종 매핑 미검수');
-  });
-
-  it('still blocks a candidate whose region is unknown', () => {
-    const unknownRegion = product({ region: { scope: 'UNKNOWN', districtCodes: [], note: '지역 조건 미확인' } });
-    const parsed = catalogFrom(validate(catalog([unknownRegion])));
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(evaluation.candidateReason).toBe('지역 조건 미확인');
-  });
-
-  it('keeps a post-registration product out of the pre-registration candidate group', () => {
-    const postOnly = product({ eligibleBusinessStages: ['POST_REGISTRATION'] });
-    const parsed = catalogFrom(validate(catalog([postOnly])));
-    const pre = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(pre.audience).toBe('POST_REGISTRATION_ONLY');
-    expect(pre.candidateStatus).toBe('POST_REGISTRATION');
-
-    const post = evaluateProduct(
-      parsed.products[0],
-      { ...preProfile, businessStage: 'POST_REGISTRATION' },
-      { asOfDate: REVIEW_DATE },
+// 상환 계산 대상인 상품만 funding_product_versions.repaymentCalculationSupported가 true다(아래 DB 테스트).
+describe('repayment calculation targets', () => {
+  it('calculates only a loan whose limit, rate, term and supported method are all confirmed', () => {
+    expect(repaymentCalculationReasons(catalogFrom(validate(catalog([product()]))).products[0]).join(' ')).toContain(
+      '금리',
     );
-    expect(post.candidateStatus).not.toBe('POST_REGISTRATION');
-  });
-
-  it('excludes a product whose review deadline passed even when it is open', () => {
-    const overdue = product({ observedAt: '2026-09-10', reviewedAt: '2026-09-10', nextReviewAt: '2026-09-16' });
-    const parsed = catalogFrom(validate(catalog([overdue])));
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.observedApplicationStatus).toBe('OPEN');
-    expect(evaluation.reviewState).toBe('REVIEW_OVERDUE');
-    expect(evaluation.candidateStatus).toBe('REVIEW_OVERDUE');
-  });
-
-  it('never exposes an unassigned reviewed product as a current candidate', () => {
-    const unassigned = product({ reviewer: 'UNASSIGNED' });
-    const parsed = catalogFrom(validate(catalog([unassigned])));
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.reviewState).toBe('UNREVIEWED');
-    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(evaluation.candidateReason).toContain('검수자가 지정되지 않아');
-  });
-
-  it('never turns a closed notice into a current candidate', () => {
-    const parsed = catalogFrom(
-      validate(
-        catalog([
-          product({
-            observedApplicationStatus: 'CLOSED',
-            applicationPeriod: { start: '2026-03-01', end: '2026-03-26', note: null },
-          }),
-        ]),
-      ),
-    );
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.candidateStatus).toBe('CLOSED');
-  });
-
-  it('does not confirm a candidate that is backed only by search-result summaries', () => {
-    const parsed = catalogFrom(
-      validate(
-        catalog([
-          product({
-            evidence: [
-              evidence('identity', 'IDENTITY', { retrievalMethod: 'SEARCH_RESULT_SUMMARY' }),
-              evidence('period', 'APPLICATION_PERIOD', { retrievalMethod: 'SEARCH_RESULT_SUMMARY' }),
-              evidence('stage', 'BUSINESS_STAGE', { retrievalMethod: 'SEARCH_RESULT_SUMMARY' }),
-              evidence('financial', 'FINANCIAL_CONDITION', { retrievalMethod: 'SEARCH_RESULT_SUMMARY' }),
-            ],
-          }),
-        ]),
-      ),
-    );
-    const evaluation = evaluateProduct(parsed.products[0], preProfile, { asOfDate: REVIEW_DATE });
-    expect(evaluation.eligibilityVerdict).toBe<Verdict>('UNKNOWN');
-    expect(evaluation.primaryEvidenceVerified).toBe(false);
-    expect(evaluation.candidateStatus).toBe('NEEDS_CONFIRMATION');
-    expect(evaluation.candidateReason).toContain('원문');
-  });
-
-  it('never marks repayment as available when the rate or method is unresolved', () => {
-    const unknownRate = catalogFrom(validate(catalog([product()]))).products[0];
-    expect(assessProductRepayment(unknownRate)).toMatchObject({ supported: false, publicLimitKrw: null });
 
     const bullet = catalogFrom(
       validate(
@@ -876,10 +530,7 @@ describe('condition verdicts and candidate status', () => {
         ]),
       ),
     );
-    const bulletRepayment = assessProductRepayment(bullet.products[0]);
-    expect(bulletRepayment.supported).toBe(false);
-    expect(bulletRepayment.publicLimitKrw).toBeNull();
-    expect(bulletRepayment.reasons.join(' ')).toContain('지원하지 않습니다');
+    expect(repaymentCalculationReasons(bullet.products[0]).join(' ')).toContain('지원하지 않습니다');
 
     const confirmed = catalogFrom(
       validate(
@@ -897,47 +548,17 @@ describe('condition verdicts and candidate status', () => {
         ]),
       ),
     );
-    expect(assessProductRepayment(confirmed.products[0])).toMatchObject({
-      supported: true,
-      publicLimitKrw: '50000000',
-      terms: {
-        annualInterestRatePercent: '3',
-        totalMonths: 60,
-        graceMonths: 0,
-        repaymentMethod: 'EQUAL_INSTALLMENT',
-      },
-    });
+    expect(repaymentCalculationReasons(confirmed.products[0])).toEqual([]);
 
-    // 구조화된 확정 조건이 없는 상품은 기존과 같이 상환 계산 대상이 아니다.
-    const withoutTerms = catalogFrom(validate(catalog([product()])));
-    const withoutTermsRepayment = assessProductRepayment(withoutTerms.products[0]);
-    expect(withoutTermsRepayment.supported).toBe(false);
-    expect(withoutTermsRepayment.terms).toBeNull();
-    expect(withoutTermsRepayment.reasons.join(' ')).toContain('상환기간');
-
-    const graceOverTerm = catalogFrom(
-      validate(
-        catalog([
-          product({
-            repaymentMethod: 'EQUAL_PRINCIPAL',
-            interestCondition: '연 3% 고정',
-            interestRateConfirmed: true,
-            interestRatePercent: '3',
-            repaymentCondition: '12개월 상환, 12개월 거치',
-            repaymentTermMonths: 12,
-            repaymentGraceMonths: 12,
-            unsupportedCalculationReasons: [],
-          }),
-        ]),
-      ),
+    // 구조화된 확정 조건이 없는 상품은 상환 계산 대상이 아니다.
+    expect(repaymentCalculationReasons(catalogFrom(validate(catalog([product()]))).products[0]).join(' ')).toContain(
+      '상환기간',
     );
+
+    // 거치가 상환기간 이상이면 규칙 검사가 거부하므로 적재되지 않는다.
     expect(issueCodes(validate(catalog([product({ repaymentTermMonths: 12, repaymentGraceMonths: 12 })])))).toContain(
       'REPAYMENT_PERIOD_CONTRADICTION',
     );
-    const graceRepayment = assessProductRepayment(graceOverTerm.products[0]);
-    expect(graceRepayment.supported).toBe(false);
-    expect(graceRepayment.terms).toBeNull();
-    expect(graceRepayment.reasons.join(' ')).toContain('거치개월이 전체 상환개월보다');
   });
 });
 
@@ -1165,5 +786,39 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading the funding catalog int
     const stored = await db().fundingCatalogRelease.findUnique({ where: { id: report.releaseId } });
     expect(stored?.status).toBe('ACTIVE');
     expect(stored?.reviewer).toBe('UNASSIGNED');
+  });
+
+  // 확정 조건이 모두 있는 대출만 상환 계산 대상으로 저장한다(docs/domains/funding.md 카탈로그, catalog README).
+  it('stores the repayment calculation flag only for a loan with every term confirmed', async () => {
+    const confirmed = product({
+      productKey: 'test-repayment-confirmed',
+      repaymentMethod: 'EQUAL_INSTALLMENT',
+      interestCondition: '연 3% 고정',
+      interestRateConfirmed: true,
+      interestRatePercent: '3',
+      repaymentCondition: '5년 원리금균등, 거치 없음',
+      repaymentTermMonths: 60,
+      repaymentGraceMonths: 0,
+      unsupportedCalculationReasons: [],
+    });
+    const unconfirmed = product({ productKey: 'test-repayment-unconfirmed' });
+    await loadFundingCatalog({
+      catalogPath: writeCatalogFile(
+        catalog([confirmed, unconfirmed], { catalogKey: 'test-repayment-catalog', catalogVersion: '2026-09-20.7' }),
+      ),
+      prisma: db(),
+      asOfDate: REVIEW_DATE,
+      log: () => {},
+    });
+    const versions = await db().fundingProductVersion.findMany({
+      where: { productKey: { startsWith: 'test-repayment-' } },
+      select: { productKey: true, repaymentCalculationSupported: true },
+    });
+    expect(
+      Object.fromEntries(versions.map((entry) => [entry.productKey, entry.repaymentCalculationSupported])),
+    ).toEqual({
+      'test-repayment-confirmed': true,
+      'test-repayment-unconfirmed': false,
+    });
   });
 });

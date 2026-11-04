@@ -596,7 +596,7 @@ describe('운영자 확인 값(ADR §3: catalog.json에 사람이 적은 조건�
     expect(condition(result, 'region').reading).toMatchObject({ source: 'OPERATOR', value: { scope, provinces } });
   });
 
-  // 예전 판정의 규칙(직접 확인한 공식 근거가 없으면 미확인)을 잇는다. 검색 결과 요약은 원문이 아니다.
+  // 직접 확인한 공식 근거가 없으면 미확인이다. 검색 결과 요약은 원문이 아니다.
   it('공식 원문 근거가 없거나 미확인으로 적은 값은 쓰지 않는다', () => {
     const summaryOnly = manualProduct({
       evidence: [

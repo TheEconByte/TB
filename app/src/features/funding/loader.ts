@@ -3,10 +3,10 @@ import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { sha256Hex } from '../../lib/checksum.ts';
 import { canonicalJson } from './canonical.ts';
 import { fromDate, toDate } from './dates.ts';
-import { assessProductRepayment } from './eligibility.ts';
 import { productVersionKey, type FundingCatalog } from './schema.ts';
 import {
   FundingCatalogError,
+  repaymentCalculationReasons,
   requireValidFundingCatalog,
   type FundingValidationCheck,
   type FundingIssue,
@@ -91,7 +91,8 @@ function productRows(catalog: FundingCatalog) {
     nextReviewAt: product.nextReviewAt === null ? null : toDate(product.nextReviewAt),
     officialUrl: product.officialUrl,
     publicLimit: product.publicLimit,
-    repaymentCalculationSupported: assessProductRepayment(product).supported,
+    // 적재하는 카탈로그는 규칙 검사를 통과했으므로 거치가 상환기간보다 짧다.
+    repaymentCalculationSupported: repaymentCalculationReasons(product).length === 0,
     productJson: product,
   }));
 }
@@ -114,7 +115,7 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
       '판정 기준일(asOfDate)이 필요합니다. 명령은 서버의 한국 시간 날짜를 넘깁니다.',
     );
   }
-  // 검수 기능은 아직 없다. 검수자가 UNASSIGNED여도 적재하고, 그런 상품은 판정에서 현재 후보가 되지 않는다.
+  // 검수 기능은 아직 없다. 검수자가 UNASSIGNED여도 적재한다. 맞춰 보기는 검수자를 그룹에 쓰지 않는다(ADR 0009 §4).
   const { catalog, catalogChecksum, reviewOverdue, warnings, checks } = readFundingCatalogFile(
     options.catalogPath,
     options.asOfDate,
@@ -186,7 +187,7 @@ export async function loadFundingCatalog(options: FundingLoadOptions): Promise<F
     },
   });
   log(
-    `임시 카탈로그 릴리스 ${release.id} 생성(${catalog.catalogKey}@${catalog.catalogVersion}). 활성화 전까지 후보로 쓰지 않습니다.`,
+    `임시 카탈로그 릴리스 ${release.id} 생성(${catalog.catalogKey}@${catalog.catalogVersion}). 활성화 전까지 맞춰 보기에 쓰지 않습니다.`,
   );
 
   const createdIds: string[] = [];

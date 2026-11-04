@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
-import { evaluateCandidates } from './eligibility.ts';
+import { matchCatalog } from './matching.ts';
 import { findActiveFundingCatalog } from './read.ts';
 import { createBizinfoAdapter } from './sources/bizinfo.ts';
 import {
@@ -379,7 +379,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect(await db().fundingCatalogRelease.count()).toBe(before);
   });
 
-  it('기업마당 공고를 유형·사업 단계 미확인 상품으로 적재하고 추가 확인으로 둔다', async () => {
+  it('기업마당 공고를 유형·사업 단계·지역 미확인 상품으로 적재하고 맞춰 보기에서 확인 필요로 둔다', async () => {
     const response = JSON.stringify({
       jsonArray: [
         {
@@ -420,7 +420,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       now: () => new Date('2026-09-28T01:00:00.000Z'),
     });
     expect(report.load?.outcome).toBe('ACTIVATED');
-    // 지역으로는 거르지 않는다(ADR 0009 §2). 경기 공고도 올리되 지역은 추측하지 않고 UNKNOWN으로 둔다.
+    // 지역으로는 거르지 않는다(ADR 0009 §2). 서울·경기 공고 모두 올리되 지역은 추측하지 않고 UNKNOWN으로 둔다(§7).
     expect(report.sources).toMatchObject([
       { source: 'BIZINFO', status: 'SUCCEEDED', lastSucceededOn: '2026-09-28', fetchedCount: 2, productCount: 2 },
     ]);
@@ -428,26 +428,28 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
       { productKey: 'bizinfo-pbln-test-0001', name: '[서울] 소상공인 경영 개선 지원사업 공고' },
       { productKey: 'bizinfo-pbln-test-0002', name: '[경기] 소상공인 지원사업 공고' },
     ]);
-    const gyeonggi = await db().fundingProductVersion.findUnique({
-      where: { productKey_version: { productKey: 'bizinfo-pbln-test-0002', version: '1.0.0' } },
-    });
-    expect((gyeonggi?.productJson as { region?: { scope?: string } } | undefined)?.region?.scope).toBe('UNKNOWN');
+    for (const productKey of ['bizinfo-pbln-test-0001', 'bizinfo-pbln-test-0002']) {
+      const stored = await db().fundingProductVersion.findUnique({
+        where: { productKey_version: { productKey, version: '1.0.0' } },
+      });
+      expect((stored?.productJson as { region?: { scope?: string } } | undefined)?.region?.scope, productKey).toBe(
+        'UNKNOWN',
+      );
+      expect(stored?.supportType, productKey).toBe('UNKNOWN');
+      expect(stored?.repaymentCalculationSupported, productKey).toBe(false);
+    }
 
-    const stored = await db().fundingProductVersion.findUnique({
-      where: { productKey_version: { productKey: 'bizinfo-pbln-test-0001', version: '1.0.0' } },
-    });
-    expect(stored?.supportType).toBe('UNKNOWN');
-    expect(stored?.repaymentCalculationSupported).toBe(false);
-
+    // 조건을 읽지 않은 공고도 숨기지 않고 확인 필요로 보여 준다(ADR 0009 §4).
     const active = await findActiveFundingCatalog(db());
     if (!active) throw new Error('ACTIVE 카탈로그가 없습니다.');
-    const list = evaluateCandidates(
+    const list = matchCatalog(
       active.catalog,
-      { businessStage: 'PRE_REGISTRATION', districtCode: '11140', industryCode: 'CS100010', purpose: 'STARTUP_COST' },
+      new Map(),
+      { businessStatus: 'PRE_STARTUP', openedYearMonth: null, districtCode: '11140', age: null, targetGroups: null },
       { asOfDate: '2026-09-28' },
     );
-    const bizinfo = list.evaluations.find((evaluation) => evaluation.productKey === 'bizinfo-pbln-test-0001');
-    expect(bizinfo).toMatchObject({ supportType: 'UNKNOWN', candidateStatus: 'NEEDS_CONFIRMATION' });
+    const bizinfo = list.tabs.SUPPORT_PROGRAM.products.find((entry) => entry.productKey === 'bizinfo-pbln-test-0001');
+    expect(bizinfo).toMatchObject({ supportType: 'UNKNOWN', group: 'NEEDS_CHECK' });
   });
 
   it('사람이 관리하는 카탈로그에 자동 검수자 상품이 있으면 거부한다', async () => {

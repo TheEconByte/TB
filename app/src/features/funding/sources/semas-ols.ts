@@ -183,7 +183,7 @@ function listAfterHeading(html: string, title: string): string[] | null {
 // 못한 것으로 보고 오류를 던진다. 그 출처는 실패로 기록된다(ADR 0006 2절).
 export function parseSemasOverview(html: string): SemasOverview {
   const qualification = listAfterHeading(html, '공통 지원자격');
-  // 사업 단계(사업자등록 이후)는 공통 지원자격의 소상공인 문장에서 정한다. 없으면 필수 항목 누락이다.
+  // 공통 지원자격은 본문에 넣어 AI가 읽는다. 소상공인 문장이 없으면 페이지 구조가 바뀐 것으로 보고 필수 항목 누락이다.
   if (qualification === null || !qualification.some((item) => item.includes('소상공인'))) {
     throw new Error('정책자금 한눈에 보기의 공통 지원자격에서 소상공인 대상 문장을 찾지 못했습니다.');
   }
@@ -598,7 +598,6 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
   const seen = new Set<string>();
   const matchedCards = new Set<SemasHomeCard>();
   let duplicateRows = 0;
-  const stageBasis = overview.qualification.find((item) => item.includes('소상공인')) ?? overview.qualification[0];
   const commonExclusions = overview.excludedIndustries === null ? [] : [overview.excludedIndustries];
 
   for (const row of overview.rows) {
@@ -620,7 +619,7 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       FOOD_EXCLUSION_PATTERN.test(line),
     );
     if (exclusionSignals.length > 0 && application.status === 'OPEN') {
-      // 제외 신호는 내리는 데만 쓴다. 접수 중으로 기록하지 않아 현재 후보가 되지 않는다(ADR 0006 4절 3번, 6절).
+      // 제외 신호는 내리는 데만 쓴다. 접수 중으로 기록하지 않아 맞아 보임이 되지 않는다(ADR 0006 4절 3번, 6절).
       application.status = 'UNKNOWN';
     }
 
@@ -650,18 +649,6 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
         id: 'semas-financial',
         subject: 'FINANCIAL_CONDITION',
         summary: `대출기간 '${row.term}', 대출한도 '${row.limit}', 대출금리 '${row.rate}'${overview.baseRate === null ? '' : `, 금리 안내 '${overview.baseRate}'`}`,
-      },
-      {
-        ...overviewEvidence,
-        id: 'semas-stage',
-        subject: 'BUSINESS_STAGE',
-        summary: `공통 지원자격 '${stageBasis}'. 소상공인(사업자) 대상이라 사업자등록 이후 단계로 기록했습니다.`,
-      },
-      {
-        ...overviewEvidence,
-        id: 'semas-region',
-        subject: 'REGION',
-        summary: '공통 지원자격에 지역 제한이 없어, 소진공 정책자금 수집 규칙에 따라 전국 대상으로 기록했습니다.',
       },
       {
         ...overviewEvidence,
@@ -716,8 +703,13 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       name: `${row.name.replace(/\s+\(/g, '(')}(${row.section})`,
       organization: ORGANIZATION,
       supportType: 'LOAN',
-      eligibleBusinessStages: ['POST_REGISTRATION'],
-      region: { scope: 'NATIONWIDE', districtCodes: [], note: null },
+      // 사업 단계·지역은 공통 지원자격에서 추측해 적지 않는다. 본문에서 AI가 읽는다(ADR 0009 §7).
+      eligibleBusinessStages: [],
+      region: {
+        scope: 'UNKNOWN',
+        districtCodes: [],
+        note: '소진공 정책자금 표는 자금별 대상 지역을 구조화해 주지 않습니다. 신청안내자료에서 확인해야 합니다.',
+      },
       purpose: {
         included: [],
         excluded: [],
