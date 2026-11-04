@@ -185,7 +185,10 @@ describe('활성 카탈로그 읽기', () => {
   // v1.4.0은 기업마당 지원분야·소진공 대출한도 문장(선택 필드)만 더했다. 그 전 릴리스는 그 필드 없이 읽는다.
   it('v1.3.0 스키마로 적재된 릴리스도 읽는다', async () => {
     const active = await findActiveFundingCatalog(
-      stubPrisma({ schemaVersion: 'funding-catalog-v1.3.0', products: [membership('test-loan', 0)] }),
+      stubPrisma({
+        schemaVersion: 'funding-catalog-v1.3.0',
+        products: [{ position: 0, productVersion: { productJson: legacyProduct('test-loan', 'UNASSIGNED') } }],
+      }),
     );
     expect(active?.schemaVersion).toBe('funding-catalog-v1.3.0');
     expect(active?.catalog.products.map((entry) => entry.productKey)).toEqual(['test-loan']);

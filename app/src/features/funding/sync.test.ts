@@ -677,7 +677,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     await db().fundingCatalogRelease.updateMany({ where: { status: 'ACTIVE' }, data: { status: 'SUPERSEDED' } });
     await db().fundingCatalogRelease.create({
       data: {
-        catalogKey: 'test-sync-catalog',
+        // 앞 테스트가 같은 날 적재한 릴리스(test-sync-catalog@2026-10-02.1)와 겹치지 않게 다른 키를 쓴다.
+        catalogKey: 'test-sync-legacy-catalog',
         catalogVersion: '2026-10-02.1',
         catalogChecksum: 'c'.repeat(64),
         status: 'ACTIVE',
@@ -724,17 +725,18 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
     expect((old?.productJson as { reviewer?: string }).reviewer).toBe('AUTO:funding-auto-v1');
   });
 
-  it('예전 모양으로 저장된 상품 버전은 내용이 같아도 다시 쓰지 않고, 지금 모양 버전은 다시 쓴다', async () => {
+  // 앞 테스트에 기대지 않는다. 지금 모양 버전을 다시 쓰는 규칙은 위 '내용이 같은 상품은 버전을 재사용' 테스트가 본다.
+  it('예전 모양으로 저장된 상품 버전은 출처가 성공해도 내용이 같으면 다시 쓰지 않고 새 버전을 만든다', async () => {
     await legacyVersion('legacy-b', '2026-10-04');
     const report = await sync({
       asOfDate: '2026-10-04',
-      result: () => collection([collected('legacy', '2026-10-04'), collected('legacy-b', '2026-10-04')], 2),
+      // 공고 수는 앞 테스트들과 같은 10건으로 둬 직전 성공 대비 급감 판정에 걸리지 않게 한다.
+      result: () => collection([collected('legacy-b', '2026-10-04')], 10),
     });
     expect(report.load?.outcome).toBe('ACTIVATED');
+    expect(report.sources[0].status).toBe('SUCCEEDED');
     const active = await findActiveFundingCatalog(db());
-    const versions = new Map(active?.catalog.products.map((product) => [product.productKey, product.version]));
-    // 앞 테스트가 만든 지금 모양 1.0.1은 내용이 같아 다시 쓴다. 예전 모양 1.0.0만 있던 상품은 1.0.1을 새로 만든다.
-    expect(versions.get('test-sync-legacy')).toBe('1.0.1');
-    expect(versions.get('test-sync-legacy-b')).toBe('1.0.1');
+    const legacyB = active?.catalog.products.find((product) => product.productKey === 'test-sync-legacy-b');
+    expect(legacyB).toMatchObject({ version: '1.0.1', origin: 'SYNC' });
   });
 });
