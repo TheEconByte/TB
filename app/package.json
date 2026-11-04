@@ -31,6 +31,7 @@
     "funding:validate": "node --env-file-if-exists=.env.local scripts/validate-funding-catalog.ts",
     "funding:load": "node --env-file-if-exists=.env.local scripts/load-funding-catalog.ts",
     "funding:sync": "node --env-file-if-exists=.env.local scripts/sync-funding.ts",
+    "eval:funding-conditions": "node --env-file-if-exists=.env.local scripts/eval-funding-conditions.ts",
     "score:train": "node --env-file-if-exists=.env.local scripts/train-market-score.ts",
     "score:build": "node --env-file-if-exists=.env.local scripts/build-market-score.ts"
   },

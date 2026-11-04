@@ -30,3 +30,5 @@ data/funding-sync/
 .idea/
 *.iml
 .DS_Store
+# 공고 조건 추출 평가 결과(npm --prefix app run eval:funding-conditions). 공고 인용과 AI 답이 들어 있어 저장소에 넣지 않는다.
+.claude/hillclimb/
