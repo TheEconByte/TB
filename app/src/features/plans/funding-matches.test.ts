@@ -90,8 +90,6 @@ const PRODUCT = {
   applicationPeriod: { start: '2026-01-01', end: FAR_FUTURE, note: null },
   observedApplicationStatus: 'OPEN',
   observedAt: '2026-11-01',
-  reviewedAt: '2026-11-01',
-  nextReviewAt: null,
   officialUrl: OFFICIAL_URL,
   sourceDocumentName: '기업마당 지원사업 공고',
   sourceDocumentRetrieved: false,
@@ -103,7 +101,7 @@ const PRODUCT = {
   repaymentMethod: 'UNKNOWN',
   unsupportedCalculationReasons: ['상환 계산 대상이 아닙니다.'],
   additionalChecks: [],
-  reviewer: 'AUTO:funding-auto-v1',
+  origin: 'SYNC',
   evidence: [evidence('identity', 'IDENTITY'), evidence('period', 'APPLICATION_PERIOD')],
   sourceRef: { source: 'BIZINFO', externalId: 'PBLN_SEONGDONG' },
   noticeTextChecksum: NOTICE_CHECKSUM,
@@ -137,13 +135,9 @@ function stubPrisma(plan: PlanRow | null, active = true) {
           catalogVersion: '2026-11-03.1',
           schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
           basisDate: new Date('2026-11-03T00:00:00.000Z'),
-          reviewedAt: new Date('2026-11-01T00:00:00.000Z'),
           activatedAt: new Date('2026-11-03T03:00:00.000Z'),
-          reviewer: 'test-reviewer',
           // 출처 확인을 오늘로 둬 최신성 보류가 결과를 가리지 않게 한다.
           automation: {
-            policyLoanPromotion: false,
-            repaymentPromotion: false,
             blockedSources: [],
             sourceSyncs: [
               {

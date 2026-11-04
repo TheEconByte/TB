@@ -4,6 +4,7 @@ import {
   BUSINESS_STAGES,
   EVIDENCE_SUBJECTS,
   FUNDING_CATALOG_SCHEMA_VERSION,
+  FUNDING_PRODUCT_ORIGINS,
   FUNDING_SOURCES,
   INDUSTRY_SCOPES,
   OBSERVED_APPLICATION_STATUSES,
@@ -105,8 +106,6 @@ export const fundingProductSchema = z.object({
   applicationPeriod: applicationPeriodSchema,
   observedApplicationStatus: z.enum(OBSERVED_APPLICATION_STATUSES),
   observedAt: isoDate,
-  reviewedAt: isoDate.nullable(),
-  nextReviewAt: isoDate.nullable(),
   officialUrl,
   sourceDocumentName: z.string().trim().min(2),
   // 원본 파일을 내려받아 보관하지 않았으면 checksum은 null이어야 한다.
@@ -140,7 +139,8 @@ export const fundingProductSchema = z.object({
   // 유형이거나 금리·기간·상환방식이 불명확하면 반드시 사유를 남긴다.
   unsupportedCalculationReasons: z.array(z.string().trim().min(1)).default([]),
   additionalChecks: z.array(z.string().trim().min(1)).default([]),
-  reviewer: z.string().trim().min(1),
+  // 누가 기록한 상품인지(types.ts FUNDING_PRODUCT_ORIGINS). 기본값을 두지 않는다. 빠진 값을 사람 상품으로 짐작하지 않는다.
+  origin: z.enum(FUNDING_PRODUCT_ORIGINS),
   evidence: z.array(evidenceSchema).min(1, '상품마다 공식 원문 근거를 하나 이상 기록해 주세요.'),
   // funding:sync가 모은 공고의 출처와 식별자. 사람이 기록한 상품도 같은 공고를 가리키면
   // 적어 두며, 그때는 사람 기록이 자동 상품보다 우선한다. 기본값을 두지 않아 이 필드가
@@ -173,27 +173,24 @@ const blockedSourceSchema = sourceRefSchema.extend({
   reason: z.string().trim().min(1, '차단 사유를 입력해 주세요.'),
 });
 
-// 자동 상품의 승격 스위치와 차단 목록, 출처별 동기화 결과(ADR 0006). 두 스위치는 저장만 하고 어디에서도
-// 읽지 않는다(ADR 0009 §6). 차단 목록은 맞춰 보기의 운영자 숨김, 동기화 결과는 출처 최신성에 쓴다.
+// 자동 상품의 차단 목록과 출처별 동기화 결과(ADR 0006). 차단 목록은 맞춰 보기의 운영자 숨김, 동기화 결과는 출처 최신성에
+// 쓴다(ADR 0009 §6). v1.4.0까지 있던 자동 승격 스위치 두 개는 없앴다(§7). 예전 릴리스에 저장된 스위치는 parse가 뺀다.
 export const fundingAutomationSchema = z.object({
-  policyLoanPromotion: z.boolean(),
-  repaymentPromotion: z.boolean(),
   blockedSources: z.array(blockedSourceSchema),
   sourceSyncs: z.array(sourceSyncSchema),
 });
 
-// 모든 스위치가 꺼진 기본 자동화 설정. 배열을 공유하지 않도록 매번 새 객체를 만든다.
+// 차단 목록과 동기화 결과가 빈 기본 자동화 설정. 배열을 공유하지 않도록 매번 새 객체를 만든다.
 export function defaultFundingAutomation(): FundingAutomation {
-  return { policyLoanPromotion: false, repaymentPromotion: false, blockedSources: [], sourceSyncs: [] };
+  return { blockedSources: [], sourceSyncs: [] };
 }
 
 export const fundingCatalogSchema = z.object({
   catalogKey: productKeySchema,
   schemaVersion: z.literal(FUNDING_CATALOG_SCHEMA_VERSION),
   catalogVersion: z.string().regex(/^\d{4}-\d{2}-\d{2}\.\d+$/, 'YYYY-MM-DD.N 형식이어야 합니다.'),
-  // 이 카탈로그를 판정한 기준일. 검수 기한·날짜 모순은 이 날짜로 계산한다.
+  // 이 카탈로그를 판정한 기준일. 확인일·근거 관측일의 날짜 모순은 이 날짜로 계산한다.
   basisDate: isoDate,
-  reviewer: z.string().trim().min(1),
   notes: z.array(z.string().trim().min(1)).default([]),
   automation: fundingAutomationSchema.default(defaultFundingAutomation),
   products: z.array(fundingProductSchema).min(1, '상품을 하나 이상 기록해 주세요.'),

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { matchCatalog } from '../matching.ts';
 import type { FundingSourceCollection } from '../sync.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from '../types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION } from '../types.ts';
 import { validateFundingCatalog } from '../validation.ts';
 import {
   SEMAS_OLS_MIN_REQUEST_INTERVAL_MS,
@@ -275,11 +275,8 @@ function catalogWith(products: unknown[], automation: Record<string, unknown> = 
     schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion: `${AS_OF}.1`,
     basisDate: AS_OF,
-    reviewer: 'tester',
     notes: [],
     automation: {
-      policyLoanPromotion: false,
-      repaymentPromotion: false,
       blockedSources: [],
       sourceSyncs: [FRESH_SYNC],
       ...automation,
@@ -578,8 +575,6 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
       applicationPeriod: { start: '2026-01-05', end: null, note: '2026-01-05 ~ 자금소진시까지' },
       observedApplicationStatus: 'OPEN',
       observedAt: AS_OF,
-      reviewedAt: AS_OF,
-      nextReviewAt: null,
       officialUrl: 'https://ols.semas.or.kr/ols/man/SMAN052M/page.do?bltwtrSeq=326&bbsTypeCd=01',
       sourceDocumentRetrieved: false,
       sourceChecksum: null,
@@ -614,10 +609,10 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
 
   it('만든 상품은 카탈로그 검사를 통과하고, 맞춰 보기의 정책자금이며 마감·보류는 출처 데이터로 정한다', () => {
     const { mapping } = mapDefault();
-    const versions = mapping.products.map((product) => ({ ...product, version: '1.0.0', reviewer: AUTO_REVIEWER }));
+    const versions = mapping.products.map((product) => ({ ...product, version: '1.0.0', origin: 'SYNC' }));
     const noInput = { businessStatus: null, openedYearMonth: null, districtCode: null, age: null, targetGroups: null };
     const matched = (automation: Record<string, unknown> = {}) => {
-      const validation = validateFundingCatalog(catalogWith(versions, automation), { asOfDate: AS_OF });
+      const validation = validateFundingCatalog(catalogWith(versions, automation));
       expect(validation.issues).toEqual([]);
       if (validation.catalog === null) throw new Error('카탈로그 검증에 실패했습니다.');
       const list = matchCatalog(validation.catalog, new Map(), noInput, { asOfDate: AS_OF });

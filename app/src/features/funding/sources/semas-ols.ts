@@ -724,8 +724,6 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       applicationPeriod: application.period,
       observedApplicationStatus: application.status,
       observedAt: context.asOfDate,
-      reviewedAt: context.asOfDate,
-      nextReviewAt: null,
       officialUrl: noticeUrl ?? SEMAS_OLS_URLS.overview,
       sourceDocumentName: notice === null ? OVERVIEW_DOCUMENT : `소진공 정책자금 공지사항 · ${notice.detail.title}`,
       sourceDocumentRetrieved: false,

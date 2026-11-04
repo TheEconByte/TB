@@ -8,7 +8,7 @@ import { FundingCatalogError } from '../src/features/funding/validation.ts';
 
 const DEFAULT_CATALOG = fileURLToPath(new URL('../catalog/funding/catalog.json', import.meta.url));
 
-const USAGE = `검수된 자금 공고 카탈로그를 새 릴리스로 적재합니다.
+const USAGE = `운영자가 관리하는 자금 공고 카탈로그를 새 릴리스로 적재합니다.
 
 사용법:
   npm run funding:load -- [옵션]
@@ -20,7 +20,6 @@ const USAGE = `검수된 자금 공고 카탈로그를 새 릴리스로 적재�
 동작:
   - 웹 요청 중에는 실행하지 않습니다. 운영자가 직접 실행합니다.
   - funding:validate와 같은 검사를 먼저 수행하고, 통과한 카탈로그만 적재합니다.
-  - 검수 기능이 생기기 전까지는 검수자가 UNASSIGNED여도 적재합니다. 맞춰 보기는 검수자를 그룹에 쓰지 않습니다.
   - 검증을 우회하는 옵션은 없습니다.
   - 상품 버전은 불변으로 저장하며, 같은 productKey + version을 재사용할 때 내용이 다르면 거부합니다.
   - 카탈로그 릴리스는 PENDING으로 적재한 뒤 전체 검증을 통과해야 한 트랜잭션으로 ACTIVE가 됩니다.
@@ -71,9 +70,8 @@ async function main() {
     console.log(`결과: ${report.outcome}`);
     console.log(`카탈로그: ${report.catalogKey}@${report.catalogVersion} (${report.releaseId})`);
     console.log(`checksum: ${report.catalogChecksum}`);
-    console.log(`기준일: ${report.basisDate} · 검수일: ${report.reviewedAt ?? '없음'} · 상품 ${report.productCount}건`);
+    console.log(`기준일: ${report.basisDate} · 상품 ${report.productCount}건`);
     for (const product of report.products) console.log(`  - ${product}`);
-    console.log(`검수 기한 경과: ${report.reviewOverdue.length === 0 ? '없음' : report.reviewOverdue.join(', ')}`);
   } finally {
     await prisma.$disconnect();
   }

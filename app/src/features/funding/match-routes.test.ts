@@ -45,8 +45,6 @@ const PRODUCT = {
   applicationPeriod: { start: '2026-01-01', end: FAR_FUTURE, note: null },
   observedApplicationStatus: 'OPEN',
   observedAt: '2026-11-01',
-  reviewedAt: '2026-11-01',
-  nextReviewAt: FAR_FUTURE,
   officialUrl: OFFICIAL_URL,
   sourceDocumentName: '테스트 공고문',
   sourceDocumentRetrieved: false,
@@ -58,7 +56,7 @@ const PRODUCT = {
   repaymentMethod: 'NOT_APPLICABLE',
   unsupportedCalculationReasons: ['지원금은 상환 계산 대상이 아닙니다.'],
   additionalChecks: [],
-  reviewer: 'test-reviewer',
+  origin: 'OPERATOR',
   evidence: [
     evidence('identity', 'IDENTITY'),
     evidence('period', 'APPLICATION_PERIOD'),
@@ -85,9 +83,7 @@ function stubPrisma(active: boolean) {
           catalogVersion: '2026-11-03.1',
           schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
           basisDate: new Date('2026-11-03T00:00:00.000Z'),
-          reviewedAt: new Date('2026-11-01T00:00:00.000Z'),
           activatedAt: new Date('2026-11-03T03:00:00.000Z'),
-          reviewer: 'test-reviewer',
           automation: null,
           products: [{ position: 0, productVersion: { productJson: PRODUCT } }],
         }

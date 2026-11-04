@@ -49,7 +49,6 @@ function catalogFile(noticeTextChecksum: string): string {
       schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
       catalogVersion: '2026-11-03.1',
       basisDate: AS_OF,
-      reviewer: 'test-reviewer',
       notes: [],
       products: [
         {
@@ -65,8 +64,6 @@ function catalogFile(noticeTextChecksum: string): string {
           applicationPeriod: { start: '2026-10-01', end: '2099-01-01', note: null },
           observedApplicationStatus: 'OPEN',
           observedAt: AS_OF,
-          reviewedAt: AS_OF,
-          nextReviewAt: '2099-01-01',
           officialUrl: OFFICIAL_URL,
           sourceDocumentName: '테스트 공고문',
           sourceDocumentRetrieved: false,
@@ -77,7 +74,7 @@ function catalogFile(noticeTextChecksum: string): string {
           repaymentCondition: null,
           repaymentMethod: 'NOT_APPLICABLE',
           unsupportedCalculationReasons: ['지원금은 상환 계산 대상이 아닙니다.'],
-          reviewer: 'test-reviewer',
+          origin: 'OPERATOR',
           evidence: [evidence('identity', 'IDENTITY'), evidence('period', 'APPLICATION_PERIOD')],
           noticeTextChecksum,
         },

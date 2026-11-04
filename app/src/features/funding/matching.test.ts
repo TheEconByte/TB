@@ -10,7 +10,7 @@ import {
   type ProductMatch,
 } from './matching.ts';
 import { fundingCatalogSchema, fundingProductSchema, type FundingCatalog, type FundingProduct } from './schema.ts';
-import { AUTO_REVIEWER, FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
+import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 
 // ADR 0009 §4의 맞춰 보기. 기대값의 근거는 각 테스트 옆에 적는다.
 // - "ADR §4": docs/decisions/0009-funding-ai-condition-extraction.md 4절
@@ -50,8 +50,6 @@ function manualProduct(overrides: Record<string, unknown> = {}): FundingProduct 
     applicationPeriod: { start: '2026-10-01', end: '2026-12-31', note: null },
     observedApplicationStatus: 'OPEN',
     observedAt: AS_OF,
-    reviewedAt: AS_OF,
-    nextReviewAt: '2027-01-01',
     officialUrl: OFFICIAL_URL,
     sourceDocumentName: '테스트 공고문',
     sourceDocumentRetrieved: false,
@@ -62,7 +60,7 @@ function manualProduct(overrides: Record<string, unknown> = {}): FundingProduct 
     repaymentCondition: null,
     repaymentMethod: 'UNKNOWN',
     unsupportedCalculationReasons: ['금리가 확정되지 않았습니다.'],
-    reviewer: 'operator',
+    origin: 'OPERATOR',
     evidence: [
       evidence('identity', 'IDENTITY'),
       evidence('period', 'APPLICATION_PERIOD'),
@@ -84,8 +82,7 @@ function autoProduct(source: 'SEMAS_OLS' | 'BIZINFO', overrides: Record<string, 
       source === 'SEMAS_OLS'
         ? { scope: 'NATIONWIDE', districtCodes: [], note: null }
         : { scope: 'UNKNOWN', districtCodes: [], note: null },
-    reviewer: AUTO_REVIEWER,
-    nextReviewAt: null,
+    origin: 'SYNC',
     evidence: [
       evidence('identity', 'IDENTITY', 'OFFICIAL_API'),
       evidence('period', 'APPLICATION_PERIOD', 'OFFICIAL_API'),
@@ -102,10 +99,7 @@ function catalogOf(products: FundingProduct[], automation: Partial<FundingCatalo
     schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
     catalogVersion: '2026-11-03.1',
     basisDate: AS_OF,
-    reviewer: 'operator',
     automation: {
-      policyLoanPromotion: false,
-      repaymentPromotion: false,
       blockedSources: [],
       sourceSyncs: (['SEMAS_OLS', 'BIZINFO'] as const).map((source) => ({
         source,
@@ -695,16 +689,27 @@ describe('카탈로그 전체 맞춰 보기', () => {
     expect(list.tabs.SUPPORT_PROGRAM.products[0]?.operatorRegionNote).toBeNull();
   });
 
-  it('사람이 등록한 상품은 기록일과 다음 검토일을 넘기고, 자동 상품은 넘기지 않는다', () => {
+  it('사람이 등록한 상품은 기록일을 넘기고, 자동 상품은 넘기지 않는다', () => {
     // 사람 상품은 출처 최신성을 따지지 않으므로(맞아 보임 판단은 그대로) 언제 기록한 내용인지 화면에 보여 준다(#57 리뷰).
-    // 자동 상품은 출처의 마지막 성공 확인일(automation)을 보여 준다.
-    const manual = manualProduct({ observedAt: '2026-09-20', nextReviewAt: '2026-10-01' });
+    // 다음 검토일은 ADR 0009 §7로 검수 기한을 없애 넘기지 않는다. 자동 상품은 출처의 마지막 성공 확인일(automation)을 보여 준다.
+    const manual = manualProduct({ observedAt: '2026-09-20' });
     const list = matchCatalog(catalogOf([manual, autoProduct('BIZINFO')]), new Map(), NO_INPUT, { asOfDate: AS_OF });
-    expect(list.tabs.POLICY_FUND.products[0]?.operatorRecord).toEqual({
-      observedAt: '2026-09-20',
-      nextReviewAt: '2026-10-01',
-    });
+    expect(list.tabs.POLICY_FUND.products[0]?.operatorRecord).toEqual({ observedAt: '2026-09-20' });
     expect(list.tabs.SUPPORT_PROGRAM.products[0]?.operatorRecord).toBeNull();
+  });
+
+  it('차단 목록은 자동 상품만 숨기고, 같은 공고를 가리키는 사람 상품은 보여 준다', () => {
+    // 운영자 숨김은 funding:sync가 모은 상품을 빼는 장치다(ADR 0009 §6). 사람이 같은 공고를 sourceRef로 적어 등록한 상품은
+    // 운영자가 직접 기록한 것이라 숨기지 않는다. 자동/사람은 sourceRef가 아니라 상품의 출처 구분(origin)으로 가른다.
+    const manual = manualProduct({ sourceRef: { source: 'BIZINFO', externalId: 'PBLN_1' } });
+    const catalog = catalogOf([manual], {
+      blockedSources: [{ source: 'BIZINFO', externalId: 'PBLN_1', reason: '운영자 숨김' }],
+    });
+    const list = matchCatalog(catalog, new Map(), NO_INPUT, { asOfDate: AS_OF });
+    expect(list.hiddenCount).toBe(0);
+    expect(list.tabs.POLICY_FUND.products.map((p) => p.productKey)).toEqual(['manual-loan']);
+    // 사람 상품은 출처 최신성을 보지 않고 출처 정보(automation)도 넘기지 않는다.
+    expect(list.tabs.POLICY_FUND.products[0]?.automation).toBeNull();
   });
 
   // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 피해 소상공인만 한정했다고 읽은 공고도 접어 둔
