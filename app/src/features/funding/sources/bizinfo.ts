@@ -19,7 +19,8 @@ export const BIZINFO_SEARCH_COUNT = 5000;
 // 무관한 수출·기술개발 공고가 대부분인 중소기업 전용 공고를 빼기 위한 기계적인 거름이다.
 export const BIZINFO_TARGET_TAGS: readonly string[] = ['소상공인', '창업벤처'];
 
-// 공고명 앞 [지역] 표시와 소관기관 이름으로 서울 밖 공고를 뺀다.
+// 공고명 앞 [지역] 표시와 소관기관 이름으로 서울 밖 공고를 가린다. 가린 공고도 빼지 않고 지역 UNKNOWN으로 올린다
+// (ADR 0009 §2). 이 추측 규칙은 ADR 0009 6단계에서 지운다.
 const OTHER_REGION_TAGS: readonly string[] = [
   '부산',
   '대구',
@@ -90,8 +91,6 @@ type BizinfoItem = z.infer<typeof bizinfoItemSchema>;
 export type BizinfoSkipCounts = {
   // 지원대상 태그에 소상공인·창업벤처가 없는 공고.
   notTarget: number;
-  // 서울 밖 지역 공고.
-  otherRegion: number;
   // 신청 종료일이 판정 기준일보다 앞선 공고.
   ended: number;
   // 공고 식별자·이름·주소·기관이 없거나 쓸 수 없는 공고.
@@ -336,7 +335,7 @@ export function mapBizinfoItems(
   items: readonly unknown[],
   context: { asOfDate: string; responseChecksum: string },
 ): BizinfoMapping {
-  const skipped: BizinfoSkipCounts = { notTarget: 0, otherRegion: 0, ended: 0, malformed: 0, duplicate: 0 };
+  const skipped: BizinfoSkipCounts = { notTarget: 0, ended: 0, malformed: 0, duplicate: 0 };
   const products: CollectedFundingProduct[] = [];
   const seen = new Set<string>();
   for (const raw of items) {
@@ -366,11 +365,8 @@ export function mapBizinfoItems(
       continue;
     }
     const jurisdiction = cleanText(item.jrsdInsttNm);
+    // 지역으로는 거르지 않는다(ADR 0009 §2). 대상 지역은 본문에서 AI가 읽고, 서울 밖 추측은 상품 지역으로 적지 않는다.
     const region = bizinfoRegion(name, jurisdiction);
-    if (region.scope === 'OTHER') {
-      skipped.otherRegion += 1;
-      continue;
-    }
     const periodText = cleanText(item.reqstBeginEndDe);
     const period = parseBizinfoPeriod(periodText);
     if (period !== null && compareIsoDates(period.end, context.asOfDate) < 0) {
@@ -420,7 +416,7 @@ export function mapBizinfoItems(
       supportType: 'UNKNOWN',
       eligibleBusinessStages: [],
       region:
-        region.scope === 'UNKNOWN'
+        region.scope === 'UNKNOWN' || region.scope === 'OTHER'
           ? {
               scope: 'UNKNOWN',
               districtCodes: [],
@@ -558,7 +554,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
         const { skipped } = mapping;
         log(
           mask(
-            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 추가 확인 후보로 만들었습니다(대상 아님 ${skipped.notTarget}건, 서울 밖 ${skipped.otherRegion}건, 신청 종료 ${skipped.ended}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
+            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 추가 확인 후보로 만들었습니다(대상 아님 ${skipped.notTarget}건, 신청 종료 ${skipped.ended}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
           ),
         );
         return { products: mapping.products, fetchedCount: items.length, responseChecksum };

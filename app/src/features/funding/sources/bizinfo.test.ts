@@ -296,7 +296,7 @@ describe('기업마당 신청기간·지역 해석', () => {
 describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
   it('사업 단계·지원 유형을 추측하지 않고, 검증을 통과하는 추가 확인 상품을 만든다', () => {
     const { products, skipped } = mapBizinfoItems([item()], { asOfDate: AS_OF, responseChecksum: CHECKSUM });
-    expect(skipped).toEqual({ notTarget: 0, otherRegion: 0, ended: 0, malformed: 0, duplicate: 0 });
+    expect(skipped).toEqual({ notTarget: 0, ended: 0, malformed: 0, duplicate: 0 });
     expect(products).toHaveLength(1);
     const [product] = products;
     expect(product).toMatchObject({
@@ -363,7 +363,8 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
     expect(evaluation.repayment.note).toContain('지원 유형이 확인되지 않은');
   });
 
-  it('소상공인·창업벤처 대상이 아닌 공고, 서울 밖 공고, 끝난 공고, 형식이 깨진 공고와 중복은 빼고 센다', () => {
+  // ADR 0009 §2: 지역으로는 거르지 않는다. 서울 밖으로 보이는 공고도 올리고, 대상 지역은 본문에서 AI가 읽는다.
+  it('소상공인·창업벤처 대상이 아닌 공고, 끝난 공고, 형식이 깨진 공고와 중복은 빼고 세며, 서울 밖 공고는 빼지 않는다', () => {
     const { products, skipped } = mapBizinfoItems(
       [
         item({ pblancId: 'PBLN_A', trgetNm: '중소기업' }),
@@ -387,9 +388,17 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
       ],
       { asOfDate: AS_OF, responseChecksum: CHECKSUM },
     );
-    expect(skipped).toEqual({ notTarget: 1, otherRegion: 2, ended: 1, malformed: 3, duplicate: 1 });
+    expect(skipped).toEqual({ notTarget: 1, ended: 1, malformed: 3, duplicate: 1 });
     const byId = new Map(products.map((product) => [product.sourceRef.externalId, product]));
-    expect([...byId.keys()]).toEqual(['PBLN_F', 'PBLN_G', 'PBLN_H']);
+    expect([...byId.keys()]).toEqual(['PBLN_B', 'PBLN_C', 'PBLN_F', 'PBLN_G', 'PBLN_H']);
+    // 공고명·소관기관으로 본 서울 밖 추측은 상품의 지역으로 적지 않는다(지역 근거도 남기지 않는다).
+    for (const id of ['PBLN_B', 'PBLN_C']) {
+      expect(byId.get(id)?.region, id).toMatchObject({ scope: 'UNKNOWN', districtCodes: [] });
+      expect(
+        byId.get(id)?.evidence.map((entry) => entry.subject),
+        id,
+      ).toEqual(['IDENTITY', 'APPLICATION_PERIOD']);
+    }
 
     expect(byId.get('PBLN_F')).toMatchObject({
       organization: '서울특별시 중구',

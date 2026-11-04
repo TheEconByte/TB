@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import FundingMatcher from '@/features/funding/FundingMatcher';
 
 export const metadata: Metadata = {
-  title: 'TrendBench | 자금 후보',
-  description: '사업단계·자치구·업종·용도를 입력해 공식 공고 기반 자금 카탈로그에서 후보와 이유를 확인합니다.',
+  title: 'TrendBench | 자금 공고 맞춰 보기',
+  description:
+    '사업자등록 여부·개업 연월·자치구·나이·대상 한정을 입력해, AI가 공고문에서 읽은 조건과 항목마다 맞춰 봅니다.',
 };
 
 export default function FundingPage() {

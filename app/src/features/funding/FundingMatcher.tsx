@@ -1,61 +1,42 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import MarketGradeBanner from '@/features/market/score/MarketGradeBanner';
-import type { FundingCandidatesResponse } from './candidates.ts';
-import { SEOUL_DISTRICTS } from './districts.ts';
-import { industryCodeIssue, purposeLabel, stageLabel } from './eligibility.ts';
+import FundingProfileFields from './FundingProfileFields.tsx';
 import {
-  FundingCandidatesErrorPanel,
-  FundingCandidatesPanel,
+  FundingMatchesErrorPanel,
+  FundingMatchesPanel,
   describeFundingError,
-  fundingProfileSummary,
   type FundingLoadError,
-} from './FundingCandidatesPanel.tsx';
-import { PURPOSES, type BusinessStage, type Purpose } from './types.ts';
+} from './FundingMatchesPanel.tsx';
+import type { FundingMatchesWithProfile } from './match-list.ts';
+import { EMPTY_FUNDING_FORM, fundingFormPayload, type FundingProfileForm } from './profile-form.ts';
 
-type IndustryOption = { code: string; displayName: string };
+const NO_INPUT = {
+  businessStatus: null,
+  openedYearMonth: null,
+  districtCode: null,
+  age: null,
+  targetGroups: null,
+} as const;
 
+// 페이지 단위 맞춰 보기(ADR 0009 §4). 입력은 저장하지 않고 이 요청에만 쓴다.
 export default function FundingMatcher() {
   const { data: session, isPending } = authClient.useSession();
-  const [businessStage, setBusinessStage] = useState<BusinessStage | 'UNKNOWN'>('UNKNOWN');
-  const [districtCode, setDistrictCode] = useState('');
-  const [industryCode, setIndustryCode] = useState('');
-  const [purpose, setPurpose] = useState<Purpose | 'UNKNOWN'>('UNKNOWN');
-  const [industries, setIndustries] = useState<IndustryOption[]>([]);
-  const [result, setResult] = useState<FundingCandidatesResponse | null>(null);
+  const [form, setForm] = useState<FundingProfileForm>(EMPTY_FUNDING_FORM);
+  const [result, setResult] = useState<FundingMatchesWithProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<FundingLoadError | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // 업종 코드 제안은 선택 사항이다. 활성 상권 릴리스가 없으면 목록이 비어 있어도
-  // 조회 자체를 막지 않는다.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch('/api/industries', { headers: { accept: 'application/json' } });
-        if (!response.ok) return;
-        const body = (await response.json()) as { industries?: IndustryOption[] };
-        if (!cancelled && Array.isArray(body.industries)) setIndustries(body.industries);
-      } catch {
-        // 제안 목록을 못 가져와도 직접 입력으로 조회할 수 있다.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const submit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const trimmedIndustry = industryCode.trim().toUpperCase();
-      const industryIssue = industryCodeIssue(industryCode);
-      if (industryIssue) {
-        setFormError(industryIssue);
+      const payload = fundingFormPayload(form);
+      if (payload.kind === 'INVALID') {
+        setFormError(payload.issue);
         return;
       }
       setFormError(null);
@@ -65,15 +46,11 @@ export default function FundingMatcher() {
         const response = await fetch('/api/funding/candidates', {
           method: 'POST',
           headers: { 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({
-            businessStage,
-            districtCode: districtCode === '' ? null : districtCode,
-            industryCode: trimmedIndustry === '' ? null : trimmedIndustry,
-            purpose,
-          }),
+          // 아무것도 입력하지 않아도 맞춰 볼 수 있다. 조건을 정하지 않은 공고와 입력 없이 정해지는 항목만 맞음이 된다.
+          body: JSON.stringify(payload.kind === 'OK' ? payload.profile : NO_INPUT),
         });
         const body = (await response.json().catch(() => null)) as
-          FundingCandidatesResponse | { error?: { code?: string; message?: string } } | null;
+          FundingMatchesWithProfile | { error?: { code?: string; message?: string } } | null;
         if (!response.ok) {
           const apiError = body as { error?: { code?: string; message?: string } } | null;
           const failure = new Error(apiError?.error?.message ?? '요청을 처리하지 못했습니다.') as Error & {
@@ -82,7 +59,7 @@ export default function FundingMatcher() {
           failure.code = apiError?.error?.code;
           throw failure;
         }
-        setResult(body as FundingCandidatesResponse);
+        setResult(body as FundingMatchesWithProfile);
       } catch (caught) {
         setResult(null);
         setError(describeFundingError(caught));
@@ -90,18 +67,7 @@ export default function FundingMatcher() {
         setLoading(false);
       }
     },
-    [businessStage, districtCode, industryCode, purpose],
-  );
-
-  const profileSummary = useMemo(
-    () =>
-      fundingProfileSummary({
-        businessStage,
-        districtCode: districtCode === '' ? null : districtCode,
-        industryCode: industryCode.trim() === '' ? null : industryCode.trim().toUpperCase(),
-        purpose,
-      }),
-    [businessStage, districtCode, industryCode, purpose],
+    [form],
   );
 
   return (
@@ -123,21 +89,22 @@ export default function FundingMatcher() {
       <MarketGradeBanner
         onLoaded={(score) => {
           // 상권에서 넘어오면 비어 있는 자치구만 채운다(ADR 0009 §6의 ADR 0008 개정). 나머지는 사용자가 고른다.
-          setDistrictCode((current) => (current === '' ? score.area.districtCode : current));
+          setForm((current) =>
+            current.districtCode === '' ? { ...current, districtCode: score.area.districtCode } : current,
+          );
         }}
       />
 
       <section className="hero funding-hero">
-        <p className="eyebrow">자금 후보 조회</p>
+        <p className="eyebrow">자금 공고 맞춰 보기</p>
         <h1>
-          공식 공고만,
-          <br />
-          상태와 이유까지.
+          공고문의 조건을,
+          <br />내 조건과 나란히.
         </h1>
         <p>
-          사업단계·자치구·업종·용도를 입력하면 활성 자금 카탈로그를 기준으로 검토 후보, 추가 확인, 등록 이후 검토, 종료,
-          검수 만료, 미충족을 이유와 함께 보여줍니다. 후보가 0건이어도 정상 결과이며, 지원금·보증·공간 지원은 대출
-          상환으로 계산하지 않습니다.
+          사업자등록 여부·개업 연월·자치구·나이·대상 한정을 입력하면, AI가 공고문에서 읽어 둔 조건과 항목마다 맞춰 보고
+          정책자금·지원사업으로 나눠 보여 줍니다. 항목마다 공고문 인용을 함께 보여 주며, 신청 전에는 원 공고를 확인해야
+          합니다.
         </p>
       </section>
 
@@ -151,7 +118,7 @@ export default function FundingMatcher() {
         <div className="empty-panel" role="status">
           <h2>로그인이 필요합니다.</h2>
           <p>
-            자금 후보 조회는 로그인한 사용자만 사용할 수 있습니다. <Link href="/">내 창업 계획</Link>에서 로그인한 뒤
+            자금 공고 맞춰 보기는 로그인한 사용자만 쓸 수 있습니다. <Link href="/">내 창업 계획</Link>에서 로그인한 뒤
             다시 열어 주세요.
           </p>
         </div>
@@ -162,74 +129,22 @@ export default function FundingMatcher() {
           <section className="notice-box" aria-labelledby="funding-limits">
             <h2 id="funding-limits">이 결과가 무엇이고 무엇이 아닌지</h2>
             <ul>
-              <li>검토 후보는 확인된 조건을 충족했다는 뜻이며 선정·승인이 확정된 것이 아닙니다.</li>
+              <li>
+                맞아 보임은 AI가 공고문에서 읽은 조건과 입력이 맞아 보인다는 뜻이며 선정이나 지원 결정이 아닙니다.
+              </li>
+              <li>
+                AI가 잘못 읽을 수 있어 조건이 안 맞아 보이는 공고도 숨기지 않고 접어 둡니다. 마감은 출처·운영자
+                기록으로만 정합니다.
+              </li>
               <li>지원금·보증·공간·프로그램 지원은 대출 원금이나 월 상환액으로 바꾸지 않습니다.</li>
-              <li>접수 상태(접수 중·종료·미확인)는 자격 판정과 별개로 저장된 관측값입니다.</li>
-              <li>입력하지 않은 값은 0으로 채우지 않고 미확인(UNKNOWN)으로 남깁니다.</li>
+              <li>입력하지 않은 항목은 해당 없음으로 채우지 않고 확인 필요로 남깁니다. 입력은 AI에 보내지 않습니다.</li>
             </ul>
           </section>
 
           <section className="picker" aria-labelledby="funding-picker">
             <h2 id="funding-picker">내 조건 입력</h2>
             <form onSubmit={submit}>
-              <div className="select-row">
-                <label className="field">
-                  <span>1. 사업 단계</span>
-                  <select
-                    value={businessStage}
-                    onChange={(event) => setBusinessStage(event.target.value as BusinessStage | 'UNKNOWN')}
-                  >
-                    <option value="UNKNOWN">아직 정하지 않음(미확인)</option>
-                    {(['PRE_REGISTRATION', 'POST_REGISTRATION'] as const).map((stage) => (
-                      <option key={stage} value={stage}>
-                        {stageLabel(stage)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>2. 사업장·거주 자치구</span>
-                  <select value={districtCode} onChange={(event) => setDistrictCode(event.target.value)}>
-                    <option value="">선택하지 않음</option>
-                    {SEOUL_DISTRICTS.map((district) => (
-                      <option key={district.code} value={district.code}>
-                        {district.name} ({district.code})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>3. 업종 코드 (선택)</span>
-                  <span className="input-wrap">
-                    <input
-                      className="text-input"
-                      list="funding-industry-options"
-                      value={industryCode}
-                      placeholder="예: CS100010"
-                      onChange={(event) => setIndustryCode(event.target.value)}
-                    />
-                  </span>
-                  <small>상권 탐색과 같은 업종 코드입니다. 비워두면 업종 조건은 미확인으로 남습니다.</small>
-                </label>
-                <label className="field">
-                  <span>4. 자금 용도</span>
-                  <select value={purpose} onChange={(event) => setPurpose(event.target.value as Purpose | 'UNKNOWN')}>
-                    <option value="UNKNOWN">아직 정하지 않음(미확인)</option>
-                    {PURPOSES.map((item) => (
-                      <option key={item} value={item}>
-                        {purposeLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <datalist id="funding-industry-options">
-                {industries.map((industry) => (
-                  <option key={industry.code} value={industry.code}>
-                    {industry.displayName}
-                  </option>
-                ))}
-              </datalist>
+              <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
               {formError && (
                 <p className="inline-error" role="alert">
                   {formError}
@@ -237,12 +152,12 @@ export default function FundingMatcher() {
               )}
               <div className="button-row">
                 <button type="submit" disabled={loading}>
-                  {loading ? '조회 중…' : '후보 조회'}
+                  {loading ? '맞춰 보는 중…' : '공고 맞춰 보기'}
                 </button>
               </div>
               <p className="picker-note">
-                판정 기준일은 서버의 한국 시간 오늘이며 요청에서 바꿀 수 없습니다. 업종 목록은 활성 상권 릴리스가 있을
-                때만 제안되고, 없어도 코드를 직접 입력할 수 있습니다.
+                판정 기준일은 서버의 한국 시간 오늘이며 요청에서 바꿀 수 없습니다. 입력은 저장하지 않습니다. 계획에
+                저장하려면 내 창업 계획 화면의 자금 조건을 쓰세요.
               </p>
             </form>
           </section>
@@ -250,19 +165,21 @@ export default function FundingMatcher() {
           <section className="market-results" aria-live="polite" aria-busy={loading}>
             {loading && (
               <p className="loading-state" role="status">
-                활성 카탈로그를 기준으로 후보를 판정하는 중…
+                활성 카탈로그의 공고를 맞춰 보는 중…
               </p>
             )}
-            {!loading && error && <FundingCandidatesErrorPanel error={error} />}
+            {!loading && error && <FundingMatchesErrorPanel error={error} />}
             {!loading && !error && !result && (
-              <p className="empty-state">조건을 입력하고 후보 조회를 누르면 상태별 후보와 이유를 표시합니다.</p>
+              <p className="empty-state">
+                조건을 입력하고 공고 맞춰 보기를 누르면 갈래·그룹별 공고와 이유를 보여 줍니다.
+              </p>
             )}
-            {!loading && !error && result && <FundingCandidatesPanel result={result} profileSummary={profileSummary} />}
+            {!loading && !error && result && <FundingMatchesPanel result={result} />}
           </section>
         </>
       )}
 
-      <footer>TrendBench · 공식 공고 기반 자금 카탈로그 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
+      <footer>TrendBench · 공식 출처 기반 자금 공고 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
 }

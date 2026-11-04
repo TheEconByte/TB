@@ -116,10 +116,17 @@ export type ProductMatch = {
   supportTypes: ConditionReading<ConditionValues['supportTypes']>;
   // 정책자금 카드의 한도. 공개 한도는 최대치이며 실제 금액은 심사로 정해진다(ADR §4).
   limit: { publicLimitKrw: string | null; limitText: string | null };
+  // 사람이 등록한 상품에 운영자가 적은 지역 메모. 자동 상품의 지역 필드는 수집기의 추측이라 null이다.
+  operatorRegionNote: string | null;
+  // 사람이 등록한 상품의 기록일과 다음 검토일. 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 보여 준다.
+  // 그룹에는 쓰지 않는다(검수자·검수 기한은 그룹에 쓰지 않는다). 자동 상품은 null이다.
+  operatorRecord: { observedAt: string; nextReviewAt: string | null } | null;
 };
 
 export type FundingMatchList = {
   asOfDate: string;
+  // 차단 목록이라 보여 주지 않은 자동 상품 수(ADR §6 운영자 숨김). 릴리스 상품 수와 보여 준 수의 차이를 밝힌다.
+  hiddenCount: number;
   tabs: Record<FundingTab, { counts: Record<FundingMatchGroup, number>; products: ProductMatch[] }>;
 };
 
@@ -457,6 +464,8 @@ export function matchProduct(
     conditions,
     supportTypes: readings.supportTypes,
     limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
+    operatorRegionNote: auto ? null : product.region.note,
+    operatorRecord: auto ? null : { observedAt: product.observedAt, nextReviewAt: product.nextReviewAt },
   };
 }
 
@@ -473,13 +482,17 @@ export function matchCatalog(
   options: { asOfDate: string },
 ): FundingMatchList {
   const blocked = new Set(catalog.automation.blockedSources.map((entry) => sourceRefKey(entry)));
+  let hiddenCount = 0;
   const matches = catalog.products.flatMap((product) => {
     const hidden =
       isAutoReviewer(product.reviewer) &&
       product.sourceRef !== undefined &&
       blocked.has(sourceRefKey(product.sourceRef));
     const extraction = product.noticeTextChecksum === undefined ? null : (extractions.get(product.productKey) ?? null);
-    if (hidden) return [];
+    if (hidden) {
+      hiddenCount += 1;
+      return [];
+    }
     return [matchProduct(product, extraction, profile, { asOfDate: options.asOfDate, automation: catalog.automation })];
   });
   const order = (group: FundingMatchGroup) => FUNDING_MATCH_GROUPS.indexOf(group);
@@ -492,5 +505,5 @@ export function matchCatalog(
       return [tab, { counts, products }];
     }),
   ) as FundingMatchList['tabs'];
-  return { asOfDate: options.asOfDate, tabs };
+  return { asOfDate: options.asOfDate, hiddenCount, tabs };
 }

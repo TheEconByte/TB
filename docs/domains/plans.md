@@ -2,7 +2,7 @@
 
 ## 코드 위치
 
-- `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI, 결과 키(`calculation-key.ts`), 계획에 저장한 자금 조건과 그 조건 판정 조립(`funding-matches.ts`), API 경계 테스트.
+- `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI, 결과 키(`calculation-key.ts`), 계획에 저장한 자금 조건으로 맞춰 보기 조립(`funding-matches.ts`), API 경계 테스트.
 - 계산 공식과 시나리오는 [finance.md](finance.md)에 있다.
 
 ## API
@@ -12,7 +12,7 @@
 - `/api/plans/{id}`: 소유자만 상세·revision 수정·삭제.
 - `/api/plans/{id}/calculations`: 저장된 입력만 서버에서 계산하고 결과를 append-only로 저장.
 - `/api/plans/{id}/business-profile`: 소유자만 사업 조건을 저장하고 revision을 올림([business-profile.md](business-profile.md)).
-- `/api/plans/{id}/funding-matches`: 저장된 계획 조건으로만 자금 후보를 판정하고 결과를 저장하지 않음.
+- `/api/plans/{id}/funding-matches`: 저장된 계획 자금 조건으로만 자금 공고를 맞춰 보고 결과를 저장하지 않음. 자치구가 비어 있으면 사업 조건의 자치구를 쓴다([funding.md](funding.md#계획에-저장한-조건으로-맞춰-보기)).
 - `/api/plans/{id}/results[/{resultId}]`: 소유자만 결과 목록·상세 조회.
 - 미로그인은 401, 타인 리소스와 없는 ID는 404, 입력 오류는 400, 오래된 revision은 409다.
 

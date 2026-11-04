@@ -9,16 +9,28 @@ import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff }
 import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
 import { parsePlanMarketScore } from '@/features/plans/market-score';
 import type { FinanceInput, FinanceResult } from '@/features/finance/types';
-import { SEOUL_DISTRICTS } from '@/features/funding/districts';
-import { industryCodeIssue, purposeLabel, stageLabel, type FundingProfile } from '@/features/funding/eligibility';
+import { districtName } from '@/features/funding/districts';
+import FundingProfileFields from '@/features/funding/FundingProfileFields';
 import {
-  FundingCandidatesErrorPanel,
-  FundingCandidatesPanel,
+  FundingMatchesErrorPanel,
+  FundingMatchesPanel,
   describeFundingError,
-  fundingProfileSummary,
   type FundingLoadError,
-} from '@/features/funding/FundingCandidatesPanel';
-import { PURPOSES, type BusinessStage, type Purpose } from '@/features/funding/types';
+} from '@/features/funding/FundingMatchesPanel';
+import {
+  businessProfileDistrict,
+  readStoredFundingProfile,
+  withBusinessDistrict,
+} from '@/features/funding/match-profile';
+import { fundingProfileSummary, type ViewedFundingGap } from '@/features/funding/match-text';
+import type { FundingMatchProfile } from '@/features/funding/matching';
+import {
+  EMPTY_FUNDING_FORM,
+  businessDistrictUnsaved,
+  fundingFormFromProfile,
+  fundingFormPayload,
+  type FundingProfileForm,
+} from '@/features/funding/profile-form';
 import type { PlanFundingMatchesResponse } from '@/features/plans/funding-matches';
 import {
   describeLoanAssumption,
@@ -56,63 +68,19 @@ const wonFormat = new Intl.NumberFormat('ko-KR');
 const formatWon = (value: string) => `${wonFormat.format(BigInt(value))}원`;
 type StoredResult = { id: string; inputRevision: number; resultJson: FinanceResult; loanAssumptionJson?: unknown };
 
-// 자금 후보 조건은 재무 입력과 별도로 저장한다. 화면에서는 빈 선택값을 문자열로
-// 다루고, 저장할 때만 F4-2와 같은 스키마 모양(UNKNOWN·null)으로 바꾼다.
-type FundingProfileForm = {
-  businessStage: BusinessStage | 'UNKNOWN';
-  districtCode: string;
-  industryCode: string;
-  purpose: Purpose | 'UNKNOWN';
-};
-const EMPTY_FUNDING_FORM: FundingProfileForm = {
-  businessStage: 'UNKNOWN',
-  districtCode: '',
-  industryCode: '',
-  purpose: 'UNKNOWN',
-};
-const PURPOSE_SET = new Set<string>(PURPOSES);
+// 자금 조건은 재무 입력과 별도로 저장한다(ADR 0009 §4). 입력란 상태와 본문 변환은 /funding과 같은 profile-form.ts를 쓴다.
 
-function fundingPayload(form: FundingProfileForm): FundingProfile {
-  const industry = form.industryCode.trim().toUpperCase();
-  return {
-    businessStage: form.businessStage,
-    districtCode: form.districtCode === '' ? null : form.districtCode,
-    industryCode: industry === '' ? null : industry,
-    purpose: form.purpose,
-  };
-}
-
-// 조건을 하나도 입력하지 않으면 UNKNOWN 프로필을 저장하지 않고 null을 보낸다. 조건 없음과
-// "모두 미확인"을 구분해 사용자가 저장된 조건을 비울 수 있게 한다.
-function isEmptyFundingForm(form: FundingProfileForm): boolean {
-  return (
-    form.businessStage === 'UNKNOWN' &&
-    form.districtCode === '' &&
-    form.industryCode.trim() === '' &&
-    form.purpose === 'UNKNOWN'
-  );
-}
-
-function fundingPayloadOrNull(form: FundingProfileForm): FundingProfile | null {
-  return isEmptyFundingForm(form) ? null : fundingPayload(form);
-}
-
-// 저장된 프로필을 화면 입력값으로 되돌린다. 스키마를 통과하지 못한 값은 임의로
-// 해석하지 않고 미입력으로 두며, 조회는 서버가 400으로 거부한다.
+// 저장된 자금 조건을 입력란으로 되돌린다. 예전 모양은 사업 단계·자치구만 옮긴다(match-profile.ts). 어느 모양에도 맞지
+// 않으면 다른 값으로 해석하지 않고 빈 입력란으로 두며, 조회는 서버가 400으로 거부한다.
 function fundingFormFromStored(value: unknown): FundingProfileForm {
-  if (value === null || value === undefined || typeof value !== 'object') return EMPTY_FUNDING_FORM;
-  const stored = value as Partial<FundingProfile>;
-  return {
-    businessStage:
-      stored.businessStage === 'PRE_REGISTRATION' || stored.businessStage === 'POST_REGISTRATION'
-        ? stored.businessStage
-        : 'UNKNOWN',
-    districtCode: typeof stored.districtCode === 'string' ? stored.districtCode : '',
-    industryCode: typeof stored.industryCode === 'string' ? stored.industryCode : '',
-    purpose:
-      typeof stored.purpose === 'string' && PURPOSE_SET.has(stored.purpose) ? (stored.purpose as Purpose) : 'UNKNOWN',
-  };
+  const stored = readStoredFundingProfile(value);
+  return stored.kind === 'OK' ? fundingFormFromProfile(stored.profile) : EMPTY_FUNDING_FORM;
 }
+
+const isEmptyFundingForm = (form: FundingProfileForm) => fundingFormPayload(form).kind === 'EMPTY';
+
+// 저장 전 변경 여부를 본문 기준으로 비교한다. 형식이 틀린 입력도 저장된 조건과 다른 것으로 본다.
+const fundingFormKey = (form: FundingProfileForm) => JSON.stringify(fundingFormPayload(form));
 
 // 저장된 대출 가정의 출처를 화면에서 쓰는 값으로 되돌린다. 스키마와 맞지 않으면 임의로
 // 해석하지 않고 출처 없음으로 둔다.
@@ -337,12 +305,14 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   }, [refreshPlans]);
 
   async function saveDraft(title: string, input: FinanceInput) {
-    // 업종 코드 형식은 서버에 보내기 전에 막는다. 형식이 틀리면 계획 저장 요청 전체가
+    // 자금 조건 형식(나이·개업 연월)은 서버에 보내기 전에 막는다. 형식이 틀리면 계획 저장 요청 전체가
     // 400으로 거부되어 재무 입력까지 함께 저장되지 않기 때문이다.
-    const industryIssue = industryCodeIssue(fundingForm.industryCode);
-    if (industryIssue) {
-      setMessage(industryIssue);
-      throw new Error(industryIssue);
+    const funding = fundingFormPayload(fundingForm);
+    if (funding.kind === 'INVALID') {
+      const fundingIssue = `자금 조건을 확인해 주세요: ${funding.issue}`;
+      setMessage(fundingIssue);
+      requestAnimationFrame(() => document.querySelector('.status-message')?.scrollIntoView({ block: 'start' }));
+      throw new Error(fundingIssue);
     }
     // 사업 조건을 일부만 입력한 채 저장하면 null이 가서 저장된 조건까지 지워진다. 저장 전에 막는다.
     const profileState = businessProfileSaveState(businessForm);
@@ -356,8 +326,9 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     setMessage('');
     try {
       // 재무 입력과 저장된 자금 조건을 함께 보낸다. 서버는 계산 키·결과 스냅샷을
-      // 건드리지 않고 조건만 따로 보존한다.
-      const fundingProfile = fundingPayloadOrNull(fundingForm);
+      // 건드리지 않고 조건만 따로 보존한다. 아무것도 입력하지 않으면 null을 보내 저장된 조건을 비운다
+      // ("조건 없음"과 "모두 입력하지 않음"을 구분한다). 예전 모양으로 저장된 조건도 이때 지금 모양으로 쓴다.
+      const fundingProfile: FundingMatchProfile | null = funding.kind === 'OK' ? funding.profile : null;
       const businessProfile = profileState.kind === 'COMPLETE' ? profileState.payload : null;
       const data = plan
         ? await api<{ plan: PlanDetail }>(`/api/plans/${plan.id}`, {
@@ -457,14 +428,17 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     }
   }
 
-  const storedFundingForm = plan ? fundingFormFromStored(plan.fundingProfileJson) : null;
-  const storedHasProfile = plan !== null && plan.fundingProfileJson !== null && plan.fundingProfileJson !== undefined;
+  const storedFunding = plan ? storedFundingState(plan) : null;
   const fundingDirty =
-    plan !== null &&
-    JSON.stringify(fundingPayloadOrNull(fundingForm)) !==
-      JSON.stringify(fundingPayloadOrNull(storedFundingForm ?? EMPTY_FUNDING_FORM));
-  const storedFundingSummary =
-    storedHasProfile && storedFundingForm ? fundingProfileSummary(fundingPayload(storedFundingForm)) : null;
+    plan !== null && fundingFormKey(fundingForm) !== fundingFormKey(fundingFormFromStored(plan.fundingProfileJson));
+  const savedBusinessDistrict = plan ? businessProfileDistrict(plan.businessProfileJson) : null;
+  // 사업 조건의 자치구를 바꾸고 저장하지 않았으면 서버가 화면과 다른 자치구로 맞춰 보므로 조회를 막는다.
+  const businessDistrictDirty =
+    plan !== null && businessDistrictUnsaved(fundingForm, businessForm.districtCode, savedBusinessDistrict);
+  // 보고 있는 저장 결과의 부족자금. 다시 계산하지 않는다.
+  const viewedFundingGap: ViewedFundingGap = storedResult
+    ? { revision: storedResult.inputRevision, value: storedResult.resultJson.plannedFundingGap }
+    : null;
   const storedAssumption = plan ? parseLoanAssumption(plan.loanAssumptionJson) : null;
   const pendingMarket = plan === null ? marketSource : null;
   const storedMarketScore = plan ? parsePlanMarketScore(plan.marketScoreJson) : null;
@@ -614,9 +588,11 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             plan={plan}
             form={fundingForm}
             onChange={setFundingForm}
-            hasStoredProfile={storedHasProfile}
-            storedSummary={storedFundingSummary}
+            stored={storedFunding}
+            savedBusinessDistrict={savedBusinessDistrict}
+            fundingGap={viewedFundingGap}
             dirty={fundingDirty}
+            businessDistrictDirty={businessDistrictDirty}
             loading={matchesLoading}
             matches={matches}
             error={matchesError}
@@ -682,13 +658,29 @@ function MarketSourceNotice({
   return null;
 }
 
+// 계획에 저장된 자금 조건의 상태. 서버(plans/funding-matches.ts)와 같은 함수로 읽고 자치구를 보충한다.
+type StoredFundingState = { kind: 'NONE' } | { kind: 'INVALID' } | { kind: 'OK'; summary: string; legacy: boolean };
+
+function storedFundingState(plan: PlanDetail): StoredFundingState {
+  const stored = readStoredFundingProfile(plan.fundingProfileJson);
+  if (stored.kind !== 'OK') return { kind: stored.kind };
+  const resolved = withBusinessDistrict(stored.profile, plan.businessProfileJson);
+  return {
+    kind: 'OK',
+    summary: fundingProfileSummary(resolved.profile, resolved.districtSource),
+    legacy: stored.legacy,
+  };
+}
+
 function PlanFundingPanel({
   plan,
   form,
   onChange,
-  hasStoredProfile,
-  storedSummary,
+  stored,
+  savedBusinessDistrict,
+  fundingGap,
   dirty,
+  businessDistrictDirty,
   loading,
   matches,
   error,
@@ -698,9 +690,13 @@ function PlanFundingPanel({
   readonly plan: { id: string; revision: number } | null;
   readonly form: FundingProfileForm;
   readonly onChange: (next: FundingProfileForm) => void;
-  readonly hasStoredProfile: boolean;
-  readonly storedSummary: string | null;
+  readonly stored: StoredFundingState | null;
+  // 자금 조건의 자치구가 비었을 때 서버가 대신 쓰는, 계획에 저장된 사업 조건의 자치구.
+  readonly savedBusinessDistrict: string | null;
+  readonly fundingGap: ViewedFundingGap;
   readonly dirty: boolean;
+  // 자금 조건의 자치구가 비어 있고 사업 조건의 자치구를 바꾼 뒤 저장하지 않았다.
+  readonly businessDistrictDirty: boolean;
   readonly loading: boolean;
   readonly matches: PlanFundingMatchesResponse | null;
   readonly error: FundingLoadError | null;
@@ -708,75 +704,26 @@ function PlanFundingPanel({
   // 적용 기능을 없애기 전(ADR 0009 §5)에 저장된 대출 가정의 출처. 새로 만들지 않고 저장된 것만 보여 준다.
   readonly appliedSummary: string | null;
 }) {
-  // 프로필 미입력·저장 전 변경·정상 조회를 서로 다른 상태로 보여준다. 조회는 항상
+  // 조건 미입력·저장 전 변경·정상 조회를 서로 다른 상태로 보여 준다. 조회는 항상
   // 서버에 저장된 조건으로만 하므로 저장하지 않은 변경이 있으면 막는다.
-  const canQuery = plan !== null && hasStoredProfile && !dirty && !loading;
+  const hasStoredProfile = stored !== null && stored.kind !== 'NONE';
+  const canQuery = plan !== null && hasStoredProfile && !dirty && !businessDistrictDirty && !loading;
+  // 자치구만 입력했다가 비우면 조건이 하나도 없어 저장된 조건이 비워진다(조회 불가). 그래서 다른 조건과 함께일 때로 쓴다.
+  const districtHint =
+    savedBusinessDistrict === null
+      ? '자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구로 맞춰 봅니다. 그것도 없으면 지역은 확인 필요로 남습니다.'
+      : `자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
   return (
     <section className="picker" aria-labelledby="plan-funding">
-      <h2 id="plan-funding">계획 기준 자금 후보</h2>
+      <h2 id="plan-funding">계획 기준 자금 공고 맞춰 보기</h2>
       <p className="picker-note">
-        이 계획에 저장한 사업단계·자치구·업종·용도로 활성 자금 카탈로그를 판정합니다. 재무 계산 입력과 분리해 저장하며,
-        조건을 바꾼 뒤에는 초안을 저장해야 조회에 반영됩니다.
+        이 계획에 저장한 자금 조건으로, AI가 공고문에서 읽어 둔 조건과 항목마다 맞춰 봅니다. 재무 계산 입력과 분리해
+        저장하며, 조건을 바꾼 뒤에는 초안을 저장해야 조회에 반영됩니다.
       </p>
-      <div className="select-row">
-        <label className="field">
-          <span>1. 사업 단계</span>
-          <select
-            value={form.businessStage}
-            onChange={(event) => onChange({ ...form, businessStage: event.target.value as BusinessStage | 'UNKNOWN' })}
-          >
-            <option value="UNKNOWN">아직 정하지 않음(미확인)</option>
-            {(['PRE_REGISTRATION', 'POST_REGISTRATION'] as const).map((stage) => (
-              <option key={stage} value={stage}>
-                {stageLabel(stage)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>2. 사업장·거주 자치구</span>
-          <select
-            value={form.districtCode}
-            onChange={(event) => onChange({ ...form, districtCode: event.target.value })}
-          >
-            <option value="">선택하지 않음</option>
-            {SEOUL_DISTRICTS.map((district) => (
-              <option key={district.code} value={district.code}>
-                {district.name} ({district.code})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>3. 업종 코드 (선택)</span>
-          <span className="input-wrap">
-            <input
-              className="text-input"
-              value={form.industryCode}
-              placeholder="예: CS100010"
-              onChange={(event) => onChange({ ...form, industryCode: event.target.value })}
-            />
-          </span>
-          <small>업종 코드는 CS100001 형식이어야 합니다. 비워두면 업종 조건은 미확인으로 남습니다.</small>
-        </label>
-        <label className="field">
-          <span>4. 자금 용도</span>
-          <select
-            value={form.purpose}
-            onChange={(event) => onChange({ ...form, purpose: event.target.value as Purpose | 'UNKNOWN' })}
-          >
-            <option value="UNKNOWN">아직 정하지 않음(미확인)</option>
-            {PURPOSES.map((item) => (
-              <option key={item} value={item}>
-                {purposeLabel(item)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <FundingProfileFields form={form} onChange={onChange} idPrefix="plan-funding" districtHint={districtHint} />
 
       {plan === null && (
-        <p className="empty-state">새 계획은 먼저 초안을 저장해야 저장된 조건으로 후보를 조회할 수 있습니다.</p>
+        <p className="empty-state">새 계획은 먼저 초안을 저장해야 저장된 조건으로 공고를 맞춰 볼 수 있습니다.</p>
       )}
 
       {plan !== null && appliedSummary && <p className="funding-position">저장된 대출 가정 출처: {appliedSummary}</p>}
@@ -785,41 +732,61 @@ function PlanFundingPanel({
         <div className="empty-panel" role="status">
           <h2>저장된 자금 조건이 없습니다.</h2>
           <p>
-            위에서 조건을 입력하고 초안을 저장하면 저장된 조건으로 후보를 조회할 수 있습니다. 조건 없이 조회하면 후보
-            0건이 아니라 400으로 거부됩니다.
+            위에서 조건을 하나 이상 입력하고 초안을 저장하면 저장된 조건으로 공고를 맞춰 볼 수 있습니다. 조건 없이
+            조회하면 0건이 아니라 400으로 거부됩니다.
           </p>
         </div>
       )}
 
       {plan !== null && hasStoredProfile && (
         <>
-          <p className="funding-position">저장된 조건: {storedSummary}</p>
+          {stored?.kind === 'OK' && <p className="funding-position">저장된 조건: {stored.summary}</p>}
+          {stored?.kind === 'OK' && stored.legacy && (
+            <p className="picker-note" role="note">
+              예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 업종·용도는 더 쓰지 않으며, 다음에 초안을 저장하면
+              지금 모양으로 저장합니다(옮길 값이 없으면 저장된 조건을 비웁니다).
+            </p>
+          )}
+          {stored?.kind === 'INVALID' && (
+            <p className="inline-error" role="status">
+              저장된 자금 조건을 읽지 못해 빈 입력란으로 보여 줍니다. 조건을 다시 입력해 저장해 주세요.
+            </p>
+          )}
           {dirty && (
             <p className="inline-error" role="status">
               아직 저장하지 않은 조건 변경이 있습니다. 초안을 저장한 뒤 조회해 주세요.
             </p>
           )}
+          {!dirty && businessDistrictDirty && (
+            <p className="inline-error" role="status">
+              사업 조건의 자치구를 바꾼 뒤 저장하지 않았습니다. 자금 조건의 자치구가 비어 있어 그 값으로 맞춰 보므로,
+              초안을 저장한 뒤 조회해 주세요.
+            </p>
+          )}
           <div className="button-row">
             <button type="button" disabled={!canQuery} onClick={onQuery}>
-              {loading ? '조회 중…' : '계획 조건으로 후보 조회'}
+              {loading ? '맞춰 보는 중…' : '계획 조건으로 공고 맞춰 보기'}
             </button>
           </div>
           <div className="market-results" aria-live="polite" aria-busy={loading}>
             {loading && (
               <p className="loading-state" role="status">
-                저장된 계획 조건으로 후보를 판정하는 중…
+                저장된 계획 조건으로 공고를 맞춰 보는 중…
               </p>
             )}
-            {!loading && error && <FundingCandidatesErrorPanel error={error} />}
+            {!loading && error && <FundingMatchesErrorPanel error={error} />}
             {!loading && !error && matches && (
-              <FundingCandidatesPanel
+              <FundingMatchesPanel
                 result={matches}
-                profileSummary={fundingProfileSummary(matches.profile)}
-                planLabel={`계획 revision ${matches.plan.revision}에 저장된 조건으로 판정했습니다.`}
+                districtSource={matches.districtSource}
+                planLabel={`계획 revision ${matches.plan.revision}에 저장된 조건으로 맞춰 봤습니다.`}
+                fundingGap={fundingGap}
               />
             )}
             {!loading && !error && !matches && (
-              <p className="empty-state">계획 조건으로 후보 조회를 누르면 상태별 후보와 이유를 표시합니다.</p>
+              <p className="empty-state">
+                계획 조건으로 공고 맞춰 보기를 누르면 갈래·그룹별 공고와 이유를 보여 줍니다.
+              </p>
             )}
           </div>
         </>

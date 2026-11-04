@@ -3,14 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
-
-const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), getPrisma: vi.fn() }));
-vi.mock('@/lib/session', () => ({ currentUser: mocks.currentUser }));
-vi.mock('@/lib/prisma', () => ({ getPrisma: mocks.getPrisma }));
-
-import { POST as postCandidates } from '@/app/api/funding/candidates/route';
+// /api/funding/candidates는 맞춰 보기(match-list.ts)로 바뀌었다(ADR 0009 5c). 경계 테스트는 match-routes.test.ts에 있다.
+// 이 파일의 예전 판정(eligibility.ts)은 6단계에서 코드와 함께 지운다.
 import { listFundingCandidates, type FundingCandidatesResponse } from './candidates.ts';
 import { loadFundingCatalog } from './loader.ts';
 import { findActiveFundingCatalog } from './read.ts';
@@ -144,91 +140,6 @@ async function candidatesOf(
   if (outcome.kind !== 'OK') throw new Error('활성 카탈로그가 없습니다.');
   return outcome.payload;
 }
-
-function jsonRequest(body: unknown): Request {
-  return new Request('http://localhost/api/funding/candidates', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-const VALID_BODY = {
-  businessStage: 'PRE_REGISTRATION',
-  districtCode: '11200',
-  industryCode: 'CS100010',
-  purpose: 'OPERATING_FUNDS',
-};
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.currentUser.mockResolvedValue({ id: 'user-a', email: 'a@example.com' });
-});
-
-describe('POST /api/funding/candidates 경계', () => {
-  it('미로그인 요청을 401로 차단하고 카탈로그를 조회하지 않는다', async () => {
-    mocks.currentUser.mockResolvedValue(null);
-    const response = await postCandidates(jsonRequest(VALID_BODY));
-    expect(response.status).toBe(401);
-    expect(mocks.getPrisma).not.toHaveBeenCalled();
-    expect((await response.json()).error.code).toBe('UNAUTHORIZED');
-  });
-
-  it('잘못된 프로필을 400으로 거부한다', async () => {
-    const invalidBodies: unknown[] = [
-      {},
-      { ...VALID_BODY, businessStage: 'REGISTERED' },
-      { ...VALID_BODY, purpose: 'TRAVEL' },
-      { ...VALID_BODY, districtCode: '1120' },
-      { ...VALID_BODY, industryCode: 'cs100010' },
-      { ...VALID_BODY, districtCode: 11200 },
-    ];
-    for (const body of invalidBodies) {
-      const response = await postCandidates(jsonRequest(body));
-      expect(response.status).toBe(400);
-      expect((await response.json()).error.code).toBe('INVALID_INPUT');
-    }
-    expect(mocks.getPrisma).not.toHaveBeenCalled();
-  });
-
-  it('본문으로 판정 기준일(asOfDate)을 지정할 수 없다', async () => {
-    const response = await postCandidates(jsonRequest({ ...VALID_BODY, asOfDate: '2000-01-01' }));
-    expect(response.status).toBe(400);
-    expect(mocks.getPrisma).not.toHaveBeenCalled();
-  });
-
-  it('활성 카탈로그 릴리스가 없으면 503 CATALOG_UNAVAILABLE이다', async () => {
-    mocks.getPrisma.mockReturnValue(stubPrisma(null).prisma);
-    const response = await postCandidates(jsonRequest(VALID_BODY));
-    expect(response.status).toBe(503);
-    expect((await response.json()).error.code).toBe('CATALOG_UNAVAILABLE');
-  });
-
-  it('조건이 모두 충족되고 접수 중이면 검토 후보 1건을 반환한다', async () => {
-    mocks.getPrisma.mockReturnValue(stubPrisma({ products: [membership(rawProduct(), 0)] }).prisma);
-    const response = await postCandidates(jsonRequest(VALID_BODY));
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as FundingCandidatesResponse;
-    expect(body.catalogKey).toBe('test-catalog');
-    expect(body.catalogVersion).toBe('2026-09-20.1');
-    expect(body.basisDate).toBe(TEST_DATE);
-    expect(body.profile).toEqual(VALID_BODY);
-    expect(body.release.reviewer).toBe('test-reviewer');
-    expect(body.release.schemaVersion).toBe(FUNDING_CATALOG_SCHEMA_VERSION);
-    expect(body.summary.CURRENT_CANDIDATE).toBe(1);
-    expect(body.evaluations).toHaveLength(1);
-    const [evaluation] = body.evaluations;
-    expect(evaluation).toMatchObject({
-      name: '테스트 대출 상품',
-      organization: '테스트 기관',
-      supportType: 'LOAN',
-      candidateStatus: 'CURRENT_CANDIDATE',
-      officialUrl: OFFICIAL_URL,
-      reviewState: 'CURRENT',
-    });
-    expect(evaluation.conditions.map((condition) => condition.verdict)).toEqual(['PASS', 'PASS', 'PASS', 'PASS']);
-  });
-});
 
 describe('후보 판정과 응답', () => {
   it('연결 테이블 position 순서를 보존한다', async () => {
