@@ -35,8 +35,11 @@ const CONCURRENCY = 4;
 // 항목마다 언급 여부, 값, 값의 근거가 된 원문 인용.
 // 구조화 출력은 enum을 강제하지 않는다(SDK가 JSON 스키마에서 enum을 설명으로 옮긴다). 그래서 선택지는 문자열로 받고
 // 검증에서 항목별로 확인한다. 잘못된 선택지 하나로 공고 전체가 실패하지 않게 하려는 것이다.
+// API는 anyOf·type 배열(null 허용 포함)을 쓰는 칸을 16개까지만 받는다. 그래서 quote는 null 대신 빈 문자열로 받는다.
+// value는 null을 받는다: 공고가 밝힌 조건을 스키마로 옮길 수 없을 때 쓴다. 빈 범위나 빈 목록은 "제한 없음"으로 읽히므로
+// 그 대신 채울 수 없다. 언급 없음은 mentioned로만 정하고, 그때 온 value·quote는 쓰지 않는다.
 function field<T extends z.ZodType>(value: T) {
-  return z.object({ mentioned: z.boolean(), value: value.nullable(), quote: z.string().nullable() });
+  return z.object({ mentioned: z.boolean(), value: value.nullable(), quote: z.string() });
 }
 
 // 범위. null인 쪽은 제한이 없다. maxExclusive가 true면 max 미만, false면 max 이하다.
@@ -74,8 +77,8 @@ const SYSTEM_PROMPT = `당신은 한국 정책자금·지원사업 공고문에�
 공고문이 여러 자금이나 트랙을 함께 다루면 <product>에 적힌 상품에 해당하는 조건만 적습니다. 그 상품의 조건인지 알 수 없으면 mentioned를 false로 둡니다.
 
 항목마다 다음을 채웁니다.
-- mentioned: 공고문이 그 조건을 밝히면 true, 아무 말이 없으면 false입니다. 말이 없으면 value와 quote는 null입니다.
-- value: 공고문이 밝힌 값입니다. 선택지가 있는 항목은 아래 영문 선택지 중 하나를 그대로 씁니다.
+- mentioned: 공고문이 그 조건을 밝히면 true, 아무 말이 없으면 false입니다. 말이 없으면 value는 null, quote는 빈 문자열입니다.
+- value: 공고문이 밝힌 값입니다. 선택지가 있는 항목은 아래 영문 선택지 중 하나를 그대로 씁니다. 공고문이 조건을 밝혔지만 아래 형식으로 옮길 수 없으면(예: 조건이 여러 갈래라 하나로 정할 수 없음) mentioned는 true, value는 null로 두고 quote에 그 구절을 적습니다. 빈 범위(min·max null)와 빈 목록은 "제한 없음"이라는 뜻이므로 이때 쓰지 않습니다.
 - quote: value의 근거가 된 공고문의 한 구절을 글자 그대로 옮깁니다. 고치거나 줄이거나 여러 곳을 잇지 않습니다. 조건 이름(예: "업력", "연령")이 들어가게 10~80자 정도로 고릅니다.
 
 항목:
@@ -88,7 +91,7 @@ const SYSTEM_PROMPT = `당신은 한국 정책자금·지원사업 공고문에�
 - applicationPeriod: 신청(접수)기간. 날짜는 YYYY-MM-DD로 적고, "예산 소진 시까지"처럼 날짜가 아니면 null로 두고 text에 원문 표기를 적습니다.
 - supportTypes: 지원 방식 하나 이상. LOAN(대출), GUARANTEE(보증), GRANT(지원금), SPACE(공간), PROGRAM(교육·컨설팅 등 프로그램), OTHER.
 
-공고문에 없는 내용을 짐작해 채우지 않습니다. 확실하지 않으면 mentioned를 false로 둡니다.`;
+공고문에 없는 내용을 짐작해 채우지 않습니다. 그 조건이 공고문에 있는지 확실하지 않으면 mentioned를 false로 둡니다.`;
 
 // 인용 대조용으로 글자를 맞춘다: 호환 글자를 표준 글자로(NFKC), 가운뎃점·물결표의 여러 모양을 하나로 바꾸고,
 // 공백(줄바꿈·묶음 빈칸 포함)과 보이지 않는 글자를 지운다. HWP는 묶음 빈칸과 'ㆍ'를, PDF는 낱말 중간의 줄바꿈을
@@ -250,8 +253,8 @@ export function verifyConditionOutput(output: ConditionOutput, text: string): Ve
       verified[name] = { status: 'NOT_MENTIONED' };
       continue;
     }
-    if (entry.value === null || entry.quote === null) {
-      verified[name] = { status: 'UNREADABLE', reason: '언급했다고 했지만 값이나 인용이 없습니다.' };
+    if (entry.value === null || entry.quote.trim() === '') {
+      verified[name] = { status: 'UNREADABLE', reason: '언급했다고 했지만 값이 없거나 인용이 없습니다.' };
       continue;
     }
     const quote = compactForQuote(entry.quote);

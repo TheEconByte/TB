@@ -54,7 +54,7 @@ describe('parseStoredConditions', () => {
         verifyConditionOutput(
           {
             ...OUTPUT,
-            age: { mentioned: false, value: null, quote: null },
+            age: { mentioned: false, value: null, quote: '' },
             region: { ...OUTPUT.region, quote: '본문에 없는 인용 문장' },
           },
           BODY,

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../lib/checksum.ts';
+import { CONDITION_FIELD_NAMES } from './condition-fields.ts';
 import {
   CONDITION_MODEL,
   CONDITION_PROMPT_VERSION,
@@ -31,7 +32,8 @@ const BODY = [
   '업력 제한 없음(재창업자 포함)는 별도 트랙에 해당합니다.',
 ].join('\n');
 
-const notMentioned = { mentioned: false, value: null, quote: null };
+// 인용 칸은 null을 받지 않는다(스키마 참고). 언급이 없으면 빈 문자열이다.
+const notMentioned = { mentioned: false, value: null, quote: '' };
 const upTo = (max: number | null, maxExclusive = false) => ({ min: null, max, maxExclusive });
 
 function output(overrides: Record<string, unknown> = {}): ConditionOutput {
@@ -117,23 +119,44 @@ describe('verifyConditionOutput', () => {
   // §3: 본문에 조건이 없으면 "제한 없음"이 아니라 "언급 없음"이다.
   it('keeps "not mentioned" apart from an explicit "no limit"', () => {
     const fields = verifyConditionOutput(
-      output({ age: notMentioned, businessAge: { mentioned: true, value: upTo(null), quote: '업력 제한 없음' } }),
+      output({
+        age: notMentioned,
+        businessAge: { mentioned: true, value: upTo(null), quote: '업력 제한 없음' },
+      }),
       BODY,
     );
     expect(fields.age).toEqual({ status: 'NOT_MENTIONED' });
     expect(fields.businessAge).toEqual({ status: 'READ', value: upTo(null), quote: '업력 제한 없음' });
   });
 
-  it('marks a stated field without a value or a quote unreadable', () => {
+  // 언급이 없는데 AI가 값이나 인용을 채워 와도 쓰지 않는다. 언급 여부만 본다.
+  it('ignores the value and quote of a field the notice does not mention', () => {
+    const fields = verifyConditionOutput(
+      output({ age: { mentioned: false, value: upTo(39), quote: '만 39세 이하' } }),
+      BODY,
+    );
+    expect(fields.age).toEqual({ status: 'NOT_MENTIONED' });
+  });
+
+  it('marks a stated field with an empty quote or an empty choice unreadable', () => {
     const fields = verifyConditionOutput(
       output({
-        age: { mentioned: true, value: null, quote: '만 39세 이하' },
-        region: { mentioned: true, value: output().region.value, quote: null },
+        region: { mentioned: true, value: output().region.value, quote: '' },
+        businessStage: { mentioned: true, value: '', quote: '예비창업자 및 업력 3년 이내 소상공인' },
       }),
       BODY,
     );
-    expect(fields.age.status).toBe('UNREADABLE');
-    expect(fields.region.status).toBe('UNREADABLE');
+    expect(fields.region).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('인용이 없') });
+    expect(fields.businessStage.status).toBe('UNREADABLE');
+  });
+
+  // 공고가 조건을 밝혔는데 형식으로 옮길 수 없으면 프롬프트대로 AI가 value를 null로 둔다. 빈 범위({min:null,max:null})나
+  // 빈 목록은 "제한 없음"으로 읽히므로 그 대신 쓸 수 없다(리뷰 지적 2026-11-04). 스키마가 null을 받는지는 아래
+  // createClaudeConditionExtractor 테스트가 보내는 스키마에서 본다.
+  it('marks a stated field whose value the AI left empty unreadable', () => {
+    const stated = { mentioned: true, value: null, quote: '만 39세 이하' };
+    const fields = verifyConditionOutput(output({ age: stated }), BODY);
+    expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('값이 없') });
   });
 
   // 구조화 출력이 선택지를 강제하지 않는다. 잘못된 선택지는 그 항목만 읽지 못함이고 다른 항목은 남는다.
@@ -438,6 +461,34 @@ describe('createClaudeConditionExtractor', () => {
     expect(request.messages).toEqual([
       { role: 'user', content: `<product>청년 창업 지원</product>\n<notice>\n${BODY}\n</notice>` },
     ]);
+  });
+
+  // 2026-11-04 첫 실제 동기화에서 API가 스키마를 400으로 거절했다: "too many parameters with union types ...
+  // (limit: 16 parameters with unions)". 거절되면 모든 공고가 실패한다. 보내는 스키마에서 type 배열·anyOf를 센다.
+  // 이 셈은 API보다 많게 나온다(거절된 스키마를 여기서는 22, API는 20으로 셌다). 그래서 16 이하면 API도 받는다.
+  it('sends a schema within the API limit of 16 union-typed parameters', async () => {
+    const { requests, extractor } = client({ stop_reason: 'end_turn', text: JSON.stringify(output()) });
+    await extractor(BODY, '청년 창업 지원');
+    const unions: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (Array.isArray(node)) return node.forEach((item, i) => walk(item, `${path}[${i}]`));
+      if (node === null || typeof node !== 'object') return;
+      const schema = node as Record<string, unknown>;
+      if (Array.isArray(schema.type) || 'anyOf' in schema) unions.push(path);
+      for (const [key, child] of Object.entries(schema)) walk(child, `${path}.${key}`);
+    };
+    const schema = (requests[0].output_config as { format: { schema: unknown } }).format.schema;
+    // 스키마를 못 찾아 0개로 통과하지 않게 한다.
+    expect(schema).toMatchObject({ type: 'object', properties: { age: expect.any(Object) } });
+    walk(schema, '$');
+    expect(unions.length, unions.join('\n')).toBeLessThanOrEqual(16);
+    // 칸 수를 줄이려고 value의 null을 빼면 "밝혔지만 옮길 수 없음"을 나타낼 길이 없어진다. 모든 항목에서 본다.
+    const properties = (schema as { properties: Record<string, { properties: { value: { anyOf?: unknown[] } } }> })
+      .properties;
+    expect(Object.keys(properties).sort()).toEqual([...CONDITION_FIELD_NAMES].sort());
+    for (const name of CONDITION_FIELD_NAMES) {
+      expect(properties[name].properties.value.anyOf, name).toContainEqual({ type: 'null' });
+    }
   });
 
   // 실패한 호출도 비용이 든다. 어떤 실패든 그 호출의 토큰 수를 남긴다(ADR 0009 Consequences의 비용 기록).
