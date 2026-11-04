@@ -563,7 +563,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('funding:sync와 PostgreSQL', ()
           files: [],
         },
       });
-    const notMentioned = { mentioned: false, value: null, quote: null };
+    const notMentioned = { mentioned: false, value: null, quote: '' };
     const output = {
       businessStage: notMentioned,
       businessAge: { mentioned: true, value: { min: null, max: 3, maxExclusive: false }, quote: '업력 3년 이내' },

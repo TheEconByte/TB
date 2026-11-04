@@ -10,6 +10,7 @@ import {
   CONDITION_PROMPT_VERSION,
   ConditionExtractionFailure,
   MAX_EXTRACTION_TEXT_CHARS,
+  conditionOutputSchema,
   createClaudeConditionExtractor,
   extractNoticeConditions,
   verifyConditionOutput,
@@ -31,8 +32,8 @@ const BODY = [
   '업력 제한 없음(재창업자 포함)는 별도 트랙에 해당합니다.',
 ].join('\n');
 
-// 언급이 없어도 value는 채워 온다(스키마가 비울 수 없게 한다). 그 값은 쓰지 않는다.
-const notMentioned = <T>(value: T) => ({ mentioned: false, value, quote: '' });
+// 인용 칸은 null을 받지 않는다(스키마 참고). 언급이 없으면 빈 문자열이다.
+const notMentioned = { mentioned: false, value: null, quote: '' };
 const upTo = (max: number | null, maxExclusive = false) => ({ min: null, max, maxExclusive });
 
 function output(overrides: Record<string, unknown> = {}): ConditionOutput {
@@ -52,7 +53,7 @@ function output(overrides: Record<string, unknown> = {}): ConditionOutput {
       // 본문은 'ㆍ'(한글 가운뎃점)이고 인용은 '·'다.
       quote: '서울 강남구·서초구 소재 사업장(송파구 제외)',
     },
-    foodBusiness: notMentioned(''),
+    foodBusiness: notMentioned,
     targetGroups: { mentioned: true, value: { groups: ['YOUTH'], note: null }, quote: '2026년 청년 창업 지원' },
     applicationPeriod: {
       mentioned: true,
@@ -60,7 +61,7 @@ function output(overrides: Record<string, unknown> = {}): ConditionOutput {
       // 본문은 전각 물결표 '～'다.
       quote: '2026. 11. 2.(월) ~ 2026. 11. 20.(금)',
     },
-    supportTypes: notMentioned([]),
+    supportTypes: notMentioned,
     ...overrides,
   } as ConditionOutput;
 }
@@ -119,7 +120,7 @@ describe('verifyConditionOutput', () => {
   it('keeps "not mentioned" apart from an explicit "no limit"', () => {
     const fields = verifyConditionOutput(
       output({
-        age: notMentioned(upTo(null)),
+        age: notMentioned,
         businessAge: { mentioned: true, value: upTo(null), quote: '업력 제한 없음' },
       }),
       BODY,
@@ -128,7 +129,7 @@ describe('verifyConditionOutput', () => {
     expect(fields.businessAge).toEqual({ status: 'READ', value: upTo(null), quote: '업력 제한 없음' });
   });
 
-  // 구조화 출력은 value·quote를 비울 수 없어서(스키마 참고) AI는 언급이 없어도 값을 채운다. 언급 여부만 본다.
+  // 언급이 없는데 AI가 값이나 인용을 채워 와도 쓰지 않는다. 언급 여부만 본다.
   it('ignores the value and quote of a field the notice does not mention', () => {
     const fields = verifyConditionOutput(
       output({ age: { mentioned: false, value: upTo(39), quote: '만 39세 이하' } }),
@@ -147,6 +148,16 @@ describe('verifyConditionOutput', () => {
     );
     expect(fields.region).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('인용이 없') });
     expect(fields.businessStage.status).toBe('UNREADABLE');
+  });
+
+  // 공고가 조건을 밝혔는데 스키마로 옮길 수 없으면 AI는 value를 null로 둔다. 빈 범위({min:null,max:null})나
+  // 빈 목록은 "제한 없음"으로 읽히므로, 그 대신 쓸 수 있는 null이 스키마에 있어야 한다(리뷰 지적 2026-11-04).
+  it('lets the AI leave the value of a stated field empty, and marks it unreadable', () => {
+    const stated = { mentioned: true, value: null, quote: '만 39세 이하' };
+    expect(conditionOutputSchema.shape.age.safeParse(stated).success).toBe(true);
+    expect(conditionOutputSchema.shape.targetGroups.safeParse({ ...stated, quote: '청년' }).success).toBe(true);
+    const fields = verifyConditionOutput(output({ age: stated }), BODY);
+    expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('값이 없') });
   });
 
   // 구조화 출력이 선택지를 강제하지 않는다. 잘못된 선택지는 그 항목만 읽지 못함이고 다른 항목은 남는다.
@@ -467,7 +478,10 @@ describe('createClaudeConditionExtractor', () => {
       if (Array.isArray(schema.type) || 'anyOf' in schema) unions.push(path);
       for (const [key, child] of Object.entries(schema)) walk(child, `${path}.${key}`);
     };
-    walk((requests[0].output_config as { format: { schema: unknown } }).format.schema, '$');
+    const schema = (requests[0].output_config as { format: { schema: unknown } }).format.schema;
+    // 스키마를 못 찾아 0개로 통과하지 않게 한다.
+    expect(schema).toMatchObject({ type: 'object', properties: { age: expect.any(Object) } });
+    walk(schema, '$');
     expect(unions.length, unions.join('\n')).toBeLessThanOrEqual(16);
   });
 
