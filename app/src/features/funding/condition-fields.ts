@@ -9,7 +9,8 @@ export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 저장할 때의 검증 결과라서, 올리지 않으면 이미 읽은 본문은 옛 규칙의 결과로 남는다.
 // v3(2026-11-03): 음식점·카페 제외의 뜻을 밝혔다(유흥주점 등만 빼면 제외 아님, 지원 업종 목록에 음식점·카페가 없으면 제외 업종
 // 문장과 상관없이 제외).
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v3';
+// v4(2026-11-04): 출력 스키마에서 value·quote가 null을 받지 않는다(API의 null 허용 칸 한도). 언급 없으면 빈 값을 채운다.
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v4';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;
 export const CONDITION_FOOD_BUSINESS = ['EXCLUDED', 'NOT_EXCLUDED'] as const;
