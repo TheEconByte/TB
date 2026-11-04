@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { expectedFields, gradeCase, type GoldCase, type GoldField } from './condition-eval.ts';
-import type { VerifiedConditions } from './condition-fields.ts';
+import type { ConditionValues, VerifiedConditions } from './condition-fields.ts';
 
 // 공고 조건 추출 평가의 채점(ADR 0009 §3). 사용자에게 위험한 오답(AI가 읽었다면서 틀린 값 → 잘못된 맞음)과
 // 안전한 오답(못 읽음 → 확인 필요)을 따로 세야 프롬프트를 고칠 때 어느 쪽으로 움직였는지 보인다.
@@ -110,7 +110,75 @@ describe('gradeCase', () => {
     const { outcomes, scores } = gradeCase(actual, acceptable);
     expect(outcomes.age).toBe('CONFIDENT_WRONG');
     expect(outcomes.foodBusiness).toBe('CONFIDENT_WRONG');
-    expect(scores.confident_wrong).toBe(2 / 8);
+    // 위험한 오답은 맞춰 보기에 쓰는 여섯 항목 중 비율이다.
+    expect(scores.confident_wrong).toBe(2 / 6);
+  });
+
+  // 채점은 값의 모양이 아니라 맞춰 보기 판정으로 한다(리뷰 지적 2026-11-04). 서울 사용자에게 같은 결과면 같은 답이다.
+  it('treats values with the same matching verdicts as the same answer', () => {
+    const { acceptable } = expectedFields(gold(), BODY);
+    const actual = asActual(acceptable);
+    // 40세 미만과 39세 이하는 만 나이(정수)에서 같다.
+    actual.age = { status: 'READ', value: { min: null, max: 40, maxExclusive: true }, quote: '만 39세 이하' };
+    // 서울이 들어 있으면 다른 시·도가 더 있어도 서울 사용자에게는 같다.
+    actual.region = {
+      status: 'READ',
+      value: {
+        ...(acceptable.region[0] as { value: ConditionValues['region'] }).value,
+        provinces: ['서울', '경기'],
+      },
+      quote: '서울시 소재 업력 3년 이내',
+    };
+    const { outcomes } = gradeCase(actual, acceptable);
+    expect(outcomes.age).toBe('CORRECT');
+    expect(outcomes.region).toBe('CORRECT');
+  });
+
+  // 둘 다 확인 필요다. 읽었다고 해서 위험한 오답은 아니다.
+  it('does not count a read value that still ends in a check as a confident error', () => {
+    const { acceptable } = expectedFields(gold(), BODY);
+    const actual = asActual(acceptable);
+    actual.targetGroups = {
+      status: 'READ',
+      value: { groups: ['OTHER'], note: '신용점수' },
+      quote: '업력 3년 이내 소상공인',
+    };
+    expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('EQUIVALENT');
+  });
+
+  // 언급 없는 지역을 전국으로 읽으면 확인 필요가 맞음이 된다.
+  it('counts reading an unmentioned condition into a match as a confident error', () => {
+    const noRegion = gold({ region: notMentioned });
+    const { acceptable } = expectedFields(noRegion, BODY);
+    const actual = asActual(acceptable);
+    actual.region = {
+      status: 'READ',
+      value: {
+        scope: 'NATIONWIDE',
+        provinces: [],
+        districts: [],
+        excludedProvinces: [],
+        excludedDistricts: [],
+        districtCodes: [],
+        excludedDistrictCodes: [],
+      },
+      quote: '서울시 소재 업력 3년 이내',
+    };
+    expect(gradeCase(actual, acceptable).outcomes.region).toBe('CONFIDENT_WRONG');
+  });
+
+  // 지원 방식은 화면에 보여 주기만 한다. 틀려도 맞음·안 맞음을 바꾸지 않으므로 위험한 오답과 따로 센다.
+  it('counts a wrong display-only field apart from confident errors', () => {
+    const { acceptable } = expectedFields(gold(), BODY);
+    const actual = asActual(acceptable);
+    actual.supportTypes = { status: 'READ', value: ['PROGRAM', 'GRANT', 'PROGRAM'], quote: '경영 컨설팅 및 판로 지원' };
+    const { outcomes, scores } = gradeCase(actual, acceptable);
+    expect(outcomes.supportTypes).toBe('DISPLAY_WRONG');
+    expect(scores.confident_wrong).toBe(0);
+    expect(scores.field_acc).toBe(7 / 8);
+    // 같은 값이 겹쳐 들어온 것만으로는 틀림이 아니다.
+    actual.supportTypes = { status: 'READ', value: ['PROGRAM', 'PROGRAM'], quote: '경영 컨설팅 및 판로 지원' };
+    expect(gradeCase(actual, acceptable).outcomes.supportTypes).toBe('CORRECT');
   });
 
   // 둘 다 화면에서 확인 필요가 되므로 맞춰 보기에는 같다. 정확도에는 넣고 완전 일치에는 넣지 않는다.

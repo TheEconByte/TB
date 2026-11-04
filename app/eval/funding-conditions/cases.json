@@ -276,15 +276,9 @@
         "mentioned": true,
         "value": null,
         "quote": "콘텐츠 분야 창업 3년 이내 스타트업 또는 콘텐츠 제작 역량을",
-        "confidence": "ambiguous",
-        "alternatives": [
-          {
-            "min": null,
-            "max": 3,
-            "maxExclusive": false
-          }
-        ],
-        "note": "스타트업 자격은 창업 3년 이내로 제한하지만 창작자 자격에는 업력 제한이 없어 한 값으로 쓸 수 없고, 스타트업 기준 최대 3년으로 볼 여지도 있다."
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "스타트업 자격은 창업 3년 이내로 제한하지만 창작자 자격에는 업력 제한이 없어 한 값으로 쓸 수 없고, 스타트업 기준 최대 3년으로 볼 여지도 있다. 사용자 결정(2026-11-04): 트랙마다 다른 업력은 형식 밖(값 null)이고 한 트랙의 값은 정답으로 인정하지 않는다."
       },
       "age": {
         "mentioned": false,
@@ -980,15 +974,9 @@
         "mentioned": true,
         "value": null,
         "quote": "사업자등록 후 6개월 이내 영업 중인 소상공인(신규 창업시)",
-        "confidence": "ambiguous",
-        "alternatives": [
-          {
-            "min": null,
-            "max": null,
-            "maxExclusive": false
-          }
-        ],
-        "note": "창업자금(등록 후 6개월 이내)과 경영안정자금(6개월 이상)으로 나뉘어 트랙별 값이 달라 null이며, 둘을 합치면 업력 제한이 없다고 볼 수도 있다."
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "창업자금(등록 후 6개월 이내)과 경영안정자금(6개월 이상)으로 나뉘어 트랙별 값이 달라 null이며, 둘을 합치면 업력 제한이 없다고 볼 수도 있다. 사용자 결정(2026-11-04): 트랙마다 다른 업력은 형식 밖(값 null)이고 한 트랙의 값은 정답으로 인정하지 않는다."
       },
       "age": {
         "mentioned": true,
@@ -2243,15 +2231,11 @@
       },
       "businessAge": {
         "mentioned": true,
-        "value": {
-          "min": null,
-          "max": 7,
-          "maxExclusive": false
-        },
+        "value": null,
         "quote": "(신규) 개별ㆍ공유ㆍ제조주방: 서울시 내 업력 7년 이내 F&B (예비)스타트업",
-        "confidence": "ambiguous",
-        "alternatives": [null],
-        "note": "신규 트랙은 업력 7년 이내다. 졸업 트랙('23년 이후 선정 기업)에는 업력 조건이 없어 트랙별로 다르다고 보면 값 null도 가능하다."
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "신규 트랙은 업력 7년 이내다. 졸업 트랙('23년 이후 선정 기업)에는 업력 조건이 없어 트랙별로 다르다고 보면 값 null도 가능하다. 사용자 결정(2026-11-04): 트랙마다 다른 업력은 형식 밖(값 null)이고 한 트랙의 값은 정답으로 인정하지 않는다."
       },
       "age": {
         "mentioned": false,
@@ -2429,20 +2413,9 @@
         "mentioned": true,
         "value": null,
         "quote": "신산업 창업 분야 기업의 경우 업력 10년 이내 지원 가능",
-        "confidence": "ambiguous",
-        "alternatives": [
-          {
-            "min": null,
-            "max": 7,
-            "maxExclusive": true
-          },
-          {
-            "min": null,
-            "max": 10,
-            "maxExclusive": false
-          }
-        ],
-        "note": "업력 초과 여부를 검토한다고 하나 일반 창업기업의 한도 숫자는 없고(법상 7년 미만) 신산업 분야만 10년 이내로 적혀 있어 값 하나로 쓸 수 없다."
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "업력 초과 여부를 검토한다고 하나 일반 창업기업의 한도 숫자는 없고(법상 7년 미만) 신산업 분야만 10년 이내로 적혀 있어 값 하나로 쓸 수 없다. 사용자 결정(2026-11-04): 트랙마다 다른 업력은 형식 밖(값 null)이고 한 트랙의 값은 정답으로 인정하지 않는다."
       },
       "age": {
         "mentioned": false,
