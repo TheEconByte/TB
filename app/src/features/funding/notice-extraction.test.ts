@@ -5,12 +5,12 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../lib/checksum.ts';
+import { CONDITION_FIELD_NAMES } from './condition-fields.ts';
 import {
   CONDITION_MODEL,
   CONDITION_PROMPT_VERSION,
   ConditionExtractionFailure,
   MAX_EXTRACTION_TEXT_CHARS,
-  conditionOutputSchema,
   createClaudeConditionExtractor,
   extractNoticeConditions,
   verifyConditionOutput,
@@ -150,12 +150,11 @@ describe('verifyConditionOutput', () => {
     expect(fields.businessStage.status).toBe('UNREADABLE');
   });
 
-  // 공고가 조건을 밝혔는데 스키마로 옮길 수 없으면 AI는 value를 null로 둔다. 빈 범위({min:null,max:null})나
-  // 빈 목록은 "제한 없음"으로 읽히므로, 그 대신 쓸 수 있는 null이 스키마에 있어야 한다(리뷰 지적 2026-11-04).
-  it('lets the AI leave the value of a stated field empty, and marks it unreadable', () => {
+  // 공고가 조건을 밝혔는데 형식으로 옮길 수 없으면 프롬프트대로 AI가 value를 null로 둔다. 빈 범위({min:null,max:null})나
+  // 빈 목록은 "제한 없음"으로 읽히므로 그 대신 쓸 수 없다(리뷰 지적 2026-11-04). 스키마가 null을 받는지는 아래
+  // createClaudeConditionExtractor 테스트가 보내는 스키마에서 본다.
+  it('marks a stated field whose value the AI left empty unreadable', () => {
     const stated = { mentioned: true, value: null, quote: '만 39세 이하' };
-    expect(conditionOutputSchema.shape.age.safeParse(stated).success).toBe(true);
-    expect(conditionOutputSchema.shape.targetGroups.safeParse({ ...stated, quote: '청년' }).success).toBe(true);
     const fields = verifyConditionOutput(output({ age: stated }), BODY);
     expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('값이 없') });
   });
@@ -483,6 +482,13 @@ describe('createClaudeConditionExtractor', () => {
     expect(schema).toMatchObject({ type: 'object', properties: { age: expect.any(Object) } });
     walk(schema, '$');
     expect(unions.length, unions.join('\n')).toBeLessThanOrEqual(16);
+    // 칸 수를 줄이려고 value의 null을 빼면 "밝혔지만 옮길 수 없음"을 나타낼 길이 없어진다. 모든 항목에서 본다.
+    const properties = (schema as { properties: Record<string, { properties: { value: { anyOf?: unknown[] } } }> })
+      .properties;
+    expect(Object.keys(properties).sort()).toEqual([...CONDITION_FIELD_NAMES].sort());
+    for (const name of CONDITION_FIELD_NAMES) {
+      expect(properties[name].properties.value.anyOf, name).toContainEqual({ type: 'null' });
+    }
   });
 
   // 실패한 호출도 비용이 든다. 어떤 실패든 그 호출의 토큰 수를 남긴다(ADR 0009 Consequences의 비용 기록).
