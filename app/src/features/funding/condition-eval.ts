@@ -113,10 +113,20 @@ function openedMonthsAgo(months: number): string {
 // 항목마다 판정이 갈릴 수 있는 입력을 만든다(리뷰 지적 2026-11-05). 정해 둔 입력은 7년·39세 같은 흔한 기준선 사이를 못
 // 봤다. 그래서 비교하는 값들의 경계(업력 ±2개월, 나이 ±1세)와 서울 25개 자치구, 대상 조합 8가지를 모두 본다.
 // 대상 한정의 청년은 나이 항목으로 보므로 나이도 함께 바꾼다.
-function profilesFor(name: MatchConditionKey, fields: VerifiedField<unknown>[]): FundingMatchProfile[] {
+function profilesFor(
+  name: MatchConditionKey,
+  fields: VerifiedField<unknown>[],
+  context: VerifiedConditions,
+): FundingMatchProfile[] {
   const withBase = (changes: Partial<FundingMatchProfile>[]) => changes.map((change) => ({ ...BASE, ...change }));
+  // 나이는 0~120세만 입력할 수 있다(match-profile.ts). 그 밖의 나이로 차이를 지어내지 않는다(리뷰 지적 2026-11-05).
   const ages = (extra: number[]) => [
-    ...new Set([null, 0, 18, 25, 37, 45, 60, 120, ...extra.flatMap((bound) => [bound - 1, bound, bound + 1])]),
+    ...new Set([
+      null,
+      ...[0, 18, 25, 37, 45, 60, 120, ...extra.flatMap((bound) => [bound - 1, bound, bound + 1])].filter(
+        (age) => age >= 0 && age <= 120,
+      ),
+    ]),
   ];
   switch (name) {
     case 'businessStage':
@@ -146,7 +156,10 @@ function profilesFor(name: MatchConditionKey, fields: VerifiedField<unknown>[]):
     case 'foodBusiness':
       return [BASE];
     case 'targetGroups':
-      return TARGET_SETS.flatMap((targetGroups) => ages([39]).map((age) => ({ ...BASE, targetGroups, age })));
+      // 청년은 정답의 나이 항목(청년 기준 나이)으로 보므로 그 경계에서도 본다.
+      return TARGET_SETS.flatMap((targetGroups) =>
+        ages([39, ...boundsOf([context.age])]).map((age) => ({ ...BASE, targetGroups, age })),
+      );
   }
 }
 
@@ -194,7 +207,7 @@ function gradeField(
     return actual.status === 'READ' ? 'DISPLAY_WRONG' : 'MISSED';
   }
   const key = name as MatchConditionKey;
-  const profiles = profilesFor(key, [actual, ...acceptable]);
+  const profiles = profilesFor(key, [actual, ...acceptable], context);
   const actualVerdicts = verdicts(key, actual, context, profiles);
   const golds = acceptable.map((option) => ({ option, verdicts: verdicts(key, option, context, profiles) }));
   const same = golds.filter((gold) => gold.verdicts.join() === actualVerdicts.join()).map((gold) => gold.option);

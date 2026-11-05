@@ -133,12 +133,12 @@ async function main() {
       `${variant}에는 다른 프롬프트(${others.join(', ')})의 결과가 있습니다. 지금 프롬프트(${fingerprint})는 새 variant 이름으로 실행하세요.`,
     );
   }
-  const done = new Set(existing.map((row) => `${row.prompt_id}#${row.rep}`));
-  // 끊긴 실행이 남긴 잘린 줄 뒤에 붙여 쓰지 않도록 줄을 끝낸다.
-  if (existsSync(resultsFile)) {
-    const content = readFileSync(resultsFile, 'utf8');
-    if (content.length > 0 && !content.endsWith('\n')) appendFileSync(resultsFile, '\n');
-  }
+  // trace가 없는 결과는 채점할 수 없으므로 다시 실행한다(요약은 같은 회차의 첫 채점 가능한 결과만 쓴다).
+  const done = new Set(
+    existing
+      .filter((row) => existsSync(join(dir, 'traces', `${row.prompt_id}_rep${row.rep}.json`)))
+      .map((row) => `${row.prompt_id}#${row.rep}`),
+  );
   const jobs = cases.flatMap((item) =>
     Array.from({ length: reps }, (_, rep) => ({ item, rep })).filter(({ rep }) => !done.has(`${item.id}#${rep}`)),
   );
@@ -180,9 +180,9 @@ async function main() {
           1,
         ),
       );
-      appendFileSync(
+      appendLine(
         resultsFile,
-        `${JSON.stringify({
+        JSON.stringify({
           prompt_id: item.id,
           rep,
           prompt: item.productName,
@@ -194,20 +194,20 @@ async function main() {
           latency_s: (Date.now() - started) / 1000,
           grade: scores,
           meta: { prompt: fingerprint, promptVersion: CONDITION_PROMPT_VERSION, outcomes },
-        })}\n`,
+        }),
       );
     } catch (error) {
       // 점수를 낼 수 없는 실패는 결과에 넣지 않는다(다음 실행에서 다시 한다). 끝까지 오지 않은 응답도 여기다.
       const failure = error instanceof ConditionExtractionFailure ? error : null;
-      appendFileSync(
+      appendLine(
         join(dir, 'errors.jsonl'),
-        `${JSON.stringify({
+        JSON.stringify({
           prompt_id: item.id,
           rep,
           error: mask(error instanceof Error ? error.message : String(error)),
           model: seen.response?.model,
           usage: failure ? { input_tokens: failure.inputTokens, output_tokens: failure.outputTokens } : undefined,
-        })}\n`,
+        }),
       );
       console.log(`  실패 ${item.id}#${rep}: ${mask(error instanceof Error ? error.message : String(error))}`);
     }
@@ -219,6 +219,12 @@ async function main() {
     }),
   );
   summarize(dir, expected, texts, reps);
+}
+
+// 한 줄을 붙여 쓴다. 끊긴 실행이 남긴 잘린 줄이 있으면 먼저 끝내서 새 줄이 그 뒤에 붙지 않게 한다.
+function appendLine(file: string, line: string) {
+  const content = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  appendFileSync(file, `${content.length > 0 && !content.endsWith('\n') ? '\n' : ''}${line}\n`);
 }
 
 function writeStateOnce() {
@@ -251,6 +257,7 @@ function summarize(dir: string, expected: Expected, texts: Map<string, string>, 
     [...expected.keys()].flatMap((id) => Array.from({ length: reps }, (_, rep) => `${id}#${rep}`)),
   );
   const skipped: string[] = [];
+  const seen = new Set<string>();
   const graded = readRows(join(dir, 'results.jsonl')).flatMap((row) => {
     const key = `${row.prompt_id}#${row.rep}`;
     if (!planned.has(key)) {
@@ -259,9 +266,15 @@ function summarize(dir: string, expected: Expected, texts: Map<string, string>, 
     }
     const traceFile = join(dir, 'traces', `${row.prompt_id}_rep${row.rep}.json`);
     if (!existsSync(traceFile)) {
-      skipped.push(`${key}(trace 없음)`);
+      skipped.push(`${key}(trace 없음, 다음 실행에서 다시 함)`);
       return [];
     }
+    // 같은 회차가 두 번 쓰였으면(두 실행이 겹친 경우) 처음 것만 쓴다.
+    if (seen.has(key)) {
+      skipped.push(`${key}(중복)`);
+      return [];
+    }
+    seen.add(key);
     const trace = JSON.parse(readFileSync(traceFile, 'utf8')) as Array<{ role: string; content: string }>;
     const output = JSON.parse(trace.find((turn) => turn.role === 'assistant')!.content) as ConditionOutput;
     const verified = verifyConditionOutput(output, texts.get(row.prompt_id) as string);

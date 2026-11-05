@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { expectedFields, gradeCase, type GoldCase, type GoldField } from './condition-eval.ts';
 import type { ConditionValues, VerifiedConditions } from './condition-fields.ts';
 
-// 공고 조건 추출 평가의 채점(ADR 0009 §3). 사용자에게 위험한 오답(AI가 읽었다면서 틀린 값 → 잘못된 맞음)과
-// 안전한 오답(못 읽음 → 확인 필요)을 따로 세야 프롬프트를 고칠 때 어느 쪽으로 움직였는지 보인다.
+// 공고 조건 추출 평가의 채점(ADR 0009 §3). 위험한 오답(어떤 사용자에게 정답과 다른 맞음·안 맞음을 냄)과 안전한
+// 오답(정답과 달라도 확인 필요로만 바뀜)을 따로 세야 프롬프트를 고칠 때 어느 쪽으로 움직였는지 보인다.
 
 const BODY = [
   '□ 신청대상 : 서울시 소재 업력 3년 이내 소상공인',
@@ -181,7 +181,6 @@ describe('gradeCase', () => {
     expect(gradeCase(actual, acceptable).outcomes.supportTypes).toBe('CORRECT');
   });
 
-  // 둘 다 화면에서 확인 필요가 되므로 맞춰 보기에는 같다. 정확도에는 넣고 완전 일치에는 넣지 않는다.
   // 확인 리뷰가 찾은 회귀(2026-11-05): 정해 둔 사용자 입력이 성겨 흔한 기준선 사이의 차이를 못 봤다. 입력은 비교하는
   // 두 값의 경계에서 만든다. 아래는 모두 실제 사용자를 잘못된 맞음·안 맞음으로 보내는 답이다.
   describe('differences near common thresholds', () => {
@@ -202,8 +201,8 @@ describe('gradeCase', () => {
       expect(gradeCase(actual, acceptable).outcomes.businessAge).toBe('CONFIDENT_WRONG');
     });
 
-    // 업력은 개업 연월(월 단위)로 재고 경계 달은 확인 필요다(matching.ts businessAgeJudgment). 그래서 7년 이하와 7년
-    // 미만은 어떤 사용자에게도 같은 결과다. 차이를 지어내지 않는다.
+    // 업력은 개업 연월(월 단위)로 재고 경계 달은 확인 필요다(matching.ts businessAgeJudgment). 채점 기준일(2026-11-04)에는
+    // 7년 이하와 7년 미만이 모든 사용자에게 같다. 매달 1일·말일에만 갈리는 차이는 보지 않는다(알려진 한계, funding.md).
     it('business age: 7 years or less and under 7 years give the same results', () => {
       const { acceptable } = expectedFields(
         gold({ businessAge: { ...gold().fields.businessAge, value: range(null, 7) } }),
@@ -223,6 +222,34 @@ describe('gradeCase', () => {
       const actual = asActual(acceptable);
       actual.age = read(actualValue, '만 39세 이하');
       expect(gradeCase(actual, acceptable).outcomes.age).toBe('CONFIDENT_WRONG');
+    });
+
+    // 나이는 0~120세만 입력할 수 있다(match-profile.ts). 그 밖의 나이로 차이를 지어내지 않는다(리뷰 지적 2026-11-05).
+    it.each([
+      ['빈 하한을 0으로', range(null, 39), range(0, 39)],
+      ['빈 상한을 120으로', range(19, null), range(19, 120)],
+    ])('age: %s is the same answer', (_, goldValue, actualValue) => {
+      const { acceptable } = expectedFields(gold({ age: { ...gold().fields.age, value: goldValue } }), BODY);
+      const actual = asActual(acceptable);
+      actual.age = read(actualValue, '만 39세 이하');
+      expect(gradeCase(actual, acceptable).outcomes.age).toBe('CORRECT');
+    });
+
+    // 청년 기준 나이는 공고마다 다르다. 정답의 나이 경계에서 청년인 사용자와 아닌 사용자를 모두 본다.
+    it('target groups: youth with a youth age other than 39', () => {
+      const young = gold({
+        age: { ...gold().fields.age, value: range(19, 24) },
+        targetGroups: {
+          mentioned: true,
+          value: { groups: ['OTHER'], note: '매출' },
+          quote: '업력 3년 이내 소상공인',
+          confidence: 'clear',
+        },
+      });
+      const { acceptable } = expectedFields(young, BODY);
+      const actual = asActual(acceptable);
+      actual.targetGroups = read({ groups: ['YOUTH', 'OTHER'], note: '매출' });
+      expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('CONFIDENT_WRONG');
     });
 
     // 울산 중구를 서울 중구로 읽으면 서울 중구 사용자에게 맞음이 된다. 서울 25개 자치구를 모두 본다.
@@ -292,6 +319,7 @@ describe('gradeCase', () => {
     expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('MISSED');
   });
 
+  // 둘 다 화면에서 확인 필요가 되므로 맞춰 보기에는 같다. 정확도에는 넣고 완전 일치에는 넣지 않는다.
   it('treats not mentioned and unreadable as equivalent for matching but not exact', () => {
     const { acceptable } = expectedFields(gold(), BODY);
     const actual = asActual(acceptable);
