@@ -4,6 +4,7 @@ import {
   type VerifiedConditions,
   type VerifiedField,
 } from './condition-fields.ts';
+import { SEOUL_DISTRICTS } from './districts.ts';
 import { MATCH_CONDITION_KEYS, matchConditions, type FundingMatchProfile, type MatchConditionKey } from './matching.ts';
 import { verifyConditionOutput, type ConditionOutput } from './notice-extraction.ts';
 
@@ -72,46 +73,104 @@ export function expectedFields(
   return { acceptable, problems };
 }
 
-// 채점은 값의 모양이 아니라 맞춰 보기 판정으로 한다(리뷰 지적 2026-11-04): 여러 사용자 입력에서 맞춰 보기
+// 채점은 값의 모양이 아니라 맞춰 보기 판정으로 한다(리뷰 지적 2026-11-04): 사용자 입력마다 맞춰 보기
 // (matchConditions)가 내는 판정이 정답과 모두 같으면 같은 답이다. 서울 사용자에게 같은 결과인 차이(다른 시·도가 더
 // 있음, 40세 미만과 39세 이하, 겹친 값)는 틀림이 아니다.
 // CORRECT: 판정과 상태가 정답과 같다. EQUIVALENT: 판정은 같고 상태만 다르다(언급 없음·읽지 못함·확인 필요로 끝나는 읽음).
-// CONFIDENT_WRONG: 읽었다면서 판정이 정답과 다르다(사용자를 잘못된 맞음·안 맞음으로 보낼 수 있다). MISSED: 읽지 못해
-// 판정이 다르다(확인 필요로 가므로 안전하다). DISPLAY_WRONG: 보여 주기만 하는 지원 방식·신청기간이 틀렸다.
+// CONFIDENT_WRONG: 어떤 입력에서 정답과 다른 맞음·안 맞음을 낸다(사용자를 잘못 보낸다). MISSED: 정답과 다르지만 다른
+// 입력에서는 확인 필요만 낸다(안전하다, 리뷰 지적 2026-11-05). DISPLAY_WRONG: 보여 주기만 하는 지원 방식·신청기간이 틀렸다.
 export type FieldOutcome = 'CORRECT' | 'EQUIVALENT' | 'CONFIDENT_WRONG' | 'MISSED' | 'DISPLAY_WRONG';
 
 const AS_OF = '2026-11-04';
-const PROFILES: FundingMatchProfile[] = [
-  { businessStatus: 'PRE_STARTUP', openedYearMonth: null },
-  { businessStatus: 'BUSINESS', openedYearMonth: '2026-08' },
-  { businessStatus: 'BUSINESS', openedYearMonth: '2023-03' },
-  { businessStatus: 'BUSINESS', openedYearMonth: '2016-01' },
-  { businessStatus: null, openedYearMonth: null },
-].flatMap((stage) =>
-  [25, 37, 45, 60, null].flatMap((age) =>
-    ['11680', '11110', null].flatMap((districtCode) =>
-      ([[], ['WOMEN'], ['RESTART'], null] as FundingMatchProfile['targetGroups'][]).map((targetGroups) => ({
-        ...(stage as Pick<FundingMatchProfile, 'businessStatus' | 'openedYearMonth'>),
-        age,
-        districtCode,
-        targetGroups,
-      })),
-    ),
+const BASE: FundingMatchProfile = {
+  businessStatus: 'BUSINESS',
+  openedYearMonth: '2023-03',
+  age: 37,
+  districtCode: '11680',
+  targetGroups: [],
+};
+const TARGET_SETS: FundingMatchProfile['targetGroups'][] = [
+  null,
+  ...[0, 1, 2, 3, 4, 5, 6, 7].map((bits) =>
+    (['WOMEN', 'DISABLED', 'RESTART'] as const).filter((_, index) => bits & (1 << index)),
   ),
-);
+];
+
+const boundsOf = (fields: VerifiedField<unknown>[]) =>
+  fields.flatMap((field) => {
+    if (field.status !== 'READ') return [];
+    const range = field.value as { min: number | null; max: number | null };
+    return [range.min, range.max].filter((bound): bound is number => bound !== null);
+  });
+
+// 기준일에서 몇 달 전 개업인지를 YYYY-MM로.
+function openedMonthsAgo(months: number): string {
+  const [year, month] = AS_OF.split('-').map(Number);
+  const index = year * 12 + (month - 1) - months;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
+// 항목마다 판정이 갈릴 수 있는 입력을 만든다(리뷰 지적 2026-11-05). 정해 둔 입력은 7년·39세 같은 흔한 기준선 사이를 못
+// 봤다. 그래서 비교하는 값들의 경계(업력 ±2개월, 나이 ±1세)와 서울 25개 자치구, 대상 조합 8가지를 모두 본다.
+// 대상 한정의 청년은 나이 항목으로 보므로 나이도 함께 바꾼다.
+function profilesFor(name: MatchConditionKey, fields: VerifiedField<unknown>[]): FundingMatchProfile[] {
+  const withBase = (changes: Partial<FundingMatchProfile>[]) => changes.map((change) => ({ ...BASE, ...change }));
+  const ages = (extra: number[]) => [
+    ...new Set([null, 0, 18, 25, 37, 45, 60, 120, ...extra.flatMap((bound) => [bound - 1, bound, bound + 1])]),
+  ];
+  switch (name) {
+    case 'businessStage':
+      return withBase([{ businessStatus: 'PRE_STARTUP', openedYearMonth: null }, {}, { businessStatus: null }]);
+    case 'businessAge': {
+      const months = [
+        1,
+        30,
+        60,
+        130,
+        400,
+        ...boundsOf(fields).flatMap((years) => [-2, -1, 0, 1, 2].map((d) => Math.round(years * 12) + d)),
+      ];
+      return withBase([
+        { businessStatus: 'PRE_STARTUP', openedYearMonth: null },
+        { businessStatus: 'BUSINESS', openedYearMonth: null },
+        { businessStatus: null, openedYearMonth: null },
+        ...[...new Set(months)].filter((m) => m >= 0).map((m) => ({ openedYearMonth: openedMonthsAgo(m) })),
+      ]);
+    }
+    case 'age':
+      return withBase(ages(boundsOf(fields)).map((age) => ({ age })));
+    case 'region':
+      return withBase(
+        [null, ...SEOUL_DISTRICTS.map((district) => district.code)].map((districtCode) => ({ districtCode })),
+      );
+    case 'foodBusiness':
+      return [BASE];
+    case 'targetGroups':
+      return TARGET_SETS.flatMap((targetGroups) => ages([39]).map((age) => ({ ...BASE, targetGroups, age })));
+  }
+}
 
 const reading = (field: VerifiedField<unknown>) =>
   field.status === 'READ' ? { ...field, source: 'AI' as const } : field;
 
 // 한 항목만 바꿔 끼운 판정 목록. 나머지 항목은 정답으로 두어(대상 한정의 청년은 나이 항목으로 본다) 그 항목의 차이만 보이게 한다.
-function verdicts(name: MatchConditionKey, field: VerifiedField<unknown>, context: VerifiedConditions): string {
+function verdicts(
+  name: MatchConditionKey,
+  field: VerifiedField<unknown>,
+  context: VerifiedConditions,
+  profiles: FundingMatchProfile[],
+): string[] {
   const readings = Object.fromEntries(
     CONDITION_FIELD_NAMES.map((key) => [key, reading(key === name ? field : context[key])]),
   ) as Parameters<typeof matchConditions>[0];
-  return PROFILES.map(
-    (profile) => matchConditions(readings, profile, AS_OF).find((match) => match.key === name)?.verdict,
-  ).join();
+  return profiles.map(
+    (profile) => matchConditions(readings, profile, AS_OF).find((match) => match.key === name)!.verdict,
+  );
 }
+
+// 정답과 다른 맞음·안 맞음을 내는 입력이 있으면 위험하다. 확인 필요로만 달라지면 안전하다.
+const misleads = (actual: string[], gold: string[]) =>
+  actual.some((verdict, index) => verdict !== 'CHECK' && verdict !== gold[index]);
 
 // 보여 주기만 하는 항목. 신청기간은 종료일만 쓰고(AI가 읽은 종료일이 지나면 확인 필요), 지원 방식은 종류만 본다.
 function displayed(name: 'applicationPeriod' | 'supportTypes', field: VerifiedField<unknown>): string {
@@ -126,16 +185,22 @@ function gradeField(
   acceptable: VerifiedField<unknown>[],
   context: VerifiedConditions,
 ): FieldOutcome {
-  const matching = (MATCH_CONDITION_KEYS as readonly string[]).includes(name);
-  const key = (field: VerifiedField<unknown>) =>
-    matching
-      ? verdicts(name as MatchConditionKey, field, context)
-      : displayed(name as 'applicationPeriod' | 'supportTypes', field);
-  const actualKey = key(actual);
-  const same = acceptable.filter((option) => key(option) === actualKey);
-  if (same.length > 0) return same.some((option) => option.status === actual.status) ? 'CORRECT' : 'EQUIVALENT';
-  if (actual.status !== 'READ') return 'MISSED';
-  return matching ? 'CONFIDENT_WRONG' : 'DISPLAY_WRONG';
+  const sameAs = (options: VerifiedField<unknown>[]) =>
+    options.some((option) => option.status === actual.status) ? 'CORRECT' : 'EQUIVALENT';
+  if (!(MATCH_CONDITION_KEYS as readonly string[]).includes(name)) {
+    const shown = (field: VerifiedField<unknown>) => displayed(name as 'applicationPeriod' | 'supportTypes', field);
+    const same = acceptable.filter((option) => shown(option) === shown(actual));
+    if (same.length > 0) return sameAs(same);
+    return actual.status === 'READ' ? 'DISPLAY_WRONG' : 'MISSED';
+  }
+  const key = name as MatchConditionKey;
+  const profiles = profilesFor(key, [actual, ...acceptable]);
+  const actualVerdicts = verdicts(key, actual, context, profiles);
+  const golds = acceptable.map((option) => ({ option, verdicts: verdicts(key, option, context, profiles) }));
+  const same = golds.filter((gold) => gold.verdicts.join() === actualVerdicts.join()).map((gold) => gold.option);
+  if (same.length > 0) return sameAs(same);
+  // 받아들일 정답 중 하나라도 안전한 차이면 안전하다.
+  return golds.some((gold) => !misleads(actualVerdicts, gold.verdicts)) ? 'MISSED' : 'CONFIDENT_WRONG';
 }
 
 export function gradeCase(

@@ -14,6 +14,7 @@ import {
   ConditionExtractionFailure,
   createClaudeConditionExtractor,
   verifyConditionOutput,
+  type ConditionOutput,
 } from '../src/features/funding/notice-extraction.ts';
 import { secretMasker } from '../src/features/market/seoul-api.ts';
 
@@ -42,8 +43,9 @@ type Row = {
 };
 type Expected = Map<string, ReturnType<typeof expectedFields>>;
 
-// 프롬프트·출력 스키마·모델을 묶은 지문. 실제 추출 코드가 만드는 요청을 보내지 않고 받아 적어 만든다.
-// 같은 variant에 다른 지문의 결과가 섞이지 않게 한다(리뷰 지적 2026-11-04).
+// 요청 전체(모델·시스템 프롬프트·메시지 틀·출력 스키마·그 밖의 매개변수)의 지문. 실제 추출 코드가 만드는 요청을
+// 보내지 않고 받아 적어 만든다. 본문·상품 이름은 고정 값이라 지문이 흔들리지 않는다. 같은 variant에 다른 지문의 결과가
+// 섞이지 않게 한다(리뷰 지적 2026-11-04·05).
 async function promptFingerprint(): Promise<string> {
   let body = '';
   const client = new Anthropic({
@@ -55,9 +57,8 @@ async function promptFingerprint(): Promise<string> {
     },
   });
   await createClaudeConditionExtractor(client)('본문', '상품').catch(() => undefined);
-  const request = JSON.parse(body) as Record<string, unknown>;
-  const parts = [request.model, request.max_tokens, request.system, request.output_config];
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 12);
+  if (body === '') throw new Error('추출 코드가 요청을 만들지 않았습니다.');
+  return createHash('sha256').update(body).digest('hex').slice(0, 12);
 }
 
 // 끝이 잘린 줄(실행이 끊긴 경우)은 건너뛰고 알린다.
@@ -124,13 +125,20 @@ async function main() {
   writeStateOnce();
   const fingerprint = await promptFingerprint();
   const existing = readRows(resultsFile);
-  const others = [...new Set(existing.map((row) => row.meta.prompt).filter((prompt) => prompt !== fingerprint))];
+  const others = [
+    ...new Set(existing.map((row) => row.meta?.prompt ?? '(지문 없음)').filter((prompt) => prompt !== fingerprint)),
+  ];
   if (others.length > 0) {
     throw new Error(
       `${variant}에는 다른 프롬프트(${others.join(', ')})의 결과가 있습니다. 지금 프롬프트(${fingerprint})는 새 variant 이름으로 실행하세요.`,
     );
   }
   const done = new Set(existing.map((row) => `${row.prompt_id}#${row.rep}`));
+  // 끊긴 실행이 남긴 잘린 줄 뒤에 붙여 쓰지 않도록 줄을 끝낸다.
+  if (existsSync(resultsFile)) {
+    const content = readFileSync(resultsFile, 'utf8');
+    if (content.length > 0 && !content.endsWith('\n')) appendFileSync(resultsFile, '\n');
+  }
   const jobs = cases.flatMap((item) =>
     Array.from({ length: reps }, (_, rep) => ({ item, rep })).filter(({ rep }) => !done.has(`${item.id}#${rep}`)),
   );
@@ -210,7 +218,7 @@ async function main() {
       for (let job = queue.shift(); job; job = queue.shift()) await runJob(job);
     }),
   );
-  summarize(dir, expected, cases.length * reps);
+  summarize(dir, expected, texts, reps);
 }
 
 function writeStateOnce() {
@@ -235,29 +243,42 @@ function writeStateOnce() {
   );
 }
 
-// 지표마다 평균과 95% 구간(공고별 평균의 표준오차 × 1.96), 항목별 결과 수를 보여 준다. 정답을 고쳐도 다시 부르지
-// 않도록 저장한 검증 결과(traces)를 지금 정답으로 다시 채점한다.
-function summarize(dir: string, expected: Expected, planned: number) {
-  const rows = readRows(join(dir, 'results.jsonl'));
-  if (rows.length === 0) return;
-  const graded = rows.map((row) => {
-    const trace = JSON.parse(
-      readFileSync(join(dir, 'traces', `${row.prompt_id}_rep${row.rep}.json`), 'utf8'),
-    ) as Array<{
-      name?: string;
-      content: string;
-    }>;
-    const { verified } = JSON.parse(trace.find((turn) => turn.name === 'grade')!.content) as {
-      verified: Parameters<typeof gradeCase>[0];
-    };
-    return { id: row.prompt_id, ...gradeCase(verified, expected.get(row.prompt_id)!.acceptable) };
+// 지표마다 평균과 95% 구간(공고별 평균의 표준오차 × 1.96), 항목별 결과 수를 보여 준다. 정답이나 검증 규칙을 고쳐도
+// 다시 부르지 않도록, 저장한 AI 원답(traces)을 지금 본문으로 다시 검증하고 지금 정답으로 다시 채점한다.
+// results.jsonl의 grade는 실행 당시의 점수이고, 이 요약이 기준이다.
+function summarize(dir: string, expected: Expected, texts: Map<string, string>, reps: number) {
+  const planned = new Set(
+    [...expected.keys()].flatMap((id) => Array.from({ length: reps }, (_, rep) => `${id}#${rep}`)),
+  );
+  const skipped: string[] = [];
+  const graded = readRows(join(dir, 'results.jsonl')).flatMap((row) => {
+    const key = `${row.prompt_id}#${row.rep}`;
+    if (!planned.has(key)) {
+      skipped.push(`${key}(지금 공고·회차에 없음)`);
+      return [];
+    }
+    const traceFile = join(dir, 'traces', `${row.prompt_id}_rep${row.rep}.json`);
+    if (!existsSync(traceFile)) {
+      skipped.push(`${key}(trace 없음)`);
+      return [];
+    }
+    const trace = JSON.parse(readFileSync(traceFile, 'utf8')) as Array<{ role: string; content: string }>;
+    const output = JSON.parse(trace.find((turn) => turn.role === 'assistant')!.content) as ConditionOutput;
+    const verified = verifyConditionOutput(output, texts.get(row.prompt_id) as string);
+    return [{ id: row.prompt_id, key, ...gradeCase(verified, expected.get(row.prompt_id)!.acceptable) }];
   });
+  const scored = new Set(graded.map((row) => row.key));
   const byCase = new Map<string, typeof graded>();
   for (const row of graded) byCase.set(row.id, [...(byCase.get(row.id) ?? []), row]);
-  const lines = [`공고 ${byCase.size}건 · 채점한 실행 ${rows.length}/${planned}회`];
+  const lines = [`공고 ${byCase.size}건 · 채점한 실행 ${scored.size}/${planned.size}회`];
+  if (skipped.length > 0) lines.push(`채점하지 않은 결과: ${skipped.join(', ')}`);
   // 실패한 회차는 평균에서 빠진다. 실패가 많은 프롬프트가 쉬운 공고로만 평균을 내지 않도록 빠진 수를 함께 보인다.
-  if (rows.length < planned) {
-    lines.push(`주의: ${planned - rows.length}회는 점수가 없습니다(errors.jsonl). 다시 실행하면 이어서 합니다.`);
+  if (scored.size < planned.size) {
+    lines.push(`주의: ${planned.size - scored.size}회는 점수가 없습니다(errors.jsonl). 다시 실행하면 이어서 합니다.`);
+  }
+  if (graded.length === 0) {
+    console.log(lines.join('\n'));
+    return;
   }
   for (const metric of ['field_acc', 'confident_wrong', 'missed', 'exact_acc'] as const) {
     const perCase = [...byCase.values()].map(

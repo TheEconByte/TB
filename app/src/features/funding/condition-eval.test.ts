@@ -182,6 +182,116 @@ describe('gradeCase', () => {
   });
 
   // 둘 다 화면에서 확인 필요가 되므로 맞춰 보기에는 같다. 정확도에는 넣고 완전 일치에는 넣지 않는다.
+  // 확인 리뷰가 찾은 회귀(2026-11-05): 정해 둔 사용자 입력이 성겨 흔한 기준선 사이의 차이를 못 봤다. 입력은 비교하는
+  // 두 값의 경계에서 만든다. 아래는 모두 실제 사용자를 잘못된 맞음·안 맞음으로 보내는 답이다.
+  describe('differences near common thresholds', () => {
+    const range = (min: number | null, max: number | null, maxExclusive = false) => ({ min, max, maxExclusive });
+    const read = <T>(value: T, quote = '업력 3년 이내 소상공인') => ({ status: 'READ' as const, value, quote });
+
+    it.each([
+      ['7년 이내 → 10년 이내', range(null, 7), range(null, 10)],
+      ['7년 이내 → 5년 이내', range(null, 7), range(null, 5)],
+      ['1년 이상 → 2년 이상', range(1, null), range(2, null)],
+    ])('business age: %s', (_, goldValue, actualValue) => {
+      const { acceptable } = expectedFields(
+        gold({ businessAge: { ...gold().fields.businessAge, value: goldValue } }),
+        BODY,
+      );
+      const actual = asActual(acceptable);
+      actual.businessAge = read(actualValue);
+      expect(gradeCase(actual, acceptable).outcomes.businessAge).toBe('CONFIDENT_WRONG');
+    });
+
+    // 업력은 개업 연월(월 단위)로 재고 경계 달은 확인 필요다(matching.ts businessAgeJudgment). 그래서 7년 이하와 7년
+    // 미만은 어떤 사용자에게도 같은 결과다. 차이를 지어내지 않는다.
+    it('business age: 7 years or less and under 7 years give the same results', () => {
+      const { acceptable } = expectedFields(
+        gold({ businessAge: { ...gold().fields.businessAge, value: range(null, 7) } }),
+        BODY,
+      );
+      const actual = asActual(acceptable);
+      actual.businessAge = read(range(null, 7, true));
+      expect(gradeCase(actual, acceptable).outcomes.businessAge).toBe('CORRECT');
+    });
+
+    it.each([
+      ['39세 이하 → 44세 이하', range(null, 39), range(null, 44)],
+      ['39세 이하 → 40세 이하', range(null, 39), range(null, 40)],
+      ['19세 이상 → 20세 이상', range(19, null), range(20, null)],
+    ])('age: %s', (_, goldValue, actualValue) => {
+      const { acceptable } = expectedFields(gold({ age: { ...gold().fields.age, value: goldValue } }), BODY);
+      const actual = asActual(acceptable);
+      actual.age = read(actualValue, '만 39세 이하');
+      expect(gradeCase(actual, acceptable).outcomes.age).toBe('CONFIDENT_WRONG');
+    });
+
+    // 울산 중구를 서울 중구로 읽으면 서울 중구 사용자에게 맞음이 된다. 서울 25개 자치구를 모두 본다.
+    it('region: another city district read as a Seoul district', () => {
+      const ulsan = gold({
+        region: {
+          mentioned: true,
+          value: {
+            scope: 'PROVINCES',
+            provinces: ['울산'],
+            districts: [],
+            excludedProvinces: [],
+            excludedDistricts: [],
+          },
+          quote: '서울시 소재 업력 3년 이내',
+          confidence: 'clear',
+        },
+      });
+      const { acceptable } = expectedFields(ulsan, BODY);
+      const actual = asActual(acceptable);
+      actual.region = read(
+        {
+          scope: 'SEOUL_DISTRICTS',
+          provinces: ['서울'],
+          districts: ['중구'],
+          excludedProvinces: [],
+          excludedDistricts: [],
+          districtCodes: ['11140'],
+          excludedDistrictCodes: [],
+        },
+        '서울시 소재 업력 3년 이내',
+      );
+      expect(gradeCase(actual, acceptable).outcomes.region).toBe('CONFIDENT_WRONG');
+    });
+
+    // 장애인 사용자가 확인 필요 대신 맞음이 된다. 대상 조합을 모두 본다.
+    it('target groups: an extra group the gold does not have', () => {
+      const other = gold({
+        targetGroups: {
+          mentioned: true,
+          value: { groups: ['OTHER'], note: '매출' },
+          quote: '업력 3년 이내 소상공인',
+          confidence: 'clear',
+        },
+      });
+      const { acceptable } = expectedFields(other, BODY);
+      const actual = asActual(acceptable);
+      actual.targetGroups = read({ groups: ['OTHER', 'DISABLED'], note: '매출' });
+      expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('CONFIDENT_WRONG');
+    });
+  });
+
+  // 맞음·안 맞음이던 판정이 확인 필요로 바뀌기만 하면 안전한 쪽이다(리뷰 지적 2026-11-05). 위험한 추측을 확인 필요로
+  // 바꾸는 프롬프트가 나빠 보이지 않게, 이런 차이는 놓침으로 센다.
+  it('counts a reading that only turns decisions into checks as a safe miss', () => {
+    const youth = gold({
+      targetGroups: {
+        mentioned: true,
+        value: { groups: ['YOUTH'], note: null },
+        quote: '만 39세 이하',
+        confidence: 'clear',
+      },
+    });
+    const { acceptable } = expectedFields(youth, BODY);
+    const actual = asActual(acceptable);
+    actual.targetGroups = { status: 'READ', value: { groups: ['OTHER'], note: '청년' }, quote: '만 39세 이하' };
+    expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('MISSED');
+  });
+
   it('treats not mentioned and unreadable as equivalent for matching but not exact', () => {
     const { acceptable } = expectedFields(gold(), BODY);
     const actual = asActual(acceptable);
