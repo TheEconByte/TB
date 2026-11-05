@@ -231,9 +231,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "소공인 한정은 업종·규모 조건이라 foodBusiness에 담았고, 대상 집단(OTHER: 소공인)으로 볼 여지도 있다."
+        "note": "소공인 한정은 업종·규모 조건이라 foodBusiness에 담았고, 대상 집단(OTHER: 소공인)으로 볼 여지도 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -323,9 +327,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "콘텐츠 분야 한정은 업종 조건이라 foodBusiness에 담았고, 창작자·초기 창업자를 대상 집단(OTHER)으로 볼 여지도 있다."
+        "note": "콘텐츠 분야 한정은 업종 조건이라 foodBusiness에 담았고, 창작자·초기 창업자를 대상 집단(OTHER)으로 볼 여지도 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -411,9 +419,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "특정 집단 제한이 없다(어린이제품 연매출 기준은 집단 조건이 아니다)."
+        "note": "특정 집단 제한이 없다(어린이제품 연매출 기준은 집단 조건이 아니다). 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": false,
@@ -499,9 +511,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "청년 조건은 채용할 근로자에 대한 것이라 신청자 집단 제한(YOUTH)이 아니며, 청년 신규 채용 기업을 OTHER로 볼 여지는 있다."
+        "note": "청년 조건은 채용할 근로자에 대한 것이라 신청자 집단 제한(YOUTH)이 아니며, 청년 신규 채용 기업을 OTHER로 볼 여지는 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -674,9 +690,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "포항시 소상공인 외에 특정 대상 집단으로 제한하지 않는다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "포항시 소상공인 외에 특정 대상 집단으로 제한하지 않는다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -1356,9 +1377,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "2024~2026년 동일 사업 수혜자 제외 같은 중복수혜 제한만 있고 특정 대상 집단 한정은 없다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "2024~2026년 동일 사업 수혜자 제외 같은 중복수혜 제한만 있고 특정 대상 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -1448,9 +1474,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "창업보육센터 입주기업은 우선선정일 뿐 신청자 한정이 아니다."
+        "note": "창업보육센터 입주기업은 우선선정일 뿐 신청자 한정이 아니다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -1545,9 +1575,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "특정 대상 집단으로 한정하지 않는다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "특정 대상 집단으로 한정하지 않는다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -1729,9 +1764,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "가구제조 소공인 한정은 업종 조건(foodBusiness)으로 보았고, 청년·백년소공인 등은 가점일 뿐이나 이를 OTHER로 볼 여지가 있다."
+        "note": "가구제조 소공인 한정은 업종 조건(foodBusiness)으로 보았고, 청년·백년소공인 등은 가점일 뿐이나 이를 OTHER로 볼 여지가 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -1823,9 +1862,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "특정 집단으로 신청을 제한하지 않는다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "특정 집단으로 신청을 제한하지 않는다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2004,9 +2048,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "신용평점·기수혜 제외 같은 자격 요건만 있고 특정 집단으로 제한하지 않는다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "신용평점·기수혜 제외 같은 자격 요건만 있고 특정 집단으로 제한하지 않는다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2094,9 +2143,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "딥테크·초기 스타트업 한정은 업종·업력 조건으로 보았으나 OTHER로 볼 여지가 있다."
+        "note": "딥테크·초기 스타트업 한정은 업종·업력 조건으로 보았으나 OTHER로 볼 여지가 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": false,
@@ -2182,9 +2235,13 @@
           {
             "groups": ["OTHER"],
             "note": "크라우드펀딩을 추진하려는 농식품 기업"
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "청년·여성 등 대상 집단 제한은 없다. 농식품 업종·크라우드펀딩 추진 기업이라는 조건을 OTHER로 볼 수도 있으나 업종 조건은 foodBusiness에서 다룬다고 봤다."
+        "note": "청년·여성 등 대상 집단 제한은 없다. 농식품 업종·크라우드펀딩 추진 기업이라는 조건을 OTHER로 볼 수도 있으나 업종 조건은 foodBusiness에서 다룬다고 봤다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2276,9 +2333,13 @@
           {
             "groups": ["OTHER"],
             "note": "졸업 트랙은 '23년도 이후 키친인큐베이터 선정 기업(팀)만"
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "신규 트랙에는 대상 집단 제한이 없다. 졸업 트랙만 과거 선정 기업으로 한정하므로 이를 OTHER로 볼 수도 있다."
+        "note": "신규 트랙에는 대상 집단 제한이 없다. 졸업 트랙만 과거 선정 기업으로 한정하므로 이를 OTHER로 볼 수도 있다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2368,9 +2429,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "청년 등 대상 집단으로 한정하지 않는다. 소공인(제조업·10인 미만) 한정을 OTHER로 볼 수도 있으나 업종 조건으로 봤다."
+        "note": "청년 등 대상 집단으로 한정하지 않는다. 소공인(제조업·10인 미만) 한정을 OTHER로 볼 수도 있으나 업종 조건으로 봤다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2454,9 +2519,13 @@
           {
             "groups": ["OTHER"],
             "note": null
+          },
+          {
+            "groups": [],
+            "note": null
           }
         ],
-        "note": "청년 등 대상 집단 제한은 없다. 기술창업 한정을 OTHER로 볼 수도 있으나 업종 성격 조건으로 봤다."
+        "note": "청년 등 대상 집단 제한은 없다. 기술창업 한정을 OTHER로 볼 수도 있으나 업종 성격 조건으로 봤다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": true,
@@ -2531,9 +2600,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "소상공인 외에 대상 집단 제한이 없다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "소상공인 외에 대상 집단 제한이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": false,
@@ -2604,9 +2678,14 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "소상공인 외에 대상 집단 제한이 없다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "소상공인 외에 대상 집단 제한이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
       },
       "applicationPeriod": {
         "mentioned": false,
