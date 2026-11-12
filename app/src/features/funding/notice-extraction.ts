@@ -214,13 +214,14 @@ export const PROMPT_EXAMPLES: ReadonlyArray<{ product: string; notice: string; o
         ' - 신청대상: 업력 1년 이상 제조업체',
         ' - 대출한도: 업체당 5천만원',
         '□ 공통 제외 업종: 유흥주점업, 대부업 등',
+        '□ 공통 신청지역: 서울특별시에 사업장이 있는 업체',
         '□ 접수기간: 2026. 2. 2. ~ 예산 소진 시까지',
       ].join('\n'),
       output: {
         businessStage: stated('BUSINESS_ONLY', '음료·제과 제조업체 중 전년도 매출액 10억원 이하인 업체'),
         businessAge: unstated,
         age: unstated,
-        region: unstated,
+        region: stated({ scope: 'PROVINCES', ...noLists, provinces: ['서울'] }, '서울특별시에 사업장이 있는 업체'),
         foodBusiness: stated('EXCLUDED', '음료·제과 제조업체'),
         targetGroups: stated(
           { groups: ['OTHER'], note: '전년도 매출액 10억원 이하' },
@@ -232,7 +233,7 @@ export const PROMPT_EXAMPLES: ReadonlyArray<{ product: string; notice: string; o
         ),
         supportTypes: stated(['LOAN'], '대출한도: 업체당 2억원'),
       },
-      why: '<product>는 시설자금이므로 업력 1년 이상은 다른 자금의 조건입니다. 음료·제과를 다뤄도 제조업으로 좁혔으니 음식점·카페는 대상이 아닙니다. 업종을 좁혔으므로 음식점이 없는 제외 업종 목록이 함께 있어도 EXCLUDED입니다. 매출 상한은 신청 자격을 좁히므로 빈 목록이 아니라 OTHER입니다.',
+      why: '<product>는 시설자금이므로 업력 1년 이상은 다른 자금의 조건입니다. 음료·제과를 다뤄도 제조업으로 좁혔으니 음식점·카페는 대상이 아닙니다. 업종을 좁혔으므로 음식점이 없는 제외 업종 목록이 함께 있어도 EXCLUDED입니다. 매출 상한은 신청 자격을 좁히므로 빈 목록이 아니라 OTHER입니다. 신청지역은 두 자금에 함께 걸리고 서울 전체로 한정했으니 PROVINCES 서울입니다. 적을 자치구가 없으므로 SEOUL_DISTRICTS가 아닙니다.',
     },
     {
       product: '2026년 상권 활성화 온라인 설명회 참가 안내',
@@ -351,8 +352,8 @@ age: 대표자(개인이면 신청자 본인)의 만 나이 제한입니다. "�
 
 region: 사업장이나 신청자의 소재지 제한입니다. 코드는 사용자의 서울 자치구로 비교하므로 서울 밖이면 어느 시·군인지까지는 필요 없습니다.
 - NATIONWIDE: 전국이 대상입니다.
-- PROVINCES: 시·도로 한정합니다. provinces에는 ${PROVINCE_NAMES.map(([short]) => short).join('·')}만 씁니다. 서울 밖의 시·군·구로 한정하면 그곳이 속한 시·도를 적습니다(창원시는 경남, 원주시는 강원, 해운대구는 부산). 구 이름만 있으면 제목의 [전남] 같은 표시로 어느 시·도인지 확인합니다. 그 표시만으로 지역을 한정한 것은 아닙니다.
-- SEOUL_DISTRICTS: 서울의 자치구로 한정합니다. provinces는 ["서울"], districts에 "강남구"처럼 적습니다. 서울 밖의 구에는 쓰지 않습니다.
+- PROVINCES: 시·도로 한정합니다. 서울 전체가 대상이면(서울시 소재, 서울에 사업장) provinces는 ["서울"]입니다. provinces에는 ${PROVINCE_NAMES.map(([short]) => short).join('·')}만 씁니다. 서울 밖의 시·군·구나 그 안의 동·읍·면으로 한정하면 그곳이 속한 시·도를 적습니다(창원시는 경남, 원주시는 강원, 해운대구는 부산, 인천 중구는 인천). 구 이름만 있으면 제목의 [전남] 같은 표시로 어느 시·도인지 확인합니다. 그 표시만으로 지역을 한정한 것은 아닙니다.
+- SEOUL_DISTRICTS: 서울 안의 특정 자치구로 좁힐 때만 씁니다. provinces는 ["서울"], districts에 그 자치구를 "강남구"처럼 하나 이상 적습니다. 적을 서울 자치구가 없으면 SEOUL_DISTRICTS가 아닙니다. 서울 밖의 구에는 쓰지 않습니다.
 "○○ 제외"처럼 빼는 지역은 excludedProvinces·excludedDistricts에 적습니다. districts와 excludedDistricts에는 서울 자치구만 씁니다. 다른 시의 중구가 서울 중구로 읽히면 안 되기 때문입니다. 서울 자치구와 서울 밖 지역이 섞여 있거나, 서울 안에서 자치구보다 좁은 동·상권으로 한정하면 형식으로 옮길 수 없습니다. 해당 없는 목록은 빈 목록입니다.
 
 foodBusiness: 일반 음식점·카페(한식, 분식, 커피전문점 등)가 신청할 수 있는 업종인가.
