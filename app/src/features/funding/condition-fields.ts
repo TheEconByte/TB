@@ -13,7 +13,9 @@ export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 형식으로 옮길 수 없는 조건은 value를 null로 두라고 밝혔다(빈 범위·빈 목록은 제한 없음으로 읽힌다).
 // v5(2026-11-12): 프롬프트를 다시 썼다. 목적과 신청 자격을 가리는 기준을 밝히고, 지어낸 공고의 예시를 넣었다. 조건 추출 평가의
 // 정답을 따른다(서울 밖 시·군은 그 시·도, 업종 한정은 음식점·카페 제외, 소상공인·기업은 사업자만). 출력 스키마는 그대로다.
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v5';
+// v6(2026-11-12): 대상·제외 자치구는 대상 시·도가 서울 하나일 때만 읽는다. 시·도가 빈 자치구 한정은 이제 읽지 못함이다
+// (부산 중구가 서울 중구로 읽혔다). 프롬프트와 출력 스키마는 그대로다.
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v6';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;
 export const CONDITION_FOOD_BUSINESS = ['EXCLUDED', 'NOT_EXCLUDED'] as const;

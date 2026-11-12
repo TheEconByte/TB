@@ -58,7 +58,7 @@ function output(overrides: Record<string, unknown> = {}): ConditionOutput {
       mentioned: true,
       value: {
         scope: 'SEOUL_DISTRICTS',
-        provinces: [],
+        provinces: ['서울'],
         districts: ['강남구', '서초구'],
         excludedProvinces: [],
         excludedDistricts: ['송파구'],
@@ -95,7 +95,12 @@ describe('verifyConditionOutput', () => {
     const fields = verifyConditionOutput(output(), BODY);
     expect(fields.region).toMatchObject({
       status: 'READ',
-      value: { scope: 'SEOUL_DISTRICTS', districtCodes: ['11680', '11650'], excludedDistrictCodes: ['11710'] },
+      value: {
+        scope: 'SEOUL_DISTRICTS',
+        provinces: ['서울'],
+        districtCodes: ['11680', '11650'],
+        excludedDistrictCodes: ['11710'],
+      },
     });
   });
 
@@ -251,9 +256,20 @@ describe('verifyConditionOutput', () => {
     expect(fields.age.status).toBe('READ');
   });
 
-  // 서울이 아닌 지역의 '중구'를 서울 중구 코드로 바꾸면, 서울 중구 사용자에게 부산 공고가 맞는 공고로 보인다.
-  it('maps district names to Seoul codes only when the area is Seoul', () => {
-    const body = '신청대상: 부산광역시 중구 소재 소상공인\n지역: 전국(강남구 제외)\n서울특별시 소재 기업(강남구 제외)';
+  // 서울이 아닌 지역의 '중구'를 서울 중구 코드로 바꾸면, 서울 중구 사용자에게 부산 공고가 맞는 공고로 보인다. 그래서 구
+  // 이름은 대상이든 제외든 대상 시·도가 서울 하나일 때만 서울 자치구로 본다. 시·도가 비어 있으면 어느 시의 구인지 알 수
+  // 없다. 서울에만 있는 구 이름(은평구)이어도 같다: 다른 시에 같은 이름이 있는지에 기대지 않는다(요구 2026-11-12, 재현:
+  // "[부산] 중구 …" 공고를 시·도 없이 중구로 적은 출력이 서울 중구 코드로 읽혔다).
+  it('maps district names to Seoul codes only when the provinces are exactly Seoul', () => {
+    const body = [
+      '[부산] 중구 골목상권 활성화 지원사업',
+      '신청대상: 중구에 사업장을 둔 소상공인',
+      '신청대상: 부산광역시 중구 소재 소상공인',
+      '신청대상: 은평구 관내에 사업장이 등록된 소상공인',
+      '지역: 전국(강남구 제외)',
+      '서울특별시 소재 기업(강남구 제외)',
+      '서울특별시·경기도 소재 기업(강남구 제외)',
+    ].join('\n');
     const region = (value: Record<string, unknown>, quote: string) =>
       verifyConditionOutput(
         output({
@@ -265,17 +281,48 @@ describe('verifyConditionOutput', () => {
         }),
         body,
       ).region;
-    const seoulOnly = { status: 'UNREADABLE', reason: expect.stringContaining('서울') };
+    const notSeoulDistricts: Array<[string, Record<string, unknown>, string]> = [
+      ['district without a province', { scope: 'SEOUL_DISTRICTS', districts: ['중구'] }, '중구에 사업장을 둔 소상공인'],
+      [
+        'Seoul-only district name without a province',
+        { scope: 'SEOUL_DISTRICTS', districts: ['은평구'] },
+        '은평구 관내에 사업장이 등록된 소상공인',
+      ],
+      [
+        'district of another province',
+        { scope: 'SEOUL_DISTRICTS', provinces: ['부산'], districts: ['중구'] },
+        '부산광역시 중구 소재',
+      ],
+      [
+        'district of Seoul and another province',
+        { scope: 'SEOUL_DISTRICTS', provinces: ['서울', '부산'], districts: ['중구'] },
+        '부산광역시 중구 소재',
+      ],
+      // 전국이면 시·도가 비어 있다.
+      ['excluded district nationwide', { scope: 'NATIONWIDE', excludedDistricts: ['강남구'] }, '전국(강남구 제외)'],
+      [
+        'excluded district of another province',
+        { scope: 'PROVINCES', provinces: ['부산'], excludedDistricts: ['중구'] },
+        '부산광역시 중구 소재',
+      ],
+      [
+        'excluded district of Seoul and another province',
+        { scope: 'PROVINCES', provinces: ['서울특별시', '경기도'], excludedDistricts: ['강남구'] },
+        '서울특별시·경기도 소재 기업(강남구 제외)',
+      ],
+    ];
+    const notSeoul = { status: 'UNREADABLE', reason: expect.stringContaining('서울 하나') };
+    for (const [label, value, quote] of notSeoulDistricts) {
+      expect(region(value, quote), label).toEqual(notSeoul);
+    }
     // 시·도 한정에 자치구 목록이 함께 오면 어느 쪽인지 알 수 없어 읽지 못함이다(서울 코드로 바꾸지 않는다).
     expect(
       region({ scope: 'PROVINCES', provinces: ['부산'], districts: ['중구'] }, '부산광역시 중구 소재'),
     ).toMatchObject({ status: 'UNREADABLE' });
-    expect(region({ scope: 'NATIONWIDE', excludedDistricts: ['강남구'] }, '전국(강남구 제외)')).toMatchObject(
-      seoulOnly,
-    );
+
     expect(
-      region({ scope: 'SEOUL_DISTRICTS', provinces: ['부산'], districts: ['중구'] }, '부산광역시 중구 소재'),
-    ).toMatchObject(seoulOnly);
+      region({ scope: 'SEOUL_DISTRICTS', provinces: ['서울특별시'], districts: ['은평구'] }, '은평구 관내에 사업장이'),
+    ).toMatchObject({ status: 'READ', value: { provinces: ['서울'], districtCodes: ['11380'] } });
     expect(
       region({ scope: 'PROVINCES', provinces: ['서울특별시'], excludedDistricts: ['강남구'] }, '서울특별시 소재 기업'),
     ).toMatchObject({
