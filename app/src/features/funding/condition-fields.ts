@@ -11,7 +11,9 @@ export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 문장과 상관없이 제외).
 // v4(2026-11-04): 출력 스키마에서 quote가 null 대신 빈 문자열을 받는다(API의 anyOf·type 배열 칸 한도 16개). 밝혔지만
 // 형식으로 옮길 수 없는 조건은 value를 null로 두라고 밝혔다(빈 범위·빈 목록은 제한 없음으로 읽힌다).
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v4';
+// v5(2026-11-12): 프롬프트를 다시 썼다. 목적과 신청 자격을 가리는 기준을 밝히고, 지어낸 공고의 예시를 넣었다. 조건 추출 평가의
+// 정답을 따른다(서울 밖 시·군은 그 시·도, 업종 한정은 음식점·카페 제외, 소상공인·기업은 사업자만). 출력 스키마는 그대로다.
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v5';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;
 export const CONDITION_FOOD_BUSINESS = ['EXCLUDED', 'NOT_EXCLUDED'] as const;
