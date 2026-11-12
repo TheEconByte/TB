@@ -22,7 +22,7 @@ import { isRealDate } from './types.ts';
 export { CONDITION_MODEL, CONDITION_PROMPT_VERSION };
 export type { ConditionFieldName, ConditionValues, VerifiedConditions, VerifiedField };
 
-// 공고 본문에서 신청 조건을 AI로 읽는다(ADR 0009 §3). funding:sync에서만 부른다. 웹 요청 경로에서 import하지 않는다
+// 공고 본문에서 신청 조건을 AI로 읽는다(ADR 0009 §3). funding:sync와 평가 명령(eval:funding-conditions)에서만 부른다. 웹 요청 경로에서 import하지 않는다
 // (notice-extraction.test.ts가 확인한다). AI에는 공고 본문(공개 문서)과 상품 이름만 보내고 사용자 데이터는 보내지 않는다.
 
 // 이보다 긴 본문은 보내지 않는다(잘라 보내지도 않는다). 요청이 지나치게 커지지 않게 하는 상한이며, 실제 토큰 수는

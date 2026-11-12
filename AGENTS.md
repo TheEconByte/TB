@@ -13,7 +13,7 @@
 ## 2. 구조
 
 - 앱은 `app/` 하나다: Next.js App Router, TypeScript, PostgreSQL 17, Prisma, Better Auth, Zod.
-- 별도 서버·Redis·큐·지도·POS 연동·자동 공고 해석 AI 같은 스택 추가는 [ADR](docs/decisions/README.md)을 먼저 쓴다. 공고 해석 AI는 [ADR 0009](docs/decisions/0009-funding-ai-condition-extraction.md)가 정한 대로 운영자 적재 명령(`funding:sync`) 안에서만 부른다.
+- 별도 서버·Redis·큐·지도·POS 연동·자동 공고 해석 AI 같은 스택 추가는 [ADR](docs/decisions/README.md)을 먼저 쓴다. 공고 해석 AI는 [ADR 0009](docs/decisions/0009-funding-ai-condition-extraction.md)가 정한 대로 운영자 명령(적재 `funding:sync`, 평가 `eval:funding-conditions`) 안에서만 부르고 웹 요청 중에는 부르지 않는다.
 - 웹 요청 중에 외부 데이터를 가져오지 않는다. 공식 데이터는 운영자 적재 명령([DEVELOPMENT.md](docs/DEVELOPMENT.md#로컬-데이터-준비))으로 적재한다.
 - 가짜 API, 샘플 운영 데이터, 성공을 흉내 내는 미구현 함수를 만들지 않는다. 기존 계산기·스키마·enum을 재사용한다.
 
