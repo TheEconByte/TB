@@ -2198,9 +2198,9 @@
           "maxExclusive": false
         },
         "quote": "사업을 영위하는 창업 7년 이내 농식품 기업",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "창업 7년 이내이며, 벤처·이노비즈·메인비즈·사회적기업만 7년 초과도 가능하다는 예외가 있다."
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "창업 7년 이내이며, 벤처·이노비즈·메인비즈·사회적기업만 7년 초과도 가능하다는 예외가 있다. 사용자 결정(2026-11-12): 사용자 입력에 없는 자격으로 넘을 수 있는 업력은 값으로 옮기지 않아도 맞음이다."
       },
       "age": {
         "mentioned": false,
@@ -2312,9 +2312,9 @@
           "excludedDistricts": []
         },
         "quote": "서울시 소재 7년 이내 F&B(외식산업분야) (예비)창업자",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "신규 트랙은 서울시 소재로 한정하며 자치구 제한은 없다."
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "신규 트랙은 서울시 소재로 한정하며 자치구 제한은 없다. 사용자 결정(2026-11-12): 졸업 트랙에는 지역 조건이 없어, 트랙마다 다른 업력과 같이 값으로 옮기지 않아도 맞음이다."
       },
       "foodBusiness": {
         "mentioned": true,
