@@ -786,6 +786,31 @@ describe('the extraction prompt', () => {
       expect(verdict(2, 'region', { districtCode: district('강남구') })).toBe('MISMATCH');
     });
 
+    // 서울 전체로 한정한 공고는 시·도 서울이다. 자치구 한정으로 적고 자치구를 비우면 검증이 버려 확인 필요로 남는다. 서울
+    // 사용자에게 가장 쓸모 있는 공고가 놓친다(v6 동기화 2026-11-12: 서울 전체 공고 6건 중 3건이 이렇게 남았고, v4는 시·도
+    // 서울로 읽었다).
+    it('writes a limit to all of Seoul as the province, so every Seoul district matches', async () => {
+      expect(verified(3).region).toMatchObject({
+        status: 'READ',
+        value: { scope: 'PROVINCES', provinces: ['서울'], districts: [] },
+      });
+      expect(verdict(3, 'region')).toBe('MATCH');
+      expect(verdict(3, 'region', { districtCode: district('은평구') })).toBe('MATCH');
+      const prompt = await sentPrompt();
+      expect(prompt).toMatch(/- PROVINCES:[^\n]*서울 전체가 대상이면[^\n]*provinces는 \["서울"\]/);
+      expect(prompt).toMatch(/- SEOUL_DISTRICTS:[^\n]*적을 서울 자치구가 없으면 SEOUL_DISTRICTS가 아닙니다/);
+      for (const example of PROMPT_EXAMPLES) {
+        const region = example.output.region.value;
+        if (region?.scope === 'SEOUL_DISTRICTS') expect(region.districts.length, example.product).toBeGreaterThan(0);
+      }
+    });
+
+    // 서울 밖의 동이나 구로 한정한 공고도 자치구 한정으로 적고 자치구를 비운 답이 나왔다(v6 동기화 2026-11-12: 시흥시의
+    // 동, 인천 중구, 대전 유성구).
+    it('writes the province of a town or a district outside Seoul', async () => {
+      expect(await sentPrompt()).toMatch(/- PROVINCES:[^\n]*서울 밖의 시·군·구나 그 안의 동·읍·면으로 한정하면/);
+    });
+
     it('turns a region left out of a nationwide program away', () => {
       expect(verdict(5, 'region')).toBe('MISMATCH');
     });
