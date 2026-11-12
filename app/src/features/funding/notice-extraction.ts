@@ -387,8 +387,10 @@ function checkRange(value: z.infer<typeof range>, low: number, high: number, lab
   return null;
 }
 
-// 지역 값을 확인하고 이름을 맞춘다. 자치구 이름은 지역이 서울일 때만 서울 자치구 코드로 바꾼다. '중구'·'강서구'
-// 같은 이름은 다른 시에도 있어, 부산 중구를 서울 중구로 바꾸면 서울 중구 사용자에게 부산 공고가 맞아 보인다.
+// 지역 값을 확인하고 이름을 맞춘다. 구 이름은 대상이든 제외든 대상 시·도가 서울 하나일 때만 서울 자치구 코드로 바꾼다.
+// '중구'·'강서구' 같은 이름은 다른 시에도 있어, 부산 중구를 서울 중구로 바꾸면 서울 중구 사용자에게 부산 공고가 맞아
+// 보인다. 시·도가 비어 있으면 어느 시의 구인지 알 수 없다. 서울에만 있는 구 이름이어도 시·도를 요구해, 다른 시에 같은
+// 이름이 있는지에 기대지 않는다.
 function checkRegion(
   region: ConditionOutput['region']['value'] & object,
 ): { ok: true; value: ConditionValues['region'] } | { ok: false; reason: string } {
@@ -405,13 +407,9 @@ function checkRegion(
   if (region.scope !== 'SEOUL_DISTRICTS' && region.districts.length > 0) {
     return fail('자치구 한정이 아닌데 대상 자치구가 있습니다.');
   }
-  const seoul =
-    (region.scope === 'SEOUL_DISTRICTS' &&
-      (provinces.length === 0 || (provinces.length === 1 && provinces[0] === '서울'))) ||
-    (region.scope === 'PROVINCES' && provinces.length === 1 && provinces[0] === '서울');
-  if (!seoul && region.excludedDistricts.length > 0)
-    return fail('서울로 한정하지 않은 공고의 구 이름은 서울 자치구로 볼 수 없습니다.');
-  if (region.scope === 'SEOUL_DISTRICTS' && !seoul) return fail('자치구 한정인데 대상 시·도가 서울이 아닙니다.');
+  const seoul = provinces.length === 1 && provinces[0] === '서울';
+  if (!seoul && (region.districts.length > 0 || region.excludedDistricts.length > 0))
+    return fail('대상 시·도가 서울 하나가 아니어서 구 이름을 서울 자치구로 볼 수 없습니다.');
   const unknownDistricts = [...region.districts, ...region.excludedDistricts].filter(
     (name) => !DISTRICT_CODES.has(name),
   );

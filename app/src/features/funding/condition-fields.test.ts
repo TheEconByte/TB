@@ -23,7 +23,7 @@ const OUTPUT: ConditionOutput = {
     mentioned: true,
     value: {
       scope: 'SEOUL_DISTRICTS',
-      provinces: [],
+      provinces: ['서울'],
       districts: ['강남구', '서초구'],
       excludedProvinces: [],
       excludedDistricts: ['송파구'],
