@@ -424,9 +424,13 @@ function aiEndDatePassed(aiPeriod: ConditionReading<ConditionValues['application
 }
 
 // 기업마당은 지자체 공고의 제목 맨 앞에 [시·도]를 붙인다. 표시가 틀린 공고도 있어 지역 값으로는 쓰지 않는다.
+export function bizinfoTitleMark(title: string): string | null {
+  return /^\s*\[([^\]]+)\]/.exec(title)?.[1].trim() ?? null;
+}
+
 function leadingTitleMark(product: FundingProduct): string | null {
   if (product.origin !== 'SYNC' || product.sourceRef?.source !== 'BIZINFO') return null;
-  return /^\s*\[([^\]]+)\]/.exec(product.name)?.[1].trim() ?? null;
+  return bizinfoTitleMark(product.name);
 }
 
 const NOT_LIMITING_MARKS = ['서울', '전국'];
@@ -454,6 +458,17 @@ function conditionGroup(conditions: readonly ConditionMatch[]): Exclude<FundingM
   return checks.every((entry) => entry.checkReason === 'NOT_MENTIONED') ? 'NOT_MENTIONED_ONLY' : 'NEEDS_CHECK';
 }
 
+// 마감이 아닌 공고의 항목별 판정과 그룹. 화면(matchProduct)과 조건 추출 평가(condition-eval.ts)가 같은 판단을 쓴다.
+export function judgeOpenNotice(
+  readings: Readings,
+  profile: FundingMatchProfile,
+  asOfDate: string,
+  titleRegionMark: string | null,
+): { conditions: ConditionMatch[]; group: Exclude<FundingMatchGroup, 'CLOSED'> } {
+  const conditions = withTitleRegionMark(matchConditions(readings, profile, asOfDate), titleRegionMark);
+  return { conditions, group: conditionGroup(conditions) };
+}
+
 export function matchProduct(
   product: FundingProduct,
   extraction: VerifiedConditions | null,
@@ -462,7 +477,8 @@ export function matchProduct(
 ): ProductMatch {
   const readings = readProductConditions(product, extraction);
   const titleRegionMark = leadingTitleMark(product);
-  const conditions = withTitleRegionMark(matchConditions(readings, profile, context.asOfDate), titleRegionMark);
+  const judged = judgeOpenNotice(readings, profile, context.asOfDate, titleRegionMark);
+  const { conditions } = judged;
   const auto = product.origin === 'SYNC';
   const source = auto ? product.sourceRef?.source : undefined;
   const fresh =
@@ -476,7 +492,7 @@ export function matchProduct(
           ...(aiEndDatePassed(readings.applicationPeriod, context.asOfDate) ? (['AI_END_DATE_PASSED'] as const) : []),
         ]
       : [];
-  const group: FundingMatchGroup = closed !== null ? 'CLOSED' : conditionGroup(conditions);
+  const group: FundingMatchGroup = closed !== null ? 'CLOSED' : judged.group;
   return {
     productKey: product.productKey,
     version: product.version,
