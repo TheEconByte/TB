@@ -478,14 +478,27 @@ function checkValue(
   }
 }
 
+// 값에 옮겨 적은 서울 자치구 이름이 인용과 제목 어디에도 없으면 사유를 돌려준다. 자치구는 공고에 적힌 이름을 그대로
+// 옮기는 값이라, 이름이 근거에 없으면 인용이 공고에 있어도 값은 공고 밖(프롬프트의 예시 이름 등)에서 온 것이다(사용자
+// 결정 2026-11-13). 시·도는 시·군 이름에서 옮겨 적으므로(창원시 → 경남) 이름을 요구하지 않는다. 줄인 이름(강남·서초)은
+// 받지 않는다. 서울과 다른 시에 함께 있는 이름(중구·강서구)은 이 대조로 가리지 못한다.
+function unquotedDistricts(region: ConditionValues['region'], evidence: readonly string[]): string | null {
+  const missing = [...region.districts, ...region.excludedDistricts].filter(
+    (district) => !evidence.some((source) => source.includes(compactForQuote(district))),
+  );
+  return missing.length === 0 ? null : `자치구 이름이 인용과 제목에 없습니다: ${missing.join(', ')}`;
+}
+
 // AI에 보낸 공고. 상품 이름(공고 제목이나 자금 이름)도 공고의 일부라 조건을 밝힐 수 있다(사용자 결정 2026-11-12).
 export type NoticeSource = { productName: string; text: string };
 
 // 인용 검증(ADR 0009 §3): 인용이 공고 제목이나 저장한 본문 중 한 곳에 그대로 없으면 그 값은 버리고 읽지 못함으로 둔다.
 // 제목과 본문은 따로 대조해, 둘을 이어 붙인 인용은 받지 않는다. 인용이 공고에 있어도 다른 항목의 문장일 수 있다
 // (예: "연령 제한 없음"의 "제한 없음"을 업력 근거로 씀). 이 경우는 막지 못한다(ADR 0009 Consequences의 해석 오류).
+// 다만 지역에 적은 서울 자치구는 그 이름이 인용이나 제목에 있어야 한다(unquotedDistricts).
 export function verifyConditionOutput(output: ConditionOutput, notice: NoticeSource): VerifiedConditions {
-  const sources = [notice.productName, notice.text].map(compactForQuote);
+  const title = compactForQuote(notice.productName);
+  const sources = [title, compactForQuote(notice.text)];
   const verified: Record<string, VerifiedField<unknown>> = {};
   for (const name of Object.keys(conditionOutputSchema.shape) as ConditionFieldName[]) {
     const entry = output[name];
@@ -507,9 +520,16 @@ export function verifyConditionOutput(output: ConditionOutput, notice: NoticeSou
       continue;
     }
     const checked = checkValue(name, entry.value);
-    verified[name] = checked.ok
-      ? { status: 'READ', value: checked.value, quote: entry.quote }
-      : { status: 'UNREADABLE', reason: checked.reason };
+    if (!checked.ok) {
+      verified[name] = { status: 'UNREADABLE', reason: checked.reason };
+      continue;
+    }
+    const unquoted =
+      name === 'region' ? unquotedDistricts(checked.value as ConditionValues['region'], [quote, title]) : null;
+    verified[name] =
+      unquoted === null
+        ? { status: 'READ', value: checked.value, quote: entry.quote }
+        : { status: 'UNREADABLE', reason: unquoted };
   }
   return verified as VerifiedConditions;
 }
