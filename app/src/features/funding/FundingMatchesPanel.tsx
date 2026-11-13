@@ -14,22 +14,32 @@ import {
   SUPPORT_TYPE_LABELS,
   aiPeriodText,
   applicationPeriodText,
+  applicationStateText,
   checkReasonText,
   closedText,
   conditionValueText,
   formatDate,
   fundingGapText,
   fundingProfileSummary,
-  holdText,
   limitText,
   supportTypesText,
+  tabCountTexts,
+  unconfirmedReasonText,
   type ViewedFundingGap,
 } from './match-text.ts';
-import { FUNDING_TABS, type ConditionMatch, type FundingTab, type ProductMatch } from './matching.ts';
+import {
+  FUNDING_MATCH_GROUPS,
+  FUNDING_TABS,
+  applicationState,
+  type ConditionMatch,
+  type FundingTab,
+  type ProductMatch,
+} from './matching.ts';
 import type { ObservedApplicationStatus } from './types.ts';
 
 // 맞춰 보기 결과(ADR 0009 §4). /funding과 계획 화면이 같은 결과를 같은 모양으로 보여 준다. 정책자금·지원사업 탭마다
-// 맞아 보임 → 확인 필요 → 안 맞아 보임(접어 둠) → 마감(기본으로 숨김) 순서다. AI가 읽은 값으로는 공고를 숨기지 않는다.
+// 맞아 보임 → 걸리는 조건 안 보임 → 확인 필요 → 안 맞아 보임(접어 둠) → 마감(기본으로 숨김) 순서다. 그룹은 조건으로만 나누고
+// 접수 상태는 카드마다 따로 보여 준다. AI가 읽은 값으로는 공고를 숨기지 않는다.
 
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
@@ -40,10 +50,12 @@ const TAB_NOTES: Record<FundingTab, string> = {
     '기업마당의 나머지 공고와 운영자가 등록한 지원금·공간·프로그램입니다. 조달액이나 대출 상환으로 계산하지 않습니다.',
 };
 
+// 출처·운영자가 기록한 접수 상태. 카드의 접수 상태 표시(접수 중 확인·접수 여부 미확인)는 여기에 출처 최신성과 AI가 읽은
+// 종료일까지 본 결과라서, 둘이 같은 말로 읽히지 않게 기록한 값만 짧게 쓴다.
 const APPLICATION_STATUS_LABELS: Record<ObservedApplicationStatus, string> = {
-  OPEN: '접수 중으로 확인',
-  CLOSED: '접수 마감으로 확인',
-  UNKNOWN: '접수 상태 미확인',
+  OPEN: '접수 중',
+  CLOSED: '마감',
+  UNKNOWN: '알 수 없음',
 };
 
 export type FundingLoadError = { code: string | null; message: string };
@@ -181,13 +193,14 @@ export function FundingMatchesPanel({
               >
                 <span>{FUNDING_TAB_LABELS[key]}</span>
                 <small>
-                  {FUNDING_GROUP_LABELS.MATCHING} {numberFormat.format(result.tabs[key].counts.MATCHING)} ·{' '}
-                  {FUNDING_GROUP_LABELS.NEEDS_CHECK} {numberFormat.format(result.tabs[key].counts.NEEDS_CHECK)}
+                  {tabCountTexts(result.tabs[key].counts).map((text) => (
+                    <span key={text}>{text}</span>
+                  ))}
                 </small>
               </button>
             ))}
           </div>
-          <TabPanel key={tab} tab={tab} list={result.tabs[tab]} fundingGap={fundingGap} />
+          <TabPanel key={tab} tab={tab} list={result.tabs[tab]} asOfDate={result.asOfDate} fundingGap={fundingGap} />
         </>
       )}
     </>
@@ -197,16 +210,19 @@ export function FundingMatchesPanel({
 function TabPanel({
   tab,
   list,
+  asOfDate,
   fundingGap,
 }: {
   readonly tab: FundingTab;
   readonly list: FundingMatchesWithProfile['tabs'][FundingTab];
+  readonly asOfDate: string;
   readonly fundingGap: ViewedFundingGap | undefined;
 }) {
   const [showClosed, setShowClosed] = useState(false);
   const of = (group: ProductMatch['group']) => list.products.filter((entry) => entry.group === group);
-  const [matching, needsCheck, notMatching, closed] = [
+  const [matching, notMentionedOnly, needsCheck, notMatching, closed] = [
     of('MATCHING'),
+    of('NOT_MENTIONED_ONLY'),
     of('NEEDS_CHECK'),
     of('NOT_MATCHING'),
     of('CLOSED'),
@@ -215,7 +231,13 @@ function TabPanel({
   const cards = (items: ProductMatch[]) => (
     <div className="candidate-list">
       {items.map((entry) => (
-        <MatchCard key={`${entry.productKey}@${entry.version}`} match={entry} policy={policy} fundingGap={fundingGap} />
+        <MatchCard
+          key={`${entry.productKey}@${entry.version}`}
+          match={entry}
+          asOfDate={asOfDate}
+          policy={policy}
+          fundingGap={fundingGap}
+        />
       ))}
     </div>
   );
@@ -234,7 +256,7 @@ function TabPanel({
         </div>
       )}
       <div className="status-counts branch-counts" aria-label={`${FUNDING_TAB_LABELS[tab]} 그룹별 개수`}>
-        {(['MATCHING', 'NEEDS_CHECK', 'NOT_MATCHING', 'CLOSED'] as const).map((group) => (
+        {FUNDING_MATCH_GROUPS.map((group) => (
           <div key={group} className={`status-count count-${group.toLowerCase()}`}>
             <span>{FUNDING_GROUP_LABELS[group]}</span>
             <strong>{numberFormat.format(list.counts[group])}건</strong>
@@ -252,16 +274,32 @@ function TabPanel({
               <span>{numberFormat.format(matching.length)}건</span>
             </div>
             <p className="group-note">
-              여섯 항목이 모두 맞아 보이고 출처에서 접수 중으로 확인한 공고입니다. 선정이나 지원 결정을 뜻하지 않습니다.
+              여섯 항목이 모두 맞아 보이는 공고입니다. 접수 중인지는 카드의 접수 상태로 따로 보여 주며, 선정이나 지원
+              결정을 뜻하지 않습니다.
             </p>
             {matching.length === 0 ? (
               <p className="empty-state">
-                맞아 보이는 공고가 0건입니다. 정상 결과입니다. 확인 필요 공고에 남은 항목을 원 공고에서 확인해 주세요.
+                맞아 보이는 공고가 0건입니다. 정상 결과입니다. 여섯 조건을 모두 밝힌 공고는 드뭅니다. 아래 그룹을 살펴
+                주세요.
               </p>
             ) : (
               cards(matching)
             )}
           </div>
+
+          {notMentionedOnly.length > 0 && (
+            <div className="candidate-group">
+              <div className="group-head">
+                <h3>걸리는 조건이 안 보이는 공고</h3>
+                <span>{numberFormat.format(notMentionedOnly.length)}건</span>
+              </div>
+              <p className="group-note">
+                안 맞아 보이는 항목이 없고, 맞음이 아닌 항목은 모두 공고문에서 찾지 못한 공고입니다. 공고문에 없다고
+                제한이 없다는 뜻은 아니니 원 공고에서 확인해 주세요.
+              </p>
+              {cards(notMentionedOnly)}
+            </div>
+          )}
 
           {needsCheck.length > 0 && (
             <div className="candidate-group">
@@ -270,8 +308,9 @@ function TabPanel({
                 <span>{numberFormat.format(needsCheck.length)}건</span>
               </div>
               <p className="group-note">
-                안 맞아 보이는 항목은 없지만, 공고문에 없거나 AI가 읽지 못했거나 입력이 없는 항목, 또는 접수 상태 확인이
-                남은 공고입니다.
+                안 맞아 보이는 항목은 없지만, AI가 읽지 못했거나 입력이 없거나 입력만으로는 정할 수 없어 맞춰 보지 못한
+                항목이 있는 공고입니다. 공고문에서 지역 조건을 찾지 못했는데 제목에 다른 지역 표시가 있는 공고도 여기에
+                둡니다.
               </p>
               {cards(needsCheck)}
             </div>
@@ -310,15 +349,18 @@ function TabPanel({
 
 function MatchCard({
   match,
+  asOfDate,
   policy,
   fundingGap,
 }: {
   readonly match: ProductMatch;
+  readonly asOfDate: string;
   readonly policy: boolean;
   readonly fundingGap: ViewedFundingGap | undefined;
 }) {
   const closed = closedText(match);
-  const { aiPeriod } = match.application;
+  const applicationText = applicationStateText(match, asOfDate);
+  const { aiPeriod, unconfirmedReasons } = match.application;
   return (
     <article className="candidate-card">
       <div className="candidate-head">
@@ -330,6 +372,11 @@ function MatchCard({
           <span className={`candidate-status status-${match.group.toLowerCase()}`}>
             {FUNDING_GROUP_LABELS[match.group]}
           </span>
+          {applicationText !== null && (
+            <span className={`application-badge application-${applicationState(match.application).toLowerCase()}`}>
+              {applicationText}
+            </span>
+          )}
           {match.supportType !== 'UNKNOWN' && (
             <span className={`support-badge support-${match.supportType.toLowerCase()}`}>
               {SUPPORT_TYPE_LABELS[match.supportType]}
@@ -339,11 +386,11 @@ function MatchCard({
         </div>
       </div>
 
-      {(closed !== null || match.holds.length > 0) && (
-        <ul className="reason-list match-holds">
+      {(closed !== null || unconfirmedReasons.length > 0) && (
+        <ul className="reason-list application-reasons">
           {closed !== null && <li>{closed}</li>}
-          {match.holds.map((hold) => (
-            <li key={hold}>{holdText(hold, match)}</li>
+          {unconfirmedReasons.map((reason) => (
+            <li key={reason}>{unconfirmedReasonText(reason, match)}</li>
           ))}
         </ul>
       )}
@@ -387,7 +434,12 @@ function MatchCard({
 
       <ul className="match-conditions" aria-label="조건별 맞춰 보기">
         {match.conditions.map((condition) => (
-          <ConditionItem key={condition.key} condition={condition} regionNote={match.operatorRegionNote} />
+          <ConditionItem
+            key={condition.key}
+            condition={condition}
+            regionNote={match.operatorRegionNote}
+            titleRegionMark={match.titleRegionMark}
+          />
         ))}
       </ul>
 
@@ -417,12 +469,14 @@ function MatchCard({
 function ConditionItem({
   condition,
   regionNote,
+  titleRegionMark,
 }: {
   readonly condition: ConditionMatch;
   readonly regionNote: string | null;
+  readonly titleRegionMark: string | null;
 }) {
   const value = conditionValueText(condition);
-  const reason = checkReasonText(condition);
+  const reason = checkReasonText(condition, titleRegionMark);
   const { reading } = condition;
   return (
     <li className={`match-condition condition-${condition.verdict.toLowerCase()}`}>

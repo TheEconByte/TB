@@ -8,6 +8,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.ts';
 import {
   EVAL_METRICS,
+  GROUP_PROFILE_NAMES,
   EVAL_SETS,
   expectedFields,
   gradeCase,
@@ -182,7 +183,8 @@ async function main() {
       const model = String(seen.response?.model ?? '');
       if (!model.startsWith(CONDITION_MODEL)) throw new Error(`요청한 모델과 다른 모델이 답했습니다: ${model}`);
       const verified = verifyConditionOutput(result.output, notice);
-      const { outcomes, scores } = gradeCase(verified, expected.get(item.id)!.acceptable);
+      const target = expected.get(item.id)!;
+      const { outcomes, groups, scores } = gradeCase(verified, target.acceptable, target.titleRegionMark);
       writeFileSync(
         join(dir, 'traces', `${item.id}_rep${rep}.json`),
         JSON.stringify(
@@ -190,7 +192,7 @@ async function main() {
             { role: 'system', content: String(seen.request?.system ?? '') },
             { role: 'user', content: (seen.request?.messages as Array<{ content: string }>)[0].content },
             { role: 'assistant', content: JSON.stringify(result.output, null, 2) },
-            { role: 'tool_result', name: 'grade', content: JSON.stringify({ verified, outcomes }, null, 2) },
+            { role: 'tool_result', name: 'grade', content: JSON.stringify({ verified, outcomes, groups }, null, 2) },
           ],
           null,
           1,
@@ -256,6 +258,8 @@ function writeStateOnce() {
           { id: 'confident_wrong', label: '위험한 오답', kind: 'float', scale: 1, better: 'lower' },
           { id: 'missed', label: '놓침', kind: 'float', scale: 1, better: 'lower' },
           { id: 'exact_acc', label: '완전 일치', kind: 'float', scale: 1 },
+          { id: 'group_changed', label: '그룹 달라짐', kind: 'float', scale: 1, better: 'lower' },
+          { id: 'group_surfaced', label: '그룹 잘못 올라옴', kind: 'float', scale: 1, better: 'lower' },
         ],
         perf_fields: [{ id: 'in_tokens' }, { id: 'out_tokens' }, { id: 'latency_s', unit: 's' }],
       },
@@ -300,7 +304,8 @@ function summarize(
     const trace = JSON.parse(readFileSync(traceFile, 'utf8')) as Array<{ role: string; content: string }>;
     const output = JSON.parse(trace.find((turn) => turn.role === 'assistant')!.content) as ConditionOutput;
     const verified = verifyConditionOutput(output, notices.get(row.prompt_id)!);
-    return [{ id: row.prompt_id, ...gradeCase(verified, expected.get(row.prompt_id)!.acceptable) }];
+    const target = expected.get(row.prompt_id)!;
+    return [{ id: row.prompt_id, ...gradeCase(verified, target.acceptable, target.titleRegionMark) }];
   });
   const lines: string[] = [];
   if (skipped.length > 0) lines.push(`채점하지 않은 결과: ${skipped.join(', ')}`);
@@ -324,6 +329,11 @@ function summarize(
       lines.push(
         `    ${name}: ${count.CORRECT}/${count.EQUIVALENT}/${count.CONFIDENT_WRONG}/${count.MISSED}/${count.DISPLAY_WRONG}`,
       );
+    }
+    lines.push('  화면 그룹, 입력별 (정답과 같음/앞의 두 그룹에 잘못 올라옴/그 밖의 차이):');
+    for (const name of GROUP_PROFILE_NAMES) {
+      const count = summary.groups[name];
+      lines.push(`    ${name}: ${count.SAME}/${count.SURFACED}/${count.OTHER}`);
     }
   }
   console.log(lines.join('\n'));

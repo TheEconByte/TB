@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { VerifiedConditions } from './condition-fields.ts';
 import {
+  applicationState,
   fundingTab,
   matchCatalog,
   matchProduct,
@@ -14,7 +15,8 @@ import { FUNDING_CATALOG_SCHEMA_VERSION } from './types.ts';
 
 // ADR 0009 §4의 맞춰 보기. 기대값의 근거는 각 테스트 옆에 적는다.
 // - "ADR §4": docs/decisions/0009-funding-ai-condition-extraction.md 4절
-// - "사용자 결정": 2026-11-03 5단계 질문의 답(맞아 보임은 여섯 항목 모두 맞음 + 접수 중, 마감은 출처·운영자 데이터로만 정함)
+// - "사용자 결정": 2026-11-03 5단계 질문의 답(마감은 출처·운영자 데이터로만 정함)과 2026-11-13의 답(그룹은 조건으로만
+//   나누고 접수 상태는 그룹과 따로 보여 준다)
 // - "기본값": 5단계 크기 제안에서 사용자에게 알리고 이의가 없던 규칙
 
 const AS_OF = '2026-11-03';
@@ -178,26 +180,125 @@ function verdictOf(conditions: VerifiedConditions | null, user: FundingMatchProf
   return { verdict: result.verdict, checkReason: result.checkReason };
 }
 
-describe('공고 그룹(ADR §4, 사용자 결정)', () => {
-  it('여섯 조건이 모두 맞고 접수 중이며 출처가 최신이면 맞아 보임이다', () => {
+describe('공고 그룹(ADR §4, 사용자 결정 2026-11-13: 마감이 아니면 여섯 항목의 판정으로만 나눈다)', () => {
+  it('여섯 조건이 모두 맞으면 맞아 보임이다', () => {
     const result = match(autoProduct('BIZINFO'), openConditions(), NO_INPUT);
     expect(result.conditions.map((entry) => entry.verdict)).toEqual(Array(6).fill('MATCH'));
     expect(result.group).toBe('MATCHING');
-    expect(result.holds).toEqual([]);
   });
 
-  // 사용자 결정: 언급 없음 하나라도 있으면 맞아 보임이 아니라 확인 필요다(ADR Validation "언급 없음은 확인 필요").
-  it('언급 없음이 하나라도 있으면 확인 필요다', () => {
-    const result = match(autoProduct('BIZINFO'), openConditions({ age: NOT_MENTIONED }), NO_INPUT);
+  // ADR §3: 언급 없음은 제한 없음이 아니라서 항목은 맞음이 아니라 확인 필요다. ADR §4: 맞음이 아닌 항목이 모두 언급
+  // 없음이면 읽지 못한 공고와 섞지 않고 따로 묶는다.
+  it('안 맞는 항목이 없고 맞음이 아닌 항목이 모두 언급 없음이면 걸리는 조건 안 보임이다', () => {
+    const conditions = openConditions({ age: NOT_MENTIONED, businessAge: NOT_MENTIONED });
+    const result = match(autoProduct('BIZINFO'), conditions, NO_INPUT);
     expect(condition(result, 'age')).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_MENTIONED' });
-    expect(result.group).toBe('NEEDS_CHECK');
+    expect(result.group).toBe('NOT_MENTIONED_ONLY');
   });
 
-  it('읽지 못한 항목은 확인 필요다', () => {
-    const conditions = openConditions({ region: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' } });
+  it('읽지 못한 항목이 있으면 나머지가 언급 없음이어도 확인 필요다', () => {
+    const conditions = openConditions({
+      region: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' },
+      age: NOT_MENTIONED,
+    });
     const result = match(autoProduct('BIZINFO'), conditions, NO_INPUT);
     expect(condition(result, 'region')).toMatchObject({ verdict: 'CHECK', checkReason: 'UNREADABLE' });
     expect(result.group).toBe('NEEDS_CHECK');
+  });
+
+  // 입력하면 결과가 정해지는 항목이 남았으면 걸리는 조건이 없는지 아직 모른다.
+  it('입력이 없어 맞춰 보지 못한 항목이 있으면 확인 필요다', () => {
+    const conditions = openConditions({ age: read({ min: null, max: 39, maxExclusive: false }) });
+    const result = match(autoProduct('BIZINFO'), conditions, NO_INPUT);
+    expect(condition(result, 'age')).toMatchObject({ verdict: 'CHECK', checkReason: 'INPUT_MISSING' });
+    expect(result.group).toBe('NEEDS_CHECK');
+    expect(match(autoProduct('BIZINFO'), conditions, profile({ age: 35 })).group).toBe('MATCHING');
+  });
+
+  // 연매출 상한 같은 '그 밖의 대상'은 공고가 밝힌 조건이다. 입력으로 정할 수 없을 뿐 언급 없음이 아니므로, 걸리는 조건이
+  // 안 보이는 공고로 올리지 않는다(ADR §4 화면 3번).
+  it('입력으로 정할 수 없는 항목이 있으면 나머지가 언급 없음이어도 확인 필요다', () => {
+    const conditions = openConditions({
+      targetGroups: read({ groups: ['OTHER'], note: '연매출 3억원 이하' }) as VerifiedConditions['targetGroups'],
+      age: NOT_MENTIONED,
+    });
+    const result = match(autoProduct('BIZINFO'), conditions, profile({ targetGroups: [] }));
+    expect(condition(result, 'targetGroups')).toMatchObject({ verdict: 'CHECK', checkReason: 'UNCERTAIN' });
+    expect(result.group).toBe('NEEDS_CHECK');
+  });
+
+  // ADR §4(2026-11-13): 지역이 언급 없음인데 제목 맨 앞에 서울도 전국도 아닌 표시가 있으면 걸리는 조건 안 보임으로 올리지
+  // 않는다. 표시는 내리는 데만 쓴다. 지역 값을 정하거나 안 맞음으로 만들지 않는다.
+  describe('제목의 [시·도] 표시', () => {
+    const regionUnmentioned = openConditions({ region: NOT_MENTIONED });
+    const titled = (name: string) => autoProduct('BIZINFO', { name });
+
+    it('지역이 언급 없음이고 제목 표시가 서울이 아니면 지역의 확인 필요 이유가 제목 표시이고 그룹은 확인 필요다', () => {
+      for (const name of [
+        '[부산] 동백전 카드수수료 지원사업 공고',
+        '[전남광주] 광양시 컨설팅 모집 공고',
+        ' [대구ㆍ경북] 모집 공고',
+      ]) {
+        const result = match(titled(name), regionUnmentioned, profile({ districtCode: GANGNAM }));
+        expect(condition(result, 'region'), name).toMatchObject({ verdict: 'CHECK', checkReason: 'TITLE_REGION_MARK' });
+        expect(result.group, name).toBe('NEEDS_CHECK');
+      }
+      expect(match(titled('[부산] 공고'), regionUnmentioned, NO_INPUT).titleRegionMark).toBe('부산');
+    });
+
+    it('표시가 없거나 서울·전국이면 언급 없음 그대로다', () => {
+      for (const name of [
+        '소상공인 온라인판로 지원사업 모집공고',
+        '[서울] 온라인 유통 MD 상담 모집 공고',
+        '[전국] 모집 공고',
+        '2026년 [부산] 공고',
+      ]) {
+        const result = match(titled(name), regionUnmentioned, profile({ districtCode: GANGNAM }));
+        expect(condition(result, 'region'), name).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_MENTIONED' });
+        expect(result.group, name).toBe('NOT_MENTIONED_ONLY');
+      }
+    });
+
+    // 표시 문장은 "AI가 지역 조건을 찾지 못했습니다"라고 말한다. AI가 지역을 읽었거나(입력이 없어 못 맞춰 본 경우 포함), 읽지
+    // 못했거나, 아직 읽지 않은 공고에 붙으면 카드가 스스로 어긋난다.
+    it('지역이 언급 없음이 아니면 확인 필요여도 이유를 바꾸지 않는다', () => {
+      const busan = read({
+        scope: 'PROVINCES',
+        provinces: ['부산'],
+        districts: [],
+        excludedProvinces: [],
+        excludedDistricts: [],
+        districtCodes: [],
+        excludedDistrictCodes: [],
+      }) as VerifiedConditions['region'];
+      const product = titled('[부산] 소상공인 모집 공고');
+      expect(condition(match(product, openConditions({ region: busan }), NO_INPUT), 'region').checkReason).toBe(
+        'INPUT_MISSING',
+      );
+      const unreadable = openConditions({ region: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' } });
+      expect(condition(match(product, unreadable, NO_INPUT), 'region').checkReason).toBe('UNREADABLE');
+      expect(condition(match(product, null, NO_INPUT), 'region').checkReason).toBe('NOT_READ');
+    });
+
+    // 표시가 틀린 공고가 있다(제목 [대구], 본문 대전 유성구). AI가 지역을 읽었으면 표시를 보지 않는다.
+    it('AI가 지역을 읽었으면 표시와 달라도 읽은 값으로 맞춰 본다', () => {
+      const result = match(
+        titled('[부산] 전국 소상공인 모집 공고'),
+        openConditions(),
+        profile({ districtCode: GANGNAM }),
+      );
+      expect(condition(result, 'region')).toMatchObject({ verdict: 'MATCH', checkReason: null });
+      expect(result.group).toBe('MATCHING');
+    });
+
+    // 제목 표시는 기업마당 공고의 관례다. 소진공 자금 이름과 사람이 등록한 상품에는 쓰지 않는다.
+    it('기업마당 자동 상품의 제목만 본다', () => {
+      const semas = autoProduct('SEMAS_OLS', { name: '[부산] 자금' });
+      expect(condition(match(semas, regionUnmentioned, NO_INPUT), 'region').checkReason).toBe('NOT_MENTIONED');
+      expect(match(semas, regionUnmentioned, NO_INPUT).titleRegionMark).toBeNull();
+      const manual = manualProduct({ name: '[부산] 대출', sourceRef: { source: 'BIZINFO', externalId: 'PBLN_1' } });
+      expect(match(manual, regionUnmentioned, NO_INPUT).titleRegionMark).toBeNull();
+    });
   });
 
   // ADR 0009 4단계 인계: 추출 결과 행이 없으면 그 공고의 모든 항목이 읽지 못함(확인 필요)이다.
@@ -218,17 +319,29 @@ describe('공고 그룹(ADR §4, 사용자 결정)', () => {
     const conditions = openConditions({ foodBusiness: read('EXCLUDED'), age: NOT_MENTIONED });
     expect(match(autoProduct('BIZINFO'), conditions, NO_INPUT).group).toBe('NOT_MATCHING');
   });
+});
 
-  // ADR §4 "접수 중": 접수 상태를 출처에서 확인하지 못했으면 조건이 모두 맞아도 확인 필요다.
-  it('조건이 모두 맞아도 접수 상태가 접수 중이 아니면 확인 필요다', () => {
-    const product = autoProduct('BIZINFO', { observedApplicationStatus: 'UNKNOWN' });
-    const result = match(product, openConditions(), NO_INPUT);
-    expect(result.group).toBe('NEEDS_CHECK');
-    expect(result.holds).toEqual(['STATUS_NOT_OPEN']);
+describe('접수 상태(ADR §4, 사용자 결정 2026-11-13: 그룹과 따로 보여 주고 그룹을 바꾸지 않는다)', () => {
+  it('출처의 접수 상태가 접수 중이고 출처가 최신이면 접수 중 확인이다', () => {
+    const result = match(autoProduct('BIZINFO'), openConditions(), NO_INPUT);
+    expect(result.application.unconfirmedReasons).toEqual([]);
+    expect(applicationState(result.application)).toBe('OPEN_CONFIRMED');
   });
 
-  // 기본값(ADR §6이 유지하는 3일 최신성): 출처 확인이 3일 넘게 끊기면 맞아 보임이 아니라 확인 필요다.
-  it('자동 상품의 출처 확인이 3일 넘게 끊기면 확인 필요다', () => {
+  // 2026-11-13 릴리스에서 출처의 접수 상태가 접수 중인 공고는 290건 중 73건이었다. 접수 상태를 모른다고 조건이 맞는
+  // 공고를 확인 필요로 내리지 않는다.
+  it('출처의 접수 상태가 접수 중이 아니면 접수 여부 미확인이고 그룹은 그대로다', () => {
+    const product = autoProduct('BIZINFO', { observedApplicationStatus: 'UNKNOWN' });
+    const result = match(product, openConditions(), NO_INPUT);
+    expect(result.group).toBe('MATCHING');
+    expect(result.application.unconfirmedReasons).toEqual(['STATUS_NOT_OPEN']);
+    expect(applicationState(result.application)).toBe('UNCONFIRMED');
+    const unmentioned = match(product, openConditions({ age: NOT_MENTIONED }), NO_INPUT);
+    expect(unmentioned.group).toBe('NOT_MENTIONED_ONLY');
+  });
+
+  // ADR §6이 유지하는 3일 최신성: 출처 확인이 3일 넘게 끊기면 접수 중으로 확인한 공고로 보여 주지 않는다.
+  it('자동 상품의 출처 확인이 3일 넘게 끊기면 접수 여부 미확인이다', () => {
     const product = autoProduct('BIZINFO');
     const stale = catalogOf([product], {
       sourceSyncs: [
@@ -244,29 +357,32 @@ describe('공고 그룹(ADR §4, 사용자 결정)', () => {
       ],
     });
     const result = match(product, openConditions(), NO_INPUT, { catalog: stale });
-    expect(result.group).toBe('NEEDS_CHECK');
-    expect(result.holds).toEqual(['SOURCE_STALE']);
+    expect(result.group).toBe('MATCHING');
+    expect(result.application.unconfirmedReasons).toEqual(['SOURCE_STALE']);
+    expect(applicationState(result.application)).toBe('UNCONFIRMED');
     expect(result.automation).toMatchObject({ source: 'BIZINFO', lastSucceededOn: '2026-10-30', fresh: false });
     // 3일째까지는 최신이다(ADR 0006의 3일 규칙: 마지막 성공일 + 3일까지).
-    expect(match(product, openConditions(), NO_INPUT, { catalog: stale, asOfDate: '2026-11-02' }).group).toBe(
-      'MATCHING',
-    );
+    const thirdDay = match(product, openConditions(), NO_INPUT, { catalog: stale, asOfDate: '2026-11-02' });
+    expect(applicationState(thirdDay.application)).toBe('OPEN_CONFIRMED');
   });
 
   it('사람이 등록한 상품은 출처 최신성을 보지 않는다', () => {
     const product = manualProduct();
     const result = match(product, null, NO_INPUT, { catalog: catalogOf([product], { sourceSyncs: [] }) });
     expect(result.automation).toBeNull();
-    expect(result.holds).not.toContain('SOURCE_STALE');
+    expect(applicationState(result.application)).toBe('OPEN_CONFIRMED');
   });
 });
 
-describe('마감(ADR §4, 사용자 결정: 마감은 출처·운영자 데이터로만, AI 종료일은 확인 필요)', () => {
+describe('마감(ADR §4, 사용자 결정: 마감은 출처·운영자 데이터로만, AI 종료일은 접수 여부 미확인)', () => {
   it('출처가 마감으로 표시하면 조건과 상관없이 마감이다', () => {
     const product = autoProduct('SEMAS_OLS', { observedApplicationStatus: 'CLOSED' });
     const result = match(product, openConditions({ foodBusiness: read('EXCLUDED') }), NO_INPUT);
     expect(result.group).toBe('CLOSED');
     expect(result.application.closedBy).toBe('SOURCE_STATUS');
+    // 마감한 공고에는 접수 여부 미확인 이유를 붙이지 않는다.
+    expect(result.application.unconfirmedReasons).toEqual([]);
+    expect(applicationState(result.application)).toBe('CLOSED');
   });
 
   // 종료일 당일까지는 접수 중이다(ADR 0006, funding.md 판정 규칙).
@@ -276,11 +392,13 @@ describe('마감(ADR §4, 사용자 결정: 마감은 출처·운영자 데이�
     expect(match(ended, openConditions(), NO_INPUT).group).toBe('CLOSED');
     const today = autoProduct('BIZINFO', { applicationPeriod: { start: '2026-10-01', end: AS_OF, note: null } });
     expect(match(today, openConditions(), NO_INPUT).group).toBe('MATCHING');
+    expect(applicationState(match(today, openConditions(), NO_INPUT).application)).toBe('OPEN_CONFIRMED');
   });
 
   // 사용자 결정(2026-11-03 단순화): AI가 읽은 값으로는 공고를 숨기지 않는다. 마감(기본으로 숨김)은 출처·운영자 데이터로만
-  // 정하고, AI가 읽은 종료일이 지났으면 확인 필요로 둔다. 소진공은 다른 회차 공지의 날짜를 쓰지 않는데 AI는 그 날짜를 읽을 수 있다.
-  it('AI가 읽은 종료일이 지나도 마감하지 않고 확인 필요로 둔다', () => {
+  // 정하고, AI가 읽은 종료일이 지났으면 접수 여부 미확인으로 둔다. 소진공은 다른 회차 공지의 날짜를 쓰지 않는데 AI는 그
+  // 날짜를 읽을 수 있다. 접수 상태는 그룹을 바꾸지 않는다(2026-11-13).
+  it('AI가 읽은 종료일이 지나도 마감하지 않고 접수 여부 미확인으로 둔다', () => {
     const aiEnded = openConditions({ applicationPeriod: read({ start: '2026-01-02', end: '2026-10-31', text: null }) });
     const noEnd = { start: '2026-01-02', end: null, note: '자금 소진 시까지' };
     for (const product of [
@@ -291,13 +409,14 @@ describe('마감(ADR §4, 사용자 결정: 마감은 출처·운영자 데이�
     ]) {
       const result = match(product, aiEnded, NO_INPUT);
       expect(result.application.closedBy).toBeNull();
-      expect(result.group).toBe('NEEDS_CHECK');
-      expect(result.holds).toContain('AI_END_DATE_PASSED');
+      expect(result.group).toBe('MATCHING');
+      expect(result.application.unconfirmedReasons).toContain('AI_END_DATE_PASSED');
+      expect(applicationState(result.application)).toBe('UNCONFIRMED');
       expect(result.application.aiPeriod).toMatchObject({ status: 'READ', quote: '공고문에 적힌 조건 문장' });
     }
-    // AI 종료일이 남아 있으면 보류하지 않는다.
+    // AI 종료일이 남아 있으면 접수 중 확인 그대로다.
     const aiOpen = openConditions({ applicationPeriod: read({ start: '2026-01-02', end: AS_OF, text: null }) });
-    expect(match(autoProduct('SEMAS_OLS'), aiOpen, NO_INPUT).group).toBe('MATCHING');
+    expect(applicationState(match(autoProduct('SEMAS_OLS'), aiOpen, NO_INPUT).application)).toBe('OPEN_CONFIRMED');
   });
 });
 
@@ -690,7 +809,7 @@ describe('카탈로그 전체 맞춰 보기', () => {
   });
 
   it('사람이 등록한 상품은 기록일을 넘기고, 자동 상품은 넘기지 않는다', () => {
-    // 사람 상품은 출처 최신성을 따지지 않으므로(맞아 보임 판단은 그대로) 언제 기록한 내용인지 화면에 보여 준다(#57 리뷰).
+    // 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 화면에 보여 준다(#57 리뷰).
     // 다음 검토일은 ADR 0009 §7로 검수 기한을 없애 넘기지 않는다. 자동 상품은 출처의 마지막 성공 확인일(automation)을 보여 준다.
     const manual = manualProduct({ observedAt: '2026-09-20' });
     const list = matchCatalog(catalogOf([manual, autoProduct('BIZINFO')]), new Map(), NO_INPUT, { asOfDate: AS_OF });
@@ -730,40 +849,72 @@ describe('카탈로그 전체 맞춰 보기', () => {
     ]);
   });
 
-  it('갈래마다 그룹 순서(맞아 보임 → 확인 필요 → 안 맞아 보임 → 마감)로 놓고 그룹별 수를 센다', () => {
-    const matching = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-a',
-      sourceRef: { source: 'BIZINFO', externalId: 'A' },
+  const bizinfo = (id: string, overrides: Record<string, unknown> = {}) =>
+    autoProduct('BIZINFO', {
+      productKey: `bizinfo-${id}`,
+      sourceRef: { source: 'BIZINFO', externalId: id.toUpperCase() },
+      ...overrides,
     });
-    const closed = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-b',
-      sourceRef: { source: 'BIZINFO', externalId: 'B' },
-      observedApplicationStatus: 'CLOSED',
-    });
-    const mismatch = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-c',
-      sourceRef: { source: 'BIZINFO', externalId: 'C' },
-    });
-    const check = autoProduct('BIZINFO', {
-      productKey: 'bizinfo-d',
-      sourceRef: { source: 'BIZINFO', externalId: 'D' },
-    });
-    const catalog = catalogOf([closed, mismatch, check, matching]);
+
+  // ADR §4 화면의 순서. 접수 상태는 그룹 안의 순서만 정하므로, 접수 여부 미확인인 맞아 보임 공고도 접수 중으로 확인한
+  // 다른 그룹의 공고보다 앞에 온다.
+  it('갈래마다 그룹 순서(맞아 보임 → 걸리는 조건 안 보임 → 확인 필요 → 안 맞아 보임 → 마감)로 놓고 그룹별 수를 센다', () => {
+    const catalog = catalogOf([
+      bizinfo('closed', { observedApplicationStatus: 'CLOSED' }),
+      bizinfo('mismatch'),
+      bizinfo('check'),
+      bizinfo('unmentioned'),
+      bizinfo('matching', { observedApplicationStatus: 'UNKNOWN' }),
+    ]);
     const extractions = new Map<string, VerifiedConditions>([
-      ['bizinfo-a', openConditions()],
-      ['bizinfo-b', openConditions()],
-      ['bizinfo-c', openConditions({ foodBusiness: read('EXCLUDED') })],
-      ['bizinfo-d', openConditions({ age: NOT_MENTIONED })],
+      ['bizinfo-matching', openConditions()],
+      ['bizinfo-closed', openConditions()],
+      ['bizinfo-mismatch', openConditions({ foodBusiness: read('EXCLUDED') })],
+      ['bizinfo-check', openConditions({ age: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' } })],
+      ['bizinfo-unmentioned', openConditions({ age: NOT_MENTIONED })],
     ]);
     const list = matchCatalog(catalog, extractions, NO_INPUT, { asOfDate: AS_OF });
     expect(list.tabs.SUPPORT_PROGRAM.products.map((p) => [p.productKey, p.group])).toEqual([
-      ['bizinfo-a', 'MATCHING'],
-      ['bizinfo-d', 'NEEDS_CHECK'],
-      ['bizinfo-c', 'NOT_MATCHING'],
-      ['bizinfo-b', 'CLOSED'],
+      ['bizinfo-matching', 'MATCHING'],
+      ['bizinfo-unmentioned', 'NOT_MENTIONED_ONLY'],
+      ['bizinfo-check', 'NEEDS_CHECK'],
+      ['bizinfo-mismatch', 'NOT_MATCHING'],
+      ['bizinfo-closed', 'CLOSED'],
     ]);
-    expect(list.tabs.SUPPORT_PROGRAM.counts).toEqual({ MATCHING: 1, NEEDS_CHECK: 1, NOT_MATCHING: 1, CLOSED: 1 });
-    expect(list.tabs.POLICY_FUND.counts).toEqual({ MATCHING: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 });
+    expect(list.tabs.SUPPORT_PROGRAM.counts).toEqual({
+      MATCHING: 1,
+      NOT_MENTIONED_ONLY: 1,
+      NEEDS_CHECK: 1,
+      NOT_MATCHING: 1,
+      CLOSED: 1,
+    });
+    expect(list.tabs.POLICY_FUND.counts).toEqual({
+      MATCHING: 0,
+      NOT_MENTIONED_ONLY: 0,
+      NEEDS_CHECK: 0,
+      NOT_MATCHING: 0,
+      CLOSED: 0,
+    });
+  });
+
+  // ADR §4(2026-11-13): 접수 상태는 그룹을 바꾸지 않는 대신, 그룹 안에서 접수 중으로 확인한 공고를 먼저 놓는다.
+  it('같은 그룹 안에서는 접수 중으로 확인한 공고를 먼저 놓고, 그 안에서는 카탈로그 순서를 지킨다', () => {
+    const catalog = catalogOf([
+      bizinfo('unknown-1', { observedApplicationStatus: 'UNKNOWN' }),
+      bizinfo('open-1'),
+      bizinfo('unknown-2', { observedApplicationStatus: 'UNKNOWN' }),
+      bizinfo('open-2'),
+    ]);
+    const extractions = new Map<string, VerifiedConditions>(
+      catalog.products.map((product) => [product.productKey, openConditions()]),
+    );
+    const list = matchCatalog(catalog, extractions, NO_INPUT, { asOfDate: AS_OF });
+    expect(list.tabs.SUPPORT_PROGRAM.products.map((p) => [p.productKey, p.group])).toEqual([
+      ['bizinfo-open-1', 'MATCHING'],
+      ['bizinfo-open-2', 'MATCHING'],
+      ['bizinfo-unknown-1', 'MATCHING'],
+      ['bizinfo-unknown-2', 'MATCHING'],
+    ]);
   });
 
   // 지금 본문이 없는 상품(본문을 읽지 못함)에는 같은 키로 넘어온 결과가 있어도 붙이지 않는다.

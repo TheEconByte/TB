@@ -3,28 +3,31 @@ import { describe, expect, it } from 'vitest';
 import type { ConditionValues } from './condition-fields.ts';
 import {
   AI_READING_NOTICE,
+  FUNDING_GROUP_LABELS,
   LIMIT_NOTE,
   aiPeriodText,
   applicationPeriodText,
+  applicationStateText,
   checkReasonText,
   closedText,
   conditionValueText,
   fundingGapText,
   fundingProfileSummary,
-  holdText,
   limitText,
   rangeText,
+  tabCountTexts,
+  unconfirmedReasonText,
 } from './match-text.ts';
 import {
   MATCH_CONDITION_KEYS,
   type CheckReason,
   type ConditionMatch,
   type FundingMatchProfile,
-  type MatchHold,
+  type OpenUnconfirmedReason,
   type ProductMatch,
 } from './matching.ts';
 
-// 맞춰 보기 화면의 문장(ADR 0009 §4). 판정 코드(hold·checkReason·closedBy)를 사람이 읽는 문장으로 바꾼다.
+// 맞춰 보기 화면의 문장(ADR 0009 §4). 판정 코드(접수 상태·checkReason·closedBy)를 사람이 읽는 문장으로 바꾼다.
 // PRODUCT.md 원칙 5: 맞아 보여도 신청 자격이나 결정이 확정된 것처럼 쓰지 않는다.
 const FORBIDDEN = ['신청 가능', '승인'];
 
@@ -49,13 +52,14 @@ function product(overrides: Partial<ProductMatch> = {}): ProductMatch {
         quote: '접수기간: 2026. 10. 1. ~ 10. 20.',
       },
       closedBy: null,
+      unconfirmedReasons: ['STATUS_NOT_OPEN'],
     },
-    holds: [],
     conditions: [],
     supportTypes: { status: 'NOT_MENTIONED' },
     limit: { publicLimitKrw: null, limitText: null },
     operatorRegionNote: null,
     operatorRecord: null,
+    titleRegionMark: null,
     ...overrides,
   };
 }
@@ -145,26 +149,58 @@ describe('확인 필요 이유 문장', () => {
     }) as ConditionMatch;
 
   it('맞음·안 맞음에는 이유 문장이 없다', () => {
-    expect(checkReasonText({ ...checked('age', 'INPUT_MISSING'), verdict: 'MATCH', checkReason: null })).toBeNull();
+    expect(
+      checkReasonText({ ...checked('age', 'INPUT_MISSING'), verdict: 'MATCH', checkReason: null }, null),
+    ).toBeNull();
   });
 
   it('읽지 못한 이유를 그대로 보여 준다', () => {
     const text = checkReasonText(
       checked('age', 'UNREADABLE', { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' }),
+      null,
     );
     expect(text).toContain('인용이 본문에 없습니다.');
   });
 
   it('입력이 없으면 무엇을 입력하면 되는지 쓴다', () => {
-    expect(checkReasonText(checked('age', 'INPUT_MISSING'))).toContain('나이');
-    expect(checkReasonText(checked('region', 'INPUT_MISSING'))).toContain('자치구');
-    expect(checkReasonText(checked('businessAge', 'INPUT_MISSING'))).toContain('개업 연월');
-    expect(checkReasonText(checked('businessStage', 'INPUT_MISSING'))).toContain('사업자등록 여부');
-    expect(checkReasonText(checked('targetGroups', 'INPUT_MISSING'))).toContain('대상 한정');
+    expect(checkReasonText(checked('age', 'INPUT_MISSING'), null)).toContain('나이');
+    expect(checkReasonText(checked('region', 'INPUT_MISSING'), null)).toContain('자치구');
+    expect(checkReasonText(checked('businessAge', 'INPUT_MISSING'), null)).toContain('개업 연월');
+    expect(checkReasonText(checked('businessStage', 'INPUT_MISSING'), null)).toContain('사업자등록 여부');
+    expect(checkReasonText(checked('targetGroups', 'INPUT_MISSING'), null)).toContain('대상 한정');
+  });
+
+  // 표시는 지역을 정하지 않는다. 표시가 있다는 사실과 AI가 본문에서 지역 조건을 찾지 못했다는 사실만 쓴다.
+  it('제목 표시 때문에 남긴 지역은 그 표시를 그대로 보여 준다', () => {
+    const text = checkReasonText(checked('region', 'TITLE_REGION_MARK', { status: 'NOT_MENTIONED' }), '전남광주');
+    expect(text).toContain('[전남광주]');
+    expect(text).toContain('찾지 못했습니다');
+    expect(text).toContain('원 공고');
+  });
+
+  // 표시 없이 이 이유만 오면 없는 표시를 지어내지 않는다.
+  it('표시를 받지 못하면 언급 없음 문장을 쓴다', () => {
+    const text = checkReasonText(checked('region', 'TITLE_REGION_MARK', { status: 'NOT_MENTIONED' }), null);
+    expect(text).toContain('언급 없음');
+    expect(text).not.toContain('[');
+  });
+
+  // 화면이 표시를 넘기지 않으면 표시 문장이 나오지 않는다. 렌더링하지 않고 소스에서 확인한다.
+  it('카드가 지역 항목의 이유에 공고의 제목 표시를 넘긴다', () => {
+    const source = readFileSync(new URL('FundingMatchesPanel.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('checkReasonText(condition, titleRegionMark)');
+    expect(source).toContain('titleRegionMark={match.titleRegionMark}');
   });
 
   it('모든 이유에 문장이 있다', () => {
-    const reasons: CheckReason[] = ['NOT_MENTIONED', 'UNREADABLE', 'NOT_READ', 'INPUT_MISSING', 'UNCERTAIN'];
+    const reasons: CheckReason[] = [
+      'NOT_MENTIONED',
+      'UNREADABLE',
+      'NOT_READ',
+      'INPUT_MISSING',
+      'UNCERTAIN',
+      'TITLE_REGION_MARK',
+    ];
     for (const key of MATCH_CONDITION_KEYS) {
       for (const reason of reasons) {
         const reading =
@@ -175,25 +211,64 @@ describe('확인 필요 이유 문장', () => {
               : reason === 'NOT_READ'
                 ? ({ status: 'NOT_READ' } as const)
                 : undefined;
-        expect(checkReasonText(checked(key, reason, reading))?.length ?? 0, `${key} ${reason}`).toBeGreaterThan(10);
+        expect(checkReasonText(checked(key, reason, reading), '부산')?.length ?? 0, `${key} ${reason}`).toBeGreaterThan(
+          10,
+        );
       }
     }
   });
 });
 
-describe('보류와 마감 문장', () => {
+describe('접수 상태와 마감 문장', () => {
+  const application = (overrides: Partial<ProductMatch['application']>) =>
+    product({ application: { ...product().application, ...overrides } });
+
+  // ADR 0009 §4(2026-11-13)의 접수 상태 셋. 남은 날은 판정 기준일부터 출처 종료일까지다(종료일 당일까지 접수 중).
+  it('접수 중으로 확인했으면 출처 종료일까지 남은 날을 함께 쓴다', () => {
+    const open = application({
+      status: 'OPEN',
+      period: { start: '2026-11-01', end: '2026-11-20', note: null },
+      unconfirmedReasons: [],
+    });
+    expect(applicationStateText(open, '2026-11-13')).toBe('접수 중 확인 · 마감까지 7일');
+    expect(applicationStateText(open, '2026-11-20')).toBe('접수 중 확인 · 오늘 마감');
+    // 달이 바뀌어도 날짜 차이로 센다.
+    expect(applicationStateText(open, '2026-10-31')).toBe('접수 중 확인 · 마감까지 20일');
+  });
+
+  it('종료일이 없는 접수 중 공고에는 남은 날을 쓰지 않는다', () => {
+    const open = application({
+      status: 'OPEN',
+      period: { start: '2026-11-01', end: null, note: '예산 소진시까지' },
+      unconfirmedReasons: [],
+    });
+    expect(applicationStateText(open, '2026-11-13')).toBe('접수 중 확인');
+  });
+
+  // 접수 중인지 모르는 공고에 남은 날을 쓰면 접수 중으로 읽힌다.
+  it('접수 중으로 확인하지 못했으면 종료일이 있어도 남은 날을 쓰지 않는다', () => {
+    const unknown = application({ period: { start: null, end: '2026-11-20', note: null } });
+    expect(applicationStateText(unknown, '2026-11-13')).toBe('접수 여부 미확인');
+  });
+
+  // 마감은 그룹 표시가 이미 알린다. 마감 카드에는 접수 상태 표시를 따로 달지 않는다(출처 기록 칸은 기록한 상태를 그대로 쓴다).
+  it('마감한 공고에는 접수 상태를 따로 쓰지 않는다', () => {
+    const closed = application({ closedBy: 'SOURCE_END_DATE', unconfirmedReasons: [] });
+    expect(applicationStateText(closed, '2026-11-13')).toBeNull();
+  });
+
   it('접수 상태를 출처에서 확인하지 못했음을 쓴다', () => {
-    expect(holdText('STATUS_NOT_OPEN', product())).toContain('접수');
+    expect(unconfirmedReasonText('STATUS_NOT_OPEN', product())).toContain('접수');
   });
 
   it('출처 확인이 끊겼으면 출처와 마지막 확인일을 쓴다', () => {
-    const text = holdText('SOURCE_STALE', product());
+    const text = unconfirmedReasonText('SOURCE_STALE', product());
     expect(text).toContain('기업마당');
     expect(text).toContain('2026. 10. 28.');
   });
 
   it('AI가 읽은 종료일이 지났으면 그 날짜와 숨기지 않은 이유를 쓴다', () => {
-    const text = holdText('AI_END_DATE_PASSED', product());
+    const text = unconfirmedReasonText('AI_END_DATE_PASSED', product());
     expect(text).toContain('2026. 10. 20.');
     expect(text).toContain('AI');
     expect(text).toContain('마감으로 숨기지 않았습니다');
@@ -218,6 +293,18 @@ describe('신청기간 문장', () => {
     );
     expect(applicationPeriodText({ start: null, end: null, note: null })).toBe('기록 없음');
     expect(aiPeriodText({ start: null, end: '2026-10-15', text: null })).toBe('~ 2026. 10. 15.');
+  });
+});
+
+describe('탭 제목의 그룹 수', () => {
+  // 펼쳐 보여 주는 세 그룹의 수를 쓴다. 입력이 없거나 일부면 공고가 확인 필요에 몰리는데(2026-11-13 릴리스에서 입력 없이
+  // 정책자금 80건·지원사업 149건), 그 수가 빠지면 공고가 있는 탭이 비어 보인다. 접어 두는 안 맞아 보임과 숨기는 마감은 뺀다.
+  // 폰 폭에서는 탭 안에서 줄이 바뀐다. 그룹마다 따로 주어 줄이 그룹 단위로 바뀌게 하고, 수는 줄바꿈 없는 공백(U+00A0)으로
+  // 이름에 붙여 수만 다음 줄로 떨어져 다른 그룹의 수로 읽히지 않게 한다.
+  it('맞아 보임·걸리는 조건 안 보임·확인 필요의 수를 그룹마다 따로 쓰고, 수를 이름에서 떼지 않는다', () => {
+    expect(
+      tabCountTexts({ MATCHING: 0, NOT_MENTIONED_ONLY: 2, NEEDS_CHECK: 1234, NOT_MATCHING: 75, CLOSED: 2 }),
+    ).toEqual(['맞아 보임 0', '걸리는 조건 안 보임 2', '확인 필요 1,234']);
   });
 });
 
@@ -281,12 +368,16 @@ describe('입력 요약', () => {
 
 describe('쓰지 않는 문구', () => {
   it('화면 문장 어디에도 신청 자격이나 결정을 확정하는 문구가 없다', () => {
+    const open = { ...product().application, status: 'OPEN' as const, unconfirmedReasons: [] };
     const texts = [
       AI_READING_NOTICE,
       LIMIT_NOTE,
-      ...(['STATUS_NOT_OPEN', 'SOURCE_STALE', 'AI_END_DATE_PASSED'] as MatchHold[]).map((hold) =>
-        holdText(hold, product()),
+      ...Object.values(FUNDING_GROUP_LABELS),
+      ...(['STATUS_NOT_OPEN', 'SOURCE_STALE', 'AI_END_DATE_PASSED'] as OpenUnconfirmedReason[]).map((reason) =>
+        unconfirmedReasonText(reason, product()),
       ),
+      applicationStateText(product({ application: open }), '2026-10-01') ?? '',
+      applicationStateText(product(), '2026-10-01') ?? '',
       closedText(product({ application: { ...product().application, closedBy: 'SOURCE_STATUS' } })) ?? '',
       limitText({ publicLimitKrw: '1', limitText: null }),
       fundingGapText(null),

@@ -1066,7 +1066,7 @@ footer {
   font-size: 13px;
 }
 .status-counts.branch-counts {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 .status-counts.branch-counts .status-count {
@@ -1142,6 +1142,7 @@ footer {
 }
 .support-badge,
 .auto-badge,
+.application-badge,
 .candidate-status {
   display: inline-block;
   padding: 4px 11px;
@@ -1212,6 +1213,9 @@ footer {
 @media (max-width: 850px) {
   .status-counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .status-counts.branch-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .candidate-meta {
     grid-template-columns: 1fr;
@@ -1292,14 +1296,19 @@ footer {
   border-radius: 12px;
   text-align: left;
 }
-.funding-tab span {
+.funding-tab > span {
   font-size: 17px;
   font-weight: 800;
 }
+/* 그룹 수 세 개가 폰 폭의 탭보다 길다. 그룹 단위로 줄을 바꾸고, 한 그룹이 탭보다 길 때만 그 안에서 줄을 바꾼다. */
 .funding-tab small {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
+  white-space: normal;
 }
 .funding-tab.active {
   border-color: var(--ink);
@@ -1325,6 +1334,9 @@ footer {
 .status-count.count-matching {
   border-left: 4px solid var(--primary);
 }
+.status-count.count-not_mentioned_only {
+  border-left: 4px solid #0f8a5f;
+}
 .status-count.count-needs_check {
   border-left: 4px solid #f2b630;
 }
@@ -1345,6 +1357,10 @@ footer {
   background: var(--primary);
   color: white;
 }
+.candidate-status.status-not_mentioned_only {
+  background: #e6f6ef;
+  color: #0f8a5f;
+}
 .candidate-status.status-needs_check {
   background: #fdf3d6;
   color: #a16207;
@@ -1353,7 +1369,18 @@ footer {
   background: #ffe4e2;
   color: #c4271b;
 }
-.match-holds {
+/* 접수 상태는 그룹과 다른 축이라 채우지 않고 테두리로 구분한다. */
+.application-badge {
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+}
+.application-badge.application-open_confirmed {
+  color: #0f8a5f;
+}
+.application-badge.application-unconfirmed {
+  color: #a16207;
+}
+.application-reasons {
   margin-top: 14px;
   padding: 12px 14px 12px 30px;
   border-radius: 10px;
@@ -1461,7 +1488,7 @@ footer {
   .funding-tab {
     padding: 12px;
   }
-  .funding-tab span {
+  .funding-tab > span {
     font-size: 15px;
   }
 }

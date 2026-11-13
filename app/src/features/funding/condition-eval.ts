@@ -5,7 +5,14 @@ import {
   type VerifiedField,
 } from './condition-fields.ts';
 import { SEOUL_DISTRICTS } from './districts.ts';
-import { MATCH_CONDITION_KEYS, matchConditions, type FundingMatchProfile, type MatchConditionKey } from './matching.ts';
+import {
+  MATCH_CONDITION_KEYS,
+  bizinfoTitleMark,
+  judgeOpenNotice,
+  matchConditions,
+  type FundingMatchProfile,
+  type MatchConditionKey,
+} from './matching.ts';
 import { verifyConditionOutput, type ConditionOutput } from './notice-extraction.ts';
 
 // 공고 조건 추출 평가의 정답과 채점(app/eval/funding-conditions). 운영자 도구이고 웹 요청 경로에서 import하지 않는다.
@@ -40,7 +47,12 @@ export type GoldCase = {
 export function expectedFields(
   gold: GoldCase,
   text: string,
-): { acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>; problems: string[] } {
+): {
+  acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>;
+  problems: string[];
+  // 화면이 그룹을 정할 때 보는 제목 맨 앞의 표시(matching.ts). 기업마당 공고에만 있다. 상품 키는 수집기가 출처별로 붙인다.
+  titleRegionMark: string | null;
+} {
   const raw = (value: unknown) =>
     Object.fromEntries(
       CONDITION_FIELD_NAMES.map((name) => {
@@ -77,7 +89,8 @@ export function expectedFields(
     }
     acceptable[name] = options;
   }
-  return { acceptable, problems };
+  const titleRegionMark = gold.productKey.startsWith('bizinfo-') ? bizinfoTitleMark(gold.productName) : null;
+  return { acceptable, problems, titleRegionMark };
 }
 
 // 채점은 값의 모양이 아니라 맞춰 보기 판정으로 한다(리뷰 지적 2026-11-04): 사용자 입력마다 맞춰 보기
@@ -86,6 +99,9 @@ export function expectedFields(
 // CORRECT: 판정과 상태가 정답과 같다. EQUIVALENT: 판정은 같고 상태만 다르다(언급 없음·읽지 못함·확인 필요로 끝나는 읽음).
 // CONFIDENT_WRONG: 어떤 입력에서 정답과 다른 맞음·안 맞음을 낸다(사용자를 잘못 보낸다). MISSED: 정답과 다르지만 다른
 // 입력에서는 확인 필요만 낸다(안전하다, 리뷰 지적 2026-11-05). DISPLAY_WRONG: 보여 주기만 하는 지원 방식·신청기간이 틀렸다.
+// 이 항목별 채점은 판정만 본다. 화면의 그룹은 확인 필요의 이유도 보므로(맞음이 아닌 항목이 언급 없음뿐이면 걸리는 조건 안
+// 보임, matching.ts), EQUIVALENT와 MISSED 가운데 언급 없음이 엇갈린 것은 공고의 그룹을 바꿀 수 있다. 그 차이는 아래
+// gradeGroups가 따로 센다.
 export type FieldOutcome = 'CORRECT' | 'EQUIVALENT' | 'CONFIDENT_WRONG' | 'MISSED' | 'DISPLAY_WRONG';
 
 const AS_OF = '2026-11-04';
@@ -192,7 +208,7 @@ function verdicts(
 const misleads = (actual: string[], gold: string[]) =>
   actual.some((verdict, index) => verdict !== 'CHECK' && verdict !== gold[index]);
 
-// 보여 주기만 하는 항목. 신청기간은 종료일만 쓰고(AI가 읽은 종료일이 지나면 확인 필요), 지원 방식은 종류만 본다.
+// 보여 주기만 하는 항목. 신청기간은 종료일만 쓰고(AI가 읽은 종료일이 지나면 접수 여부 미확인), 지원 방식은 종류만 본다.
 function displayed(name: 'applicationPeriod' | 'supportTypes', field: VerifiedField<unknown>): string {
   if (field.status !== 'READ') return name === 'supportTypes' ? '[]' : 'null';
   if (name === 'applicationPeriod') return String((field.value as { end: string | null }).end);
@@ -223,17 +239,100 @@ function gradeField(
   return golds.some((gold) => !misleads(actualVerdicts, gold.verdicts)) ? 'MISSED' : 'CONFIDENT_WRONG';
 }
 
-export const EVAL_METRICS = ['field_acc', 'confident_wrong', 'missed', 'exact_acc'] as const;
+// 화면의 그룹을 견주는 입력. 항목 채점은 경계마다 입력을 만들지만, 그룹은 사용자가 실제로 보는 결과라 제품이 겨냥하는 세
+// 경우(입력 없음, 예비 창업자, 개업 1~2년 차 사업자. 대상 한정은 해당 없음)로 본다.
+export const GROUP_PROFILES = {
+  NO_INPUT: { businessStatus: null, openedYearMonth: null, districtCode: null, age: null, targetGroups: null },
+  PRE_STARTUP: {
+    businessStatus: 'PRE_STARTUP',
+    openedYearMonth: null,
+    districtCode: '11440',
+    age: 32,
+    targetGroups: [],
+  },
+  BUSINESS: {
+    businessStatus: 'BUSINESS',
+    openedYearMonth: '2025-03',
+    districtCode: '11680',
+    age: 45,
+    targetGroups: [],
+  },
+} as const satisfies Record<string, FundingMatchProfile>;
+export type GroupProfileName = keyof typeof GROUP_PROFILES;
+export const GROUP_PROFILE_NAMES = Object.keys(GROUP_PROFILES) as GroupProfileName[];
+
+// SAME: 인정하는 정답 조합 중 하나와 같은 그룹이다. SURFACED: 정답이 인정하지 않는데 맞아 보임이나 걸리는 조건 안 보임으로
+// 올라왔다(사용자가 먼저 보는 두 그룹에 잘못 들어온다). OTHER: 그 밖의 차이다. 안 맞아 보임이어야 할 공고가 확인 필요로
+// 가는 안전한 놓침과, 확인 필요나 안 맞아 보임으로 내려가는 차이가 여기에 든다. 도착한 그룹만 보므로 어느 정답이 주
+// 정답인지에 기대지 않는다.
+export type GroupOutcome = 'SAME' | 'SURFACED' | 'OTHER';
+const GROUP_OUTCOMES: readonly GroupOutcome[] = ['SAME', 'SURFACED', 'OTHER'];
+const SURFACE_GROUPS: readonly string[] = ['MATCHING', 'NOT_MENTIONED_ONLY'];
+
+// 항목마다 인정하는 정답을 하나씩 고른 모든 조합.
+function acceptableCombinations(
+  acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>,
+): VerifiedConditions[] {
+  return CONDITION_FIELD_NAMES.reduce<Record<string, VerifiedField<unknown>>[]>(
+    (combos, name) =>
+      combos.flatMap((combo) =>
+        acceptable[name]
+          // 보여 주기만 하는 항목은 그룹과 무관하므로 주 정답만 쓴다.
+          .filter((_, index) => index === 0 || (MATCH_CONDITION_KEYS as readonly string[]).includes(name))
+          .map((option) => ({ ...combo, [name]: option })),
+      ),
+    [{}],
+  ) as VerifiedConditions[];
+}
+
+// 화면의 그룹(마감 제외)을 입력마다 정답과 견준다. 화면과 같은 판단(judgeOpenNotice)을 쓰고 제목 표시도 함께 본다.
+export function gradeGroups(
+  actual: VerifiedConditions,
+  acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>,
+  titleRegionMark: string | null,
+): Record<GroupProfileName, GroupOutcome> {
+  const groupOf = (fields: VerifiedConditions, profile: FundingMatchProfile) => {
+    const readings = Object.fromEntries(CONDITION_FIELD_NAMES.map((key) => [key, reading(fields[key])])) as Parameters<
+      typeof judgeOpenNotice
+    >[0];
+    return judgeOpenNotice(readings, profile, AS_OF, titleRegionMark).group;
+  };
+  const combos = acceptableCombinations(acceptable);
+  return Object.fromEntries(
+    GROUP_PROFILE_NAMES.map((name) => {
+      const profile = GROUP_PROFILES[name];
+      const got = groupOf(actual, profile);
+      const golds = combos.map((combo) => groupOf(combo, profile));
+      if (golds.includes(got)) return [name, 'SAME'];
+      return [name, SURFACE_GROUPS.includes(got) ? 'SURFACED' : 'OTHER'];
+    }),
+  ) as Record<GroupProfileName, GroupOutcome>;
+}
+
+// group_changed·group_surfaced는 세 입력 중 정답과 그룹이 다른 입력, 앞의 두 그룹에 잘못 올라온 입력의 비율이다.
+export const EVAL_METRICS = [
+  'field_acc',
+  'confident_wrong',
+  'missed',
+  'exact_acc',
+  'group_changed',
+  'group_surfaced',
+] as const;
 export type EvalMetric = (typeof EVAL_METRICS)[number];
 export type CaseGrade = {
   outcomes: Record<ConditionFieldName, FieldOutcome>;
+  groups: Record<GroupProfileName, GroupOutcome>;
   scores: Record<EvalMetric, number>;
 };
 
 export function gradeCase(
   actual: VerifiedConditions,
   acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>,
+  titleRegionMark: string | null,
 ): CaseGrade {
+  const groups = gradeGroups(actual, acceptable, titleRegionMark);
+  const groupShare = (...kinds: GroupOutcome[]) =>
+    GROUP_PROFILE_NAMES.filter((name) => kinds.includes(groups[name])).length / GROUP_PROFILE_NAMES.length;
   const context = Object.fromEntries(
     CONDITION_FIELD_NAMES.map((name) => [name, acceptable[name][0]]),
   ) as VerifiedConditions;
@@ -244,12 +343,15 @@ export function gradeCase(
     CONDITION_FIELD_NAMES.filter((name) => kinds.includes(outcomes[name])).length;
   return {
     outcomes,
+    groups,
     scores: {
       field_acc: count('CORRECT', 'EQUIVALENT') / CONDITION_FIELD_NAMES.length,
       exact_acc: count('CORRECT') / CONDITION_FIELD_NAMES.length,
       // 맞춰 보기에 쓰는 여섯 항목 중 비율이다.
       confident_wrong: count('CONFIDENT_WRONG') / MATCH_CONDITION_KEYS.length,
       missed: count('MISSED') / CONDITION_FIELD_NAMES.length,
+      group_changed: groupShare('SURFACED', 'OTHER'),
+      group_surfaced: groupShare('SURFACED'),
     },
   };
 }
@@ -265,6 +367,8 @@ export type SetSummary = {
   metrics: Record<EvalMetric, { mean: number; half: number }> | null;
   // 항목마다 결과별 회차 수.
   fields: Record<ConditionFieldName, Record<FieldOutcome, number>>;
+  // 입력마다 그룹 결과별 회차 수.
+  groups: Record<GroupProfileName, Record<GroupOutcome, number>>;
 };
 
 const OUTCOMES: readonly FieldOutcome[] = ['CORRECT', 'EQUIVALENT', 'CONFIDENT_WRONG', 'MISSED', 'DISPLAY_WRONG'];
@@ -301,6 +405,14 @@ export function summarizeBySet(cases: readonly GoldCase[], runs: readonly Graded
           Object.fromEntries(OUTCOMES.map((kind) => [kind, inSet.filter((run) => run.outcomes[name] === kind).length])),
         ]),
       ) as SetSummary['fields'],
+      groups: Object.fromEntries(
+        GROUP_PROFILE_NAMES.map((name) => [
+          name,
+          Object.fromEntries(
+            GROUP_OUTCOMES.map((kind) => [kind, inSet.filter((run) => run.groups[name] === kind).length]),
+          ),
+        ]),
+      ) as SetSummary['groups'],
     };
   });
 }

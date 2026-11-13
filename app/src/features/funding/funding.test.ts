@@ -327,7 +327,7 @@ describe('automated products in the catalog (ADR 0006)', () => {
     ...overrides,
   });
 
-  // 출처 최신성은 맞춰 보기가 보류 이유(출처 확인 끊김)로 보여 준다(matching.test.ts). 규칙 검사는 적재를 막거나 주의로 알리지 않는다.
+  // 출처 최신성은 맞춰 보기가 접수 여부 미확인 이유(출처 확인 끊김)로 보여 준다(matching.test.ts). 규칙 검사는 적재를 막거나 주의로 알리지 않는다.
   it('loads a synced product whose source has no recent successful sync', () => {
     const stale = validate(
       catalog([product({ origin: 'SYNC', sourceRef })], { automation: automation({ sourceSyncs: [] }) }),
