@@ -1,6 +1,7 @@
 [
   {
     "id": "c01",
+    "set": "dev",
     "productKey": "semas-ols-direct-0bd5843028",
     "textChecksum": "5377d932200dd69af7eb3089c5358d2e6f8883d0c9c11a9db5ede1369b1730f1",
     "productName": "일시적경영애로자금(직접대출)",
@@ -91,6 +92,7 @@
   },
   {
     "id": "c02",
+    "set": "dev",
     "productKey": "semas-ols-direct-4b3dcaede6",
     "textChecksum": "7c8b641efab9eb65dbd08b540e62bbe64a1c2fa2ce4ef49234a08ab49d32a67c",
     "productName": "긴급경영안정자금('26년 거제·통영 호우피해)(직접대출)",
@@ -173,6 +175,7 @@
   },
   {
     "id": "c03",
+    "set": "dev",
     "productKey": "semas-ols-agency-bdcc768c27",
     "textChecksum": "0d086fe9a6fc14c8c91ee937d11a998fd47845b3b7451f2f45bae3d1178da777",
     "productName": "소공인특화자금(대리대출)",
@@ -263,6 +266,7 @@
   },
   {
     "id": "c04",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000125089",
     "textChecksum": "dc542bdc296b72f0afe423544d4d4da576c0ced69878cd9c0b06c5f5e2f4d91b",
     "productName": "[울산] 울산콘텐츠코리아랩 U-Grow 상시 컨설팅 모집 공고",
@@ -359,6 +363,7 @@
   },
   {
     "id": "c05",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000124676",
     "textChecksum": "2f56f0a124959c152a2f0d9b65b711ea0b966dcccfc590686cc0775d129e8d43",
     "productName": "[서울] 2026년 하반기 소상공인 안전검사 지원사업 공고(생활용품 및 어린이제품)",
@@ -447,6 +452,7 @@
   },
   {
     "id": "c06",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000124545",
     "textChecksum": "632bf05645a402f1762f684fd97ed10984df7dbb4047059aac45f20f8d27c15a",
     "productName": "2026년 경북 그린바이오 벤처 캠퍼스 기업지원 프로그램(고용창출) 수혜기업 모집 공고",
@@ -549,6 +555,7 @@
   },
   {
     "id": "c07",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127411",
     "textChecksum": "ad031949e0a519b8d8ed701a3f0533449c66511b942e572d070f62235cb8b135",
     "productName": "2026년 강원연구개발특구육성(R&D)사업 강원 특구 배치 프로그램 1기 창업기업 모집 공고",
@@ -635,6 +642,7 @@
   },
   {
     "id": "c08",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127287",
     "textChecksum": "4b799706f3f29e38f3be26ef37ad7e961f02988884f2acfe927d5c7b62227301",
     "productName": "[경북] 포항시 2026년 소상공인 대상 무료 택시지붕광고 참여업체 추가모집 공고",
@@ -723,6 +731,7 @@
   },
   {
     "id": "c09",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000126662",
     "textChecksum": "ea107a5aefafe30c8231455645a892b020ef84f4c8e425eda7cedcfa4e83cbfc",
     "productName": "[충북] 충주시 2026년 2차 소상공인 이자비용 지원사업 공고",
@@ -806,6 +815,7 @@
   },
   {
     "id": "c10",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121681",
     "textChecksum": "40c42ae7df4fd45f11d018ffbac12ae5d7a256e94992007a211ebe584aca6746",
     "productName": "[광주] 2026년 첫걸음입점 광주소상공인 지원사업 참여 소상공인 모집 공고",
@@ -892,6 +902,7 @@
   },
   {
     "id": "c11",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000125055",
     "textChecksum": "0e5f56370a3cce58128366fcb6e52a314247a50f1d97b5e19cf9a8ca56a6dfe8",
     "productName": "[경북] 의성군 2026년 소상공인 카드수수료 지원사업 참여점포 모집 변경 공고",
@@ -978,6 +989,7 @@
   },
   {
     "id": "c12",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000126517",
     "textChecksum": "d07132803f7dc7a2f857200da8d31cdcf87792d4f3dd6853d8939698eb0b3c99",
     "productName": "[경남] 김해시 2026년 하반기 소상공인 육성자금 지원계획 공고",
@@ -1064,6 +1076,7 @@
   },
   {
     "id": "c13",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000126578",
     "textChecksum": "f444f18ea0be9b861b7535442ed43b2f08e7d823b802b7e852f7c489d72d805c",
     "productName": "[대구] 2026년 소상공인 IP창출지원 후속지원 사업(디자인출원) 모집공고",
@@ -1150,6 +1163,7 @@
   },
   {
     "id": "c14",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127263",
     "textChecksum": "fd4a8267cd1e8dd45739cb5c41b8bfe2bbe357b1afdb88a7c23a0b6b2be79961",
     "productName": "[경북] 고령군 2026년 소상공인 카드수수료 지원사업 참여점포 모집 변경 공고",
@@ -1236,6 +1250,7 @@
   },
   {
     "id": "c15",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000116966",
     "textChecksum": "237505116f87ffc9fe7b593a47c34c3c1bcad0f08d80cce67e5df103179a77a0",
     "productName": "[경남] 김해시 2026년 가축분뇨 수집ㆍ운반 수수료 지원사업 신청서 접수 공고",
@@ -1322,6 +1337,7 @@
   },
   {
     "id": "c16",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000125890",
     "textChecksum": "26d2fcaaf2349cf9e40598e91d5347e535389e44d1bfa7635a80949012dd4a81",
     "productName": "[울산] 2026년 소상공인 온라인 판로ㆍ마케팅 지원 사업 공고",
@@ -1410,6 +1426,7 @@
   },
   {
     "id": "c17",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000123753",
     "textChecksum": "3978bc6ee864a8b0b7e86a633984781acd1348e48c02c7181b2fed196b62b9e0",
     "productName": "[경기] 안산시 2026년 특화역량 BI 육성지원사업 ICTㆍSW 창업 컨설팅 지원 참여기업 모집 공고",
@@ -1512,6 +1529,7 @@
   },
   {
     "id": "c18",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121193",
     "textChecksum": "c5612bfba802d3d5f6a0688b7bffabf4b16fc18f0095b3bf9888d1df57cff1f0",
     "productName": "[경남] 2026년 소상공인 IP출원(상표출원) 지원사업 소상공인 수혜자 모집 공고",
@@ -1544,24 +1562,16 @@
       "region": {
         "mentioned": true,
         "value": {
-          "scope": "NATIONWIDE",
-          "provinces": [],
+          "scope": "PROVINCES",
+          "provinces": ["경남"],
           "districts": [],
           "excludedProvinces": [],
           "excludedDistricts": []
         },
-        "quote": "반드시 소재지(사업자등록증상 주소) 관할구역 지역지식재산센터로 신청서",
-        "confidence": "ambiguous",
-        "alternatives": [
-          {
-            "scope": "PROVINCES",
-            "provinces": ["경남"],
-            "districts": [],
-            "excludedProvinces": [],
-            "excludedDistricts": []
-          }
-        ],
-        "note": "전국 지역지식재산센터 공통 사업으로 사업장 관할 센터에 신청하라는 문구일 뿐 경남 소재를 요구하지 않지만, 경남센터 담당자만 안내된 경남 공고라 경남으로 볼 수도 있다."
+        "quote": "[경남] 2026년 소상공인 IP출원(상표출원) 지원사업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제목의 [경남] 표시가 지역을 정한다(사용자 결정 2026-11-12: 제목도 공고의 일부). 본문은 사업장 관할 지역지식재산센터에 신청하라고만 해 전국 공통 사업처럼 읽히지만, 이 공고는 경남센터의 공고다. 다른 시·도 사업자는 그 시·도 센터의 공고로 신청한다."
       },
       "foodBusiness": {
         "mentioned": true,
@@ -1608,6 +1618,7 @@
   },
   {
     "id": "c19",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121182",
     "textChecksum": "acd1289228507066bb9a75bb175d1f73bf52b830834d16ec33be30dde50dfbce",
     "productName": "2026년 희망리턴패키지 재기사업화(경영개선) 위기 소상공인 진단ㆍ멘토링 지원 모집 공고",
@@ -1700,6 +1711,7 @@
   },
   {
     "id": "c20",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121976",
     "textChecksum": "4a9a0a459f848b2a5c7d9940ccaf3d23164c4b401cce67b95e64ca57d52cefca",
     "productName": "[경기] 포천시 2026년 지역소공인육성사업 소공인특화지원센터 지원사업 공고",
@@ -1803,6 +1815,7 @@
   },
   {
     "id": "c21",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121931",
     "textChecksum": "9ff03a1ca22112a5d9100a2445f607e4b1156d73e42884ee5a3d3a7c1541408c",
     "productName": "[부산] 2026년 소상공인 경영전략 컨설팅 소상공인 모집 공고",
@@ -1895,6 +1908,7 @@
   },
   {
     "id": "c22",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000126349",
     "textChecksum": "04b635bf4f9348c2e2940650f72cff8d69f4405df24a61f62946fb5ca61f77c9",
     "productName": "[충남] 당진시 2026년 청년 취ㆍ창업 지원사업 디자인 개선 지원 사업 참여 기업 모집 공고",
@@ -1989,6 +2003,7 @@
   },
   {
     "id": "c23",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000126184",
     "textChecksum": "6f0ea623116e6e2152716730f02053d97fa8035edd9b35760d92181ff63d2c29",
     "productName": "[대구] 동구 2026년 하반기 소상공인 경영안정자금 지원사업 공고",
@@ -2081,6 +2096,7 @@
   },
   {
     "id": "c24",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000124279",
     "textChecksum": "6b2f2dee21d456f2f789636df0a6541a0e898515ddd0c0320f70c5fca3a09b43",
     "productName": "2026년 울산창조경제혁신센터 U-OASIS 프로그램 참가기업 모집 공고",
@@ -2118,9 +2134,17 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "울산 기관의 공고지만 신청자 소재지 요건은 적혀 있지 않다."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "scope": "PROVINCES",
+            "provinces": ["울산"],
+            "districts": [],
+            "excludedProvinces": [],
+            "excludedDistricts": []
+          }
+        ],
+        "note": "울산 기관의 공고지만 신청자 소재지 요건은 적혀 있지 않다. 제목과 본문 전체 맥락으로 보면(사용자 결정 2026-11-12) 울산창조경제혁신센터가 여는 프로그램이라 울산 기업 대상으로 읽을 수도 있어 둘 다 인정한다."
       },
       "foodBusiness": {
         "mentioned": true,
@@ -2177,6 +2201,7 @@
   },
   {
     "id": "c25",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000119567",
     "textChecksum": "5a52bba988b7a755c9cdd0fa462133c46df43cb2faf83e30f820e2958dabc5ab",
     "productName": "2026년 농식품 크라우드펀딩 지원사업 공고",
@@ -2273,6 +2298,7 @@
   },
   {
     "id": "c26",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127598",
     "textChecksum": "f7f83850a56b0e7de82673e55b49a86749c55cc51f18129a7fa4a9f531f20bf4",
     "productName": "[서울] 2026년 키친인큐베이터 개별ㆍ공유주방 25기 및 제조주방 13기 통합모집 공고",
@@ -2365,6 +2391,7 @@
   },
   {
     "id": "c27",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127619",
     "textChecksum": "67230b3d4eede30a0232485db4a3e537240926f717e7181f65b866d070e3994e",
     "productName": "[충북] 보은군 2026년 식품 제조 소공인특화지원센터 기업지원 사업 참여기업 추가 모집 공고",
@@ -2461,6 +2488,7 @@
   },
   {
     "id": "c28",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000121175",
     "textChecksum": "fd0db6d92d619be8c5a1a1788da393c5db5c217fb0c77b6e028f1437aae02b60",
     "productName": "2026년 스타트업 법률지원사업 참여기업 모집 수정 공고",
@@ -2551,6 +2579,7 @@
   },
   {
     "id": "c29",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000127674",
     "textChecksum": "2b08f556a22c875e88964471f875b5609c617ecc07bbb8595c4688b118908fd7",
     "productName": "2026년 스마트 플래그십 스토어 (소담상회 with LOTTE ON) 모집 공고",
@@ -2629,6 +2658,7 @@
   },
   {
     "id": "c30",
+    "set": "dev",
     "productKey": "bizinfo-pbln-000000000118556",
     "textChecksum": "bb42dbed42fffcb83cf1e01d0ff5d23800db2ba6b96793bb92472844c44b4fce",
     "productName": "2026년 디지털커머스 전문기관(소담스퀘어 in 광주) 모집 공고",
@@ -2662,9 +2692,17 @@
         "mentioned": false,
         "value": null,
         "quote": "",
-        "confidence": "clear",
-        "alternatives": [],
-        "note": "본문에 신청자 소재지 조건이 없다(광주는 공고명의 시설 위치일 뿐이다)."
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "scope": "PROVINCES",
+            "provinces": ["광주"],
+            "districts": [],
+            "excludedProvinces": [],
+            "excludedDistricts": []
+          }
+        ],
+        "note": "본문에 신청자 소재지 조건이 없다. 제목과 본문 전체 맥락으로 보면(사용자 결정 2026-11-12) 광주에 있는 시설(소담스퀘어 in 광주)에서 받는 지원이라 광주 사업자 대상으로 읽을 수도 있어 둘 다 인정한다."
       },
       "foodBusiness": {
         "mentioned": false,
@@ -2702,6 +2740,1909 @@
         "confidence": "ambiguous",
         "alternatives": [["PROGRAM", "SPACE"]],
         "note": "콘텐츠 제작·교육·입점 지원 프로그램이다. 장비·시설을 구축한다는 개요를 공간 지원(SPACE)으로 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t01",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000119051",
+    "textChecksum": "4f325ab62324d87729404762542154c4711ea55694ab0b524643b2582f4a68e9",
+    "productName": "2026년 Startup:D 창업 BuS 참가자 사전 모집 공고(대전창조경제혁신센터)",
+    "stratum": "region-agency",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BOTH",
+        "quote": "예비창업자 또는 7 년 이내 창업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "예비창업자와 7년 이내 창업자가 함께 대상이다."
+      },
+      "businessAge": {
+        "mentioned": true,
+        "value": {
+          "min": null,
+          "max": 7,
+          "maxExclusive": false
+        },
+        "quote": "예비창업자 또는 7 년 이내 창업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "예비창업자는 0년이라 상한 7년이 모두에게 맞는다."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "scope": "PROVINCES",
+            "provinces": ["대전"],
+            "districts": [],
+            "excludedProvinces": [],
+            "excludedDistricts": []
+          }
+        ],
+        "note": "신청자 소재지 조건이 없다. 대전창조경제혁신센터의 프로그램이라 대전 기업 대상으로 읽을 수도 있어 둘 다 인정한다(dev c24와 같은 원칙). 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "EXCLUDED",
+        "quote": "공공기술ㆍ우주항공ㆍ로봇ㆍAI 등 유망 스타트업",
+        "confidence": "ambiguous",
+        "alternatives": ["NOT_EXCLUDED"],
+        "note": "공공기술·우주항공·로봇·AI 분야 스타트업을 발굴하는 투자 연계 프로그램이라 음식점·카페는 대상이 아니지만, \"등\"으로 끝나 넓게 읽을 여지도 있다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "특정 집단 한정이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": null,
+          "end": null,
+          "text": "연중 상시"
+        },
+        "quote": "연중 상시 공공기술ㆍ우주항공ㆍ로봇ㆍAI 등 유망 스타트업을 상시 발굴",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "날짜 없이 연중 상시 발굴한다고만 적었다. 모집 기간을 말하지 않았다고 볼 수도 있다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "OTHER"],
+        "quote": "기업 IR (Open Window, Open Stage), 액셀러레이팅 (Build-UP, SET-UP), 멘토링",
+        "confidence": "ambiguous",
+        "alternatives": [["PROGRAM"]],
+        "note": "IR·액셀러레이팅·멘토링은 프로그램, 투자 연계는 그 밖이다."
+      }
+    }
+  },
+  {
+    "id": "t02",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000123926",
+    "textChecksum": "072241f6e65b085b170d9d2c6d8bbdbe84235cf2f2527b9eefa9ace8d11e4e40",
+    "productName": "2026 디지털커머스 전문기관(소담스퀘어 in 전남) 지원사업 공고",
+    "stratum": "region-facility",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "디지털전환이 필요한 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "scope": "PROVINCES",
+            "provinces": ["전남"],
+            "districts": [],
+            "excludedProvinces": [],
+            "excludedDistricts": []
+          }
+        ],
+        "note": "신청자 소재지 조건이 없다. 제목의 \"소담스퀘어 in 전남\", 신청서의 \"(전남)\", 남도장터 입점 지원으로 보면 전남 소상공인 대상으로 읽을 수도 있어 둘 다 인정한다(dev c30과 같은 원칙). 사업개요는 \"소담스퀘어 전주\"라고 잘못 적었다. 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "업종 조건이 없다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "소상공인 외에 대상 집단 제한이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "신청기간이 없다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "디지털콘텐츠 제작, 업종별 특성에 맞는 콘텐츠 제작",
+        "confidence": "ambiguous",
+        "alternatives": [
+          ["PROGRAM", "SPACE"],
+          ["PROGRAM", "GRANT"]
+        ],
+        "note": "콘텐츠 제작·라이브커머스·입점 지원 프로그램이다. 스튜디오를 공간으로, 할인 쿠폰을 비용 지원으로 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t03",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000121478",
+    "textChecksum": "4d669650d247d4f24b4df3aee0167700c2e5ebbb06abccdebde7156dcb68df65",
+    "productName": "2026 디지털커머스 전문기관(소담스퀘어 in 전주) 소상공인 지원 프로그램 지원대상 모집 공고",
+    "stratum": "region-facility",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "디지털전환이 필요한 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "소상공인이 대상이고 신청서에 사업자등록번호를 적는다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["전북"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "전주/완주/군산/익산/고창 등",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "신청서의 사업장 소재지 칸이 전북 시·군을 보기로 들고, 전주 맛배달 입점·지역 행사 연계를 지원해 전북 소상공인 대상으로 읽힌다. 소재지 요건을 밝힌 문장은 없어 언급 없음도 인정한다. 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "도소매/서비스/음식점/제조/기타",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "신청서의 업종 보기에 음식점이 있다. 업종 조건을 밝힌 문장은 없어 언급 없음도 인정한다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "소상공인 외에 대상 집단 제한이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "신청기간이 없다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "AI 마케팅 콘텐츠 제작 교육, 숏폼 제작 실습 교육",
+        "confidence": "ambiguous",
+        "alternatives": [["PROGRAM", "SPACE"]],
+        "note": "교육·컨설팅·상세페이지 제작·입점 지원 프로그램이다. 스튜디오를 공간으로 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t04",
+    "set": "test",
+    "productKey": "semas-ols-agency-54e4828875",
+    "textChecksum": "70e2e4e39231233c185cd7e89e9ec8a977bfad64704511f2e104a50abececb20",
+    "productName": "장애인기업지원자금(대리대출)",
+    "stratum": "semas",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "장애인기업확인서를 소지한 장애 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "장애 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "소재지 조건이 없다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "제외업종: 유흥 향락 업종, 전문업종, 금융업, 보험업, 부동산업 등",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제외 업종에 일반 음식점·카페가 없다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["DISABLED"],
+          "note": null
+        },
+        "quote": "장애인기업확인서를 소지한 장애 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "장애인복지카드·장애인기업확인서를 가진 장애 소상공인으로 한정한다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-10-06",
+          "end": null,
+          "text": "2026. 10. 6.(화) 10:00 ~ 예산소진 시까지"
+        },
+        "quote": "접수기간 : 2026. 10. 6.(화) 10:00 ~ 예산소진 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜이고 끝은 예산 소진 시까지다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["LOAN"],
+        "quote": "대출한도: 1억원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "정책자금 대리대출이다."
+      }
+    }
+  },
+  {
+    "id": "t05",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000117576",
+    "textChecksum": "2662d036324dde82608dfa8bd90c1430fbe407a4175896b429b3aef4bf4d25f4",
+    "productName": "[충북] 괴산군 2026년 저신용 소상공인 대출이자 지원사업 공고",
+    "stratum": "region-title-quote",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "괴산군에 사업장을 운영하고 있는 저신용 소상공인(개인사업자)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업장을 운영하는 개인사업자가 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["충북"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "괴산군에 사업장을 운영하고 있는 저신용 소상공인(개인사업자)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "괴산군 사업장이 요건이라 충북으로 적는다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "금융ㆍ보험업 및 사치향락적 소비나 투기를 조장하는 업종",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제외 업종에 일반 음식점·카페가 없다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "저신용(신용평점 하위 20%) 또는 차상위계층 이하·근로장려금 수급 소상공인"
+        },
+        "quote": "신용평점 KCB 700점 또는 NICE 749점 이하인 자",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "신용평점이나 소득 기준으로 신청자를 좁혀 OTHER로 보지만, 자격 조건이라 언급 없음도 인정한다(라벨링 원칙 2026-11-04)."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-01-02",
+          "end": null,
+          "text": "2026. 1. 2. ~ 예산 소진 시까지"
+        },
+        "quote": "신청 접수기간 : 2026. 1. 2. ~ 예산 소진 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["LOAN"],
+        "quote": "대출한도 2천만원 이내, 대출 금리 4.5%",
+        "confidence": "ambiguous",
+        "alternatives": [["LOAN", "GRANT"]],
+        "note": "미소금융 대출에 군이 이자 3%를 보전한다. 이자 지원을 비용 지원(GRANT)으로도 볼 수 있다."
+      }
+    }
+  },
+  {
+    "id": "t06",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000124890",
+    "textChecksum": "8126706ab724edeb4a5108be43d6b200157176a8e88349c8c756eefb48278b20",
+    "productName": "[대구] 유성구 2026년 하반기 디지털 골목상점 참여업소 모집 공고",
+    "stratum": "region-other-city-district",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "유성구에 영업신고한 상시근로자 5인 미만 사업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "영업신고한 사업자가 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["대전"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "유성구에 영업신고한 상시근로자 5인 미만 사업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "대전광역시 유성구의 공고다. 제목의 [대구] 표시는 기업마당이 잘못 단 것으로, 본문의 발행 기관과 맞지 않는다. 어느 쪽이든 서울 밖이라 판정은 같다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "(신청 제외) 프랜차이즈 형태의 영업을 하는 업소, 2021~2025년 사업참여 업소, 불건전 업종 등",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "신청 제외는 프랜차이즈·기참여 업소·불건전 업종뿐이고, 배달앱 등록·메뉴판 디자인을 지원해 음식점을 받는다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "프랜차이즈 제외 같은 결격 사유만 있고 특정 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-07-27",
+          "end": null,
+          "text": "2026. 7. 27. (월) ~ 상시모집"
+        },
+        "quote": "신청기간 : 2026. 7. 27. (월) ~ 상시모집",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "디지털 지원, 디자인 제작 지원, 교육 및 컨설팅 지원",
+        "confidence": "ambiguous",
+        "alternatives": [["PROGRAM", "GRANT"]],
+        "note": "무료로 제공하는 디지털·디자인·교육 지원이다. 디자인 제작을 비용 지원으로 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t07",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000126694",
+    "textChecksum": "ff51bcbff2ea552d255e1e954c8633b2d1fd2da3341ff39dbc092d95c5de6489",
+    "productName": "[부산] 동백전 카드수수료 지원사업 공고",
+    "stratum": "region-title-quote",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "연매출 10억원 이하 동백전 가맹점(소상공인)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "영업 중인 가맹점이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["부산"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "[부산] 동백전 카드수수료 지원사업 공고",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "부산시 공고이고, 대상은 부산의 지역사랑상품권(동백전) 가맹점이다. 소재지를 밝힌 문장은 없지만 공고 전체로 부산 가맹점만 대상임이 드러난다."
+      },
+      "foodBusiness": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "업종 조건이 없다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "연매출 10억원 이하 동백전 가맹점"
+        },
+        "quote": "연매출 10억원 이하 동백전 가맹점",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "매출 상한과 가맹점 요건이 신청자를 좁혀 OTHER로 보지만, 자격 조건이라 언급 없음도 인정한다(라벨링 원칙 2026-11-04)."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-09-28",
+          "end": "2026-12-06",
+          "text": null
+        },
+        "quote": "신청기간 : 2026. 9. 28. ~ 12. 6.",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사전·일반 신청을 합친 전체 기간이다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["GRANT"],
+        "quote": "동백전 카드 결제액 0.15% 동백전 지급",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "카드수수료 지원금을 동백전으로 준다."
+      }
+    }
+  },
+  {
+    "id": "t08",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000124693",
+    "textChecksum": "c50ea8b39bf04b6f2cb8ac7c8e33291a76dc43b649b421a2269596fd85969c25",
+    "productName": "[전남광주] 광양시 2026년 2차 식품안심업소(음식점 위생등급) 지정 컨설팅 참여업소 모집 공고",
+    "stratum": "region-issuer",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "일반ㆍ휴게음식점, 제과점, 집단급식소(위탁급식영업) 중 식품안심업소 지정 희망업소",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "영업 중인 업소가 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["전남"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "광양시 공고 제2026-1690호",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "소재지 요건을 밝힌 문장은 없지만, 광양시가 공고하고 광양시보건소가 접수·선정하며 컨설팅 업체가 영업장을 방문하는 사업이라 광양시 업소 대상으로 읽힌다. 문장이 없으니 언급 없음도 인정한다. 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "일반ㆍ휴게음식점, 제과점, 집단급식소(위탁급식영업) 중 식품안심업소 지정 희망업소",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "음식점이 대상이다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "위생 법령 위반이 없는 업소 같은 결격 사유만 있고 특정 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-07-23",
+          "end": null,
+          "text": "2026. 7. 23. ~ 모집 완료 시까지"
+        },
+        "quote": "모집기간 : 2026. 7. 23. ~ 모집 완료 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "식품안심업소(음식점 위생등급) 지정 맞춤형 컨설팅 지원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "컨설팅이다."
+      }
+    }
+  },
+  {
+    "id": "t09",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000117984",
+    "textChecksum": "210d5d4a01df424d7948b6c5619e292aee482f5d8a6936fe79b4074cdde4fa4b",
+    "productName": "2026년 제주창조경제혁신센터 창업-BuS 프로그램(W-JOIN) 참여기업 모집 공고",
+    "stratum": "region-agency",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BOTH",
+        "quote": "예비창업자 또는 창업 7년 이내 스타트업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "예비창업자와 7년 이내 스타트업이 함께 대상이다."
+      },
+      "businessAge": {
+        "mentioned": true,
+        "value": {
+          "min": null,
+          "max": 7,
+          "maxExclusive": false
+        },
+        "quote": "예비창업자 또는 창업 7년 이내 스타트업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "예비창업자는 0년이라 상한 7년이 모두에게 맞는다."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "scope": "PROVINCES",
+            "provinces": ["제주"],
+            "districts": [],
+            "excludedProvinces": [],
+            "excludedDistricts": []
+          }
+        ],
+        "note": "신청자 소재지 조건이 없다. 제주창조경제혁신센터의 프로그램이고 제주 창업생태계와의 연계를 심사해 제주 기업 대상으로 읽을 수도 있어 둘 다 인정한다(dev c24와 같은 원칙). 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "중점분야 이외에도 우수한 역량을 가진 스타트업은 지원 가능",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "중점분야를 두지만 그 밖의 분야도 신청할 수 있다고 밝혔다. 업종을 말하지 않았다고 보면 언급 없음도 인정한다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "특정 집단 한정이 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": null,
+          "end": null,
+          "text": "2026년 1월 ~ 12월"
+        },
+        "quote": "(신청기간) 2026년 1월 ~ 12월",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "text": "2026년 1월 ~ 12월"
+          }
+        ],
+        "note": "일자 없이 월만 적었다. 1월 1일~12월 31일로 풀 수도 있다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "OTHER"],
+        "quote": "창업-BuS DB 등록 및 맞춤형 액셀러레이팅 지원",
+        "confidence": "ambiguous",
+        "alternatives": [["PROGRAM"]],
+        "note": "액셀러레이팅·멘토링은 프로그램, 직접투자는 그 밖이다."
+      }
+    }
+  },
+  {
+    "id": "t10",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000118108",
+    "textChecksum": "32f9e959dcff2fa24446bc9a7f7b9d204e11ddf0ca4208ec4de66a0242d69ad4",
+    "productName": "[서울] 은평구 2026년 소규모 자영업자 LED간판 설치 지원사업 공고",
+    "stratum": "region-seoul-district",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "은평구 관내에 사업장이 등록된 소규모 자영업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업장이 등록된 자영업자가 대상이다."
+      },
+      "businessAge": {
+        "mentioned": true,
+        "value": null,
+        "quote": "신규 자영업자 : 2026. 1. 1. 이후 신규개업 및 사업장 이전 사업자",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "신규 자영업자는 2026년 개업·이전만 받지만 기존 자영업자는 불법간판을 교체하면 받아, 유형마다 달라 하나의 값으로 옮길 수 없다."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "SEOUL_DISTRICTS",
+          "provinces": ["서울"],
+          "districts": ["은평구"],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "은평구 관내에 사업장이 등록된 소규모 자영업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "서울 은평구로 한정한다."
+      },
+      "foodBusiness": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "업종 조건이 없다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "영업장 면적 99㎡ 미만"
+        },
+        "quote": "면적 기준 : 99㎡ 미만",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "영업장 면적 상한이 신청자를 좁혀 OTHER로 보지만, 규모 조건이라 언급 없음도 인정한다(라벨링 원칙 2026-11-04)."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-01-19",
+          "end": "2026-12-31",
+          "text": null
+        },
+        "quote": "모집(접수)기간 : 2026. 1. 19. ~ 12. 31. (예산소진시 조기 마감)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "예산 소진 시 조기 마감한다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["GRANT"],
+        "quote": "각 업소당 800천원 이내 지원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "간판 설치 보조금이다."
+      }
+    }
+  },
+  {
+    "id": "t11",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000127603",
+    "textChecksum": "af6a2c794733901de84f1450c1b660b31c5757efa4fcdf54000bd7f81568cb36",
+    "productName": "[인천] 대학 청년 창업펀드 2호 UniVest Scale-Up 참여기업 모집 공고",
+    "stratum": "region-ambiguous",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "인천 소재 9개 대학ㆍ대학원 구성원이 창업한 법인기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "창업한 법인사업자만 받는다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "중소기업창업지원법상 창업자라고만 적고 기간을 밝히지 않았다."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제목의 청년은 펀드 이름이고, 대표 자격은 학생·졸업자·교직원이다."
+      },
+      "region": {
+        "mentioned": true,
+        "value": null,
+        "quote": "본사 인천 기업 또는 투자 후 1년 이내 인천으로 본사 이전 기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "인천 본사 기업과 투자 후 1년 안에 인천으로 옮길 기업을 함께 받아, 인천 밖 기업도 이전을 약속하면 신청할 수 있다. 하나의 값으로 옮길 수 없다. 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "유흥 주점업, 기타 사행시설 관리 및 운영업 등",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "선정 제외는 유흥주점·사행시설 등 벤처투자 대상이 아닌 업종이고, 신청서의 산업 보기에 숙박·음식업이 있다. 제외 기준을 외부 법률로 넘겨 언급 없음도 인정한다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "인천 9개 대학 구성원(학생·졸업자·교직원)이 창업한 기업"
+        },
+        "quote": "대표가 대학생ㆍ대학원생(졸업자 포함) 또는 대학교 교직원",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "인천 9개 대학 출신 창업기업으로 신청자를 좁혀 OTHER로 보지만, 자격 조건이라 언급 없음도 인정한다(라벨링 원칙 2026-11-04)."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-10-30",
+          "end": "2026-11-26",
+          "text": null
+        },
+        "quote": "신청기간 : 2026. 10. 30.(금) ∼ 11. 26.(목)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "OTHER"],
+        "quote": "인사이트 클래스, VC 맞춤형 멘토링, 직접 투자 지원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "강연·멘토링은 프로그램, 직접 투자는 그 밖이다."
+      }
+    }
+  },
+  {
+    "id": "t12",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000117950",
+    "textChecksum": "c3aa54f26c3f13dd0eb4234f8fdabe6b4fb2e3e45b29abeaa46246058f3847fc",
+    "productName": "[인천] 중구 2026년 소상공인 (특례)협약보증 지원 사업 공고",
+    "stratum": "region-other-city-district",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "인천광역시 중구 소재 사업장을 소유한 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업장을 가진 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["인천"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "인천광역시 중구 소재 사업장을 소유한 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "인천 중구로 한정한다. 서울에도 중구가 있지만 서울 자치구가 아니다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "사치·향락 등 재보증 제한업종",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "보증제한업종 목록의 음식점업은 유흥주점뿐이다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "보증 이용·신용·체납 같은 결격 사유만 있고 특정 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-01-23",
+          "end": null,
+          "text": "2026. 1. 23. ~ 자금 소진 시까지"
+        },
+        "quote": "신청기간 : 2026. 1. 23. ~ 자금 소진 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["LOAN", "GUARANTEE"],
+        "quote": "융자한도 총 보증금액 1억 원 이내 지원",
+        "confidence": "ambiguous",
+        "alternatives": [["LOAN"], ["LOAN", "GUARANTEE", "GRANT"]],
+        "note": "인천신용보증재단 보증으로 은행 대출을 받고 구가 이자 2.5%를 보전한다. 이차보전을 비용 지원으로 볼지 갈릴 수 있다."
+      }
+    }
+  },
+  {
+    "id": "t13",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000126492",
+    "textChecksum": "d771cfa1a7a273543ae4af701271dc940210387de56476ca37c5c9b0fb9175b6",
+    "productName": "[서울] 서대문구 2026년 청년창업기업 및 사회연대경제기업 수시 전문상담 경영컨설팅 신청 기업 모집 공고",
+    "stratum": "region-seoul-district",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BOTH",
+        "quote": "청년창업기업 및 사회연대경제기업, 예비창업자",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "기업과 예비창업자를 함께 대상으로 적었다. 제출서류에 사업자등록증 사본이 있어 값 없이 둘 수도 있다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": true,
+        "value": {
+          "min": null,
+          "max": 39,
+          "maxExclusive": false
+        },
+        "quote": "대표자의 연령이 39세 이하인 서대문구 소재 청년창업기업",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "\"대표자의 연령이 39세 이하인\"이 청년창업기업·사회연대경제기업·예비창업자 모두에 걸린다고 읽었다. 청년창업기업에만 걸린다고 보면 하나의 값으로 옮길 수 없다."
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "SEOUL_DISTRICTS",
+          "provinces": ["서울"],
+          "districts": ["서대문구"],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "서대문구 소재 청년창업기업 및 사회연대경제기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "서울 서대문구로 한정한다."
+      },
+      "foodBusiness": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "업종 조건이 없다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["YOUTH"],
+          "note": null
+        },
+        "quote": "대표자의 연령이 39세 이하인 서대문구 소재 청년창업기업",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": ["YOUTH", "OTHER"],
+            "note": "사회연대경제기업"
+          },
+          null
+        ],
+        "note": "39세 이하가 모두에게 걸리면 청년 한정이다. 사회연대경제기업은 나이와 상관없이 받는다고 보면 청년 또는 사회연대경제기업(OTHER)이고, 하나의 값으로 옮길 수 없다고 볼 수도 있다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-09-04",
+          "end": "2026-11-30",
+          "text": null
+        },
+        "quote": "2026. 9.4.(금) ~ 2026.11.30.(월) (예산소진시 마감)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "신청기간은 공고일(2026. 9. 4.)부터 11. 30.까지다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "전문상담 경영컨설팅 지원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "전문가 상담·컨설팅이다."
+      }
+    }
+  },
+  {
+    "id": "t14",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000120829",
+    "textChecksum": "8761d99878be34e31f9b95719bd76367c401d8c21f458cdfc683555d441cce9f",
+    "productName": "[울산] 2026년 소상공인 재기지원자금 긴급 융자 지원계획 공고",
+    "stratum": "target-restart",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "접수일 현재 사업자 등록 후 영업 중이며",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업자 등록 후 영업 중인 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "2020. 1. 1. 이후 폐업 후 재창업했거나 휴업 후 영업을 재개해야 하지만, 휴업 후 재개한 사업자는 개업일이 그보다 이를 수 있어 업력 제한이 아니다."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["울산"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "휴업 후 영업을 재개한 울산광역시 소재 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "울산 소재 소상공인으로 한정한다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "도·소매업, 음식업, 서비스업 등 : 상시근로자 5명 미만 업체",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "음식업을 소상공인 범위에 적었고, 융자지원 제한 업종의 음식점업은 유흥주점뿐이다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["RESTART"],
+          "note": null
+        },
+        "quote": "2020. 1. 1. 이후 폐업 후 재창업 또는 휴업 후 영업을 재개한",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": ["RESTART", "OTHER"],
+            "note": "재창업 교육 수료자"
+          },
+          null
+        ],
+        "note": "재창업이나 휴업 후 재개한 소상공인으로 한정한다. 행복드림센터·희망리턴패키지 교육 수료도 함께 요구하는데(둘 다 충족) 이는 대상 목록으로 옮길 수 없어, 수료 조건을 OTHER로 더하거나 하나의 값으로 옮길 수 없다고 볼 수도 있다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-04-17",
+          "end": null,
+          "text": "2026. 4. 17.(금) 09:00 ~ 자금 소진 시까지(온라인 선착순)"
+        },
+        "quote": "신청기간 : 2026. 4. 17.(금) 09:00 ~ 자금 소진 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["LOAN", "GUARANTEE"],
+        "quote": "대출한도 : 8천만원 이내",
+        "confidence": "ambiguous",
+        "alternatives": [["LOAN"], ["LOAN", "GUARANTEE", "GRANT"], ["LOAN", "GRANT"]],
+        "note": "울산신용보증재단 보증서로 협약은행 대출을 받고 시가 이자 일부를 지원한다. 이자 지원을 비용 지원으로 볼지 갈릴 수 있다."
+      }
+    }
+  },
+  {
+    "id": "t15",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000127798",
+    "textChecksum": "311a4049df096869de7ede517b857bb1abcdfa50e955c87f2c7fcd10f112aa32",
+    "productName": "[전북] 익산시 청년공유주방(배달형 외식창업 인큐베이팅) 예비창업자 모집 재공고(익산시 음식ㆍ식품교육문화원)",
+    "stratum": "pre-startup",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "PRE_STARTUP_ONLY",
+        "quote": "외식업 창업을 희망하는 익산시 청년",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "창업을 희망하는 예비창업자를 모집하고, 선정 후 1개월 안에 사업자 등록을 하게 한다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": true,
+        "value": {
+          "min": 19,
+          "max": 39,
+          "maxExclusive": false
+        },
+        "quote": "공고일 기준 19세~39세 이하 익산시 주민등록자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "청년 기준 나이다."
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["전북"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "공고일 기준 19세~39세 이하 익산시 주민등록자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "익산시 주민등록자로 한정해 전북으로 적는다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "외식업 창업을 희망하는 익산시 청년",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "외식업 창업이 대상이다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["YOUTH"],
+          "note": null
+        },
+        "quote": "외식업 창업을 희망하는 익산시 청년",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "청년으로 한정한다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-11-03",
+          "end": "2026-11-16",
+          "text": null
+        },
+        "quote": "접수기간 : 2026. 11. 3(화) - 11. 16(월) 18:00시까지 도착분에 한함",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["SPACE", "GRANT", "PROGRAM"],
+        "quote": "공유주방 임대 지원",
+        "confidence": "ambiguous",
+        "alternatives": [
+          ["SPACE", "PROGRAM"],
+          ["SPACE", "GRANT"]
+        ],
+        "note": "공유주방 임대(공간), 임대료 50%·공과금·POS 렌탈 비용 지원(비용), 교육 컨설팅(프로그램)이다. 임대료 감면을 공간 지원에 넣어 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t16",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000121671",
+    "textChecksum": "9545262c3ad22d733d690f052b1cd3661c94bb8bd12e0c2ed788e9860d35a553",
+    "productName": "[충남] 2026년 소상공인 IP출원(상표) 지원 사업 모집 공고",
+    "stratum": "region-title-only",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "소상공인(사업자등록증 보유)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업자등록증을 가진 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["충남"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "[충남] 2026년 소상공인 IP출원(상표) 지원 사업 모집 공고",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "본문에 소재지 요건 문장은 없지만, 제목의 [충남]과 \"반드시 충남지식재산센터로 신청\"으로 충남센터의 공고임이 드러난다. 다른 시·도 사업자는 그 시·도 센터의 공고로 신청한다(dev c18과 같은 원칙)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "지원제외 업종(유흥향락, 전문업종, 금융‧보험업, 부동산업 등)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제외 업종에 일반 음식점·카페가 없다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "프랜차이즈 가맹점 제외 같은 결격 사유만 있고 특정 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-02-27",
+          "end": null,
+          "text": "2026년 2월 27일 ~ 예산 소진 시 마감"
+        },
+        "quote": "2026년 2월 27일 ~ 예산 소진 시 마감",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["GRANT"],
+        "quote": "상표출원(건당 약 53만원) 지원",
+        "confidence": "ambiguous",
+        "alternatives": [["GRANT", "PROGRAM"], ["PROGRAM"]],
+        "note": "상표출원 비용의 80%를 전문기관에 대신 지급하는 비용 지원이고, 상담·교육을 거치는 출원 서비스로 볼 수도 있다(dev c18과 같다)."
+      }
+    }
+  },
+  {
+    "id": "t17",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000121288",
+    "textChecksum": "e398242976232341e8f6305446da336f4c2ab38bd67407d94c3f749e90038e58",
+    "productName": "[부산] 2026년 디지털커머스 전문기관 구축ㆍ운영라이브커머스 운영 지원 모집 공고",
+    "stratum": "region-facility",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "사업자등록을 한 국내 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업자등록을 한 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "NATIONWIDE",
+          "provinces": [],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "사업자등록을 한 국내 소상공인",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "부산시·부산경제진흥원의 사업이고 촬영은 소담스퀘어 in 부산에서 하지만, 신청자격을 \"국내 소상공인\"으로 밝혔다. 소재지를 좁히는 문장이 아니라고 보면 언급 없음도 인정한다. 부산 한정은 아니다. 사용자 결정(2026-11-12)."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "소상공인정책자금 지원제외 업종",
+        "confidence": "ambiguous",
+        "alternatives": ["EXCLUDED"],
+        "note": "제외 업종은 소상공인 정책자금 지원제외 업종이라 일반 음식점이 빠지지 않는다. 다만 온라인으로 팔 소비재·완제품을 제조·판매해야 해 상품이 없는 음식점·카페는 사실상 어렵다고 볼 수도 있다(dev c10과 같다)."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "온라인 판매 가능한 소비재를 제조·판매하고 방송 가능 등급 이상인 소상공인"
+        },
+        "quote": "네이버 및 기타 플랫폼 방송 가능 등급 이상인 소상공인",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "판매 상품과 방송 가능 등급 요건이 신청자를 좁혀 OTHER로 보지만, 자격 조건이라 언급 없음도 인정한다(라벨링 원칙 2026-11-04)."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-04-22",
+          "end": "2026-12-18",
+          "text": "’26. 4. 22.(수). ~ 12. 18.(금).(상시모집)"
+        },
+        "quote": "신청기간 : ’26. 4. 22.(수). ~ 12. 18.(금).(상시모집)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM"],
+        "quote": "사전컨설팅(라이브커머스 운영, 상품분석 등), 쇼호스트 섭외",
+        "confidence": "ambiguous",
+        "alternatives": [
+          ["PROGRAM", "GRANT"],
+          ["PROGRAM", "SPACE"]
+        ],
+        "note": "컨설팅·쇼호스트·촬영·송출을 대신 해 주는 프로그램이다. 업체당 120만원 이내라 비용 지원으로, 스튜디오를 공간으로 볼 수도 있다."
+      }
+    }
+  },
+  {
+    "id": "t18",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000120933",
+    "textChecksum": "531630328b8f978973441b772500132682d948baec6d07c2bea2e11d5e176cb4",
+    "productName": "[경기] 시흥시 2026년 대야기계장비 소공인특화지원센터 자율사업 통합 모집 공고",
+    "stratum": "region-other-city-district",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "C25, C29업종 소공인(상시 근로자 수 10인 미만 제조업) 업체",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제조업 소공인 업체가 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "청년소공인 가업승계 지원 트랙이 있지만 나이를 밝히지 않았다."
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["경기"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "업체 소재지가 집적지(시흥시 대야동, 신천동, 은행동, 신현동, 매화동, 과림동) 내 위치",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시흥시의 동으로 한정해 경기로 적는다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "EXCLUDED",
+        "quote": "C25, C29업종 소공인(상시 근로자 수 10인 미만 제조업) 업체",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "금속가공·기계장비 제조업으로 좁혔다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "업종 한정은 음식점·카페 제외에 담았고 특정 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-04-10",
+          "end": null,
+          "text": "공고일 ~ 예산 소진 시"
+        },
+        "quote": "신청기간 : 공고일 ~ 예산 소진 시",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "start": null,
+            "end": null,
+            "text": "공고일 ~ 예산 소진 시"
+          }
+        ],
+        "note": "공고일(2026. 4. 10.)부터 예산 소진 시까지다. 시작일을 비워 둘 수도 있다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "GRANT"],
+        "quote": "맞춤형 컨설팅지원, 기업인증 취득지원, 시제품제작지원",
+        "confidence": "ambiguous",
+        "alternatives": [["GRANT"], ["PROGRAM"]],
+        "note": "컨설팅은 프로그램, 인증·시제품·공정개선·마케팅은 업체당 한도 안의 비용 지원이다."
+      }
+    }
+  },
+  {
+    "id": "t19",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000123842",
+    "textChecksum": "c8fbb7fb5ae63aba969db67097975bd3ae61c7fca3c3481509f1f1c6e46e767c",
+    "productName": "[서울] 2026년 하반기 위기 소상공인 조기발굴 및 선제지원(Track2) 사업 모집 공고",
+    "stratum": "region-seoul-wide",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "서울시 내에서 사업장을 운영중인 점포형 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업장을 운영 중인 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": true,
+        "value": {
+          "min": 2,
+          "max": null,
+          "maxExclusive": false
+        },
+        "quote": "매출감소 : 업력이 2년 이상이며",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "매출감소 유형은 업력 2년 이상이지만 재해피해 유형(재해중소기업 확인증 발급)은 업력 조건이 없다. 사용자 입력에 없는 자격으로 넘을 수 있는 업력이라 값으로 옮기지 않아도 맞음이다(사용자 결정 2026-11-12, dev c25와 같다)."
+      },
+      "age": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["서울"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "서울시 내에서 사업장을 운영중인 점포형 소상공인",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "서울 전체가 대상이고 자치구 제한은 없다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "사치향락업종 및 도박·투기·사치 등 지원제한업종을 영위중인 자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "지원제한업종의 음식점업은 유흥주점뿐이고, 점포형 소상공인이 대상이다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["OTHER"],
+          "note": "매출 감소로 경영 위기에 직면했거나 재해 피해를 입은 소상공인"
+        },
+        "quote": "아래 조건 하나에 해당하는 소상공인",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": ["OTHER", "DAMAGED"],
+            "note": "매출 감소 위기 또는 재해 피해"
+          },
+          null
+        ],
+        "note": "매출감소 위기나 재해피해 소상공인으로 한정해 OTHER로 보지만, 자격 조건이라 언급 없음도 인정한다. 재해피해만 보고 DAMAGED로 적으면 매출감소 유형이 빠진다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-07-02",
+          "end": null,
+          "text": "2026. 7. 2. (목) 오전 10:00 ~ 예산 소진 시까지"
+        },
+        "quote": "접수기간 : 2026. 7. 2. (목) 오전 10:00 ~ 예산 소진 시까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "GRANT"],
+        "quote": "현장방문 예비진단, 경영진단 및 맞춤형 컨설팅(필수 2회), 솔루션 이행 비용",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "진단·컨설팅은 프로그램, 솔루션 이행 비용(최대 300만원)은 비용 지원이다."
+      }
+    }
+  },
+  {
+    "id": "t20",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000123844",
+    "textChecksum": "3197bf894ac74d6697b700eb95379c914485bab2cfc9d11dff25a9e04e082b14",
+    "productName": "[서울] 2026년 하반기 중장년 소상공인 디지털 전환지원 사업 모집 공고",
+    "stratum": "region-seoul-wide",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "사업자등록증상 사업장 소재지가 ‘서울시’인 기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "사업자등록을 한 소상공인이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": true,
+        "value": null,
+        "quote": "업 력: 개업일이 2025년 7월 1일 이전인 자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "개업일의 날짜 기준이라 몇 년으로 바꾸면 신청 시점마다 달라진다. 공고일 기준 1년으로 옮기면 지금(채점 기준일) 2025년 7월 뒤에 개업한 사업자가 맞음이 된다. 사용자 결정(2026-11-12)."
+      },
+      "age": {
+        "mentioned": true,
+        "value": {
+          "min": 40,
+          "max": null,
+          "maxExclusive": false
+        },
+        "quote": "지원연령: 만 40세 이상인 자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "만 50세 이상은 우대(가점)다."
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["서울"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "사업자등록증상 사업장 소재지가 ‘서울시’인 기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "서울 전체가 대상이고 자치구 이야기는 없다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "NOT_EXCLUDED",
+        "quote": "디지털 취약 업종(숙박·음식점업, 제조업, 수리·기타서비스업)",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "음식점업은 우대 업종이고, 지원제한업종은 사치향락업종 등이다."
+      },
+      "targetGroups": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "ambiguous",
+        "alternatives": [
+          {
+            "groups": [],
+            "note": null
+          }
+        ],
+        "note": "중장년 한정은 나이 항목(만 40세 이상)으로 옮겼고, 그 밖의 집단 한정은 없다. 사용자 결정(2026-11-05): 신청 대상을 밝혔는데 특정 집단 한정이 없으면 한정 없음도 정답이다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-07-02",
+          "end": null,
+          "text": "2026. 7. 2.(목) 오전 10:00 ~ 예산 소진 시 까지"
+        },
+        "quote": "신청기간: 2026. 7. 2.(목) 오전 10:00 ~ 예산 소진 시 까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "시작일만 날짜다."
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "GRANT"],
+        "quote": "디지털 전환을 위한 교육, 컨설팅, 비용, 사후관리 지원",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "교육·컨설팅은 프로그램, 솔루션 이행 비용(최대 300만원)은 비용 지원이다."
+      }
+    }
+  },
+  {
+    "id": "t21",
+    "set": "test",
+    "productKey": "bizinfo-pbln-000000000127618",
+    "textChecksum": "3a730829456ee88809e3d729ac2119135adcc7a3802a6a5d4bedd2cedfd96867",
+    "productName": "2027년 서울시 청년 쿡 푸드테크 센터 참여 스타트업 모집 공고",
+    "stratum": "region-seoul-wide",
+    "fields": {
+      "businessStage": {
+        "mentioned": true,
+        "value": "BUSINESS_ONLY",
+        "quote": "제품ㆍ서비스를 보유한 창업기업 중 스케일업(고도화) 필요 기업",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제품·서비스를 가진 창업기업이 대상이다."
+      },
+      "businessAge": {
+        "mentioned": false,
+        "value": null,
+        "quote": "",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "age": {
+        "mentioned": true,
+        "value": {
+          "min": 19,
+          "max": 39,
+          "maxExclusive": false
+        },
+        "quote": "공고일 기준 19~39세 대표자",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "제대군인은 상한을 최대 3년 늘린다. 사용자 입력에 없는 자격으로 넘을 수 있는 나이라 값으로 옮기지 않아도 맞음으로 본다(dev c25의 업력과 같은 원칙)."
+      },
+      "region": {
+        "mentioned": true,
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["서울"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "서울 사업소재지를 둔 기업 또는 서울로 본점, 지점, 연구소 등 주소지 이전을 계획중인 기업",
+        "confidence": "ambiguous",
+        "alternatives": [null],
+        "note": "서울 소재 기업과 서울로 옮길 기업을 받는다. 서울 사용자에게는 어느 쪽이든 맞으므로 서울로 적는다. 이전 예정 기업도 받아 하나의 값으로 옮길 수 없다고 볼 수도 있다."
+      },
+      "foodBusiness": {
+        "mentioned": true,
+        "value": "EXCLUDED",
+        "quote": "푸드테크 기반 제품 및 서비스 개발 분야 유망 청년 창업자",
+        "confidence": "ambiguous",
+        "alternatives": ["NOT_EXCLUDED"],
+        "note": "외식자동화·신식품·푸드 플랫폼·식품제조 기술혁신 같은 푸드테크 스타트업이 대상이라 일반 음식점·카페는 대상이 아니지만, 외식 분야를 포함해 넓게 읽을 여지도 있다."
+      },
+      "targetGroups": {
+        "mentioned": true,
+        "value": {
+          "groups": ["YOUTH"],
+          "note": null
+        },
+        "quote": "푸드테크 기반 제품 및 서비스 개발 분야 유망 청년 창업자",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "청년 창업자로 한정한다."
+      },
+      "applicationPeriod": {
+        "mentioned": true,
+        "value": {
+          "start": "2026-11-02",
+          "end": "2026-11-20",
+          "text": null
+        },
+        "quote": "접수기간 : 2026. 11. 2.(월) ~ 2026. 11. 20.(금) 23:59까지",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": ""
+      },
+      "supportTypes": {
+        "mentioned": true,
+        "value": ["PROGRAM", "SPACE", "GRANT"],
+        "quote": "인큐베이팅 프로그램(초기사업화자금, 멘토링, 연구개발 등 지원)",
+        "confidence": "ambiguous",
+        "alternatives": [
+          ["PROGRAM", "SPACE"],
+          ["PROGRAM", "SPACE", "GRANT", "OTHER"]
+        ],
+        "note": "멘토링·판로는 프로그램, 입주사무실·오픈키친은 공간, 초기·중간·최종 사업화자금은 비용 지원이다. 투자연계를 그 밖으로 더할 수도 있다."
       }
     }
   }

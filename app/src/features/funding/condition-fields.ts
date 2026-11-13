@@ -17,7 +17,9 @@ export const CONDITION_MODEL = 'claude-haiku-5-5';
 // (부산 중구가 서울 중구로 읽혔다). 프롬프트와 출력 스키마는 그대로다.
 // v7(2026-11-12): 서울 전체는 시·도 서울, 자치구 한정은 자치구를 하나 이상 적을 때만이라고 밝히고, 서울 전체 예시를 넣었다
 // (v6 동기화에서 서울 전체 공고 6건 중 3건을 자치구 없는 자치구 한정으로 적었다). 출력 스키마와 검증 규칙은 그대로다.
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v7';
+// v8(2026-11-13): 검증이 인용을 공고 제목(상품 이름)에서도 찾는다. 제목과 본문을 이은 인용은 받지 않는다(v7 동기화에서
+// 인용으로 제목을 적은 공고의 지역이 버려졌다). 프롬프트와 출력 스키마는 그대로다.
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v8';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;
 export const CONDITION_FOOD_BUSINESS = ['EXCLUDED', 'NOT_EXCLUDED'] as const;
@@ -69,7 +71,7 @@ export const CONDITION_FIELD_NAMES: readonly ConditionFieldName[] = [
 export type VerifiedField<T> =
   | { status: 'READ'; value: T; quote: string }
   | { status: 'NOT_MENTIONED' }
-  // 값이나 인용이 없거나, 인용이 본문에 없거나, 값이 말이 안 된다. 언급 없음과 섞지 않는다.
+  // 값이나 인용이 없거나, 인용이 공고 제목과 본문에 없거나, 값이 말이 안 된다. 언급 없음과 섞지 않는다.
   | { status: 'UNREADABLE'; reason: string };
 
 export type VerifiedConditions = { [K in ConditionFieldName]: VerifiedField<ConditionValues[K]> };

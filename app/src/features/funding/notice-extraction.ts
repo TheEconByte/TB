@@ -478,11 +478,14 @@ function checkValue(
   }
 }
 
-// 인용 검증(ADR 0009 §3): 인용이 저장한 본문에 그대로 없으면 그 값은 버리고 읽지 못함으로 둔다.
-// 인용이 본문에 있어도 다른 항목의 문장일 수 있다(예: "연령 제한 없음"의 "제한 없음"을 업력 근거로 씀). 이 경우는
-// 막지 못한다(ADR 0009 Consequences의 해석 오류).
-export function verifyConditionOutput(output: ConditionOutput, text: string): VerifiedConditions {
-  const body = compactForQuote(text);
+// AI에 보낸 공고. 상품 이름(공고 제목이나 자금 이름)도 공고의 일부라 조건을 밝힐 수 있다(사용자 결정 2026-11-12).
+export type NoticeSource = { productName: string; text: string };
+
+// 인용 검증(ADR 0009 §3): 인용이 공고 제목이나 저장한 본문 중 한 곳에 그대로 없으면 그 값은 버리고 읽지 못함으로 둔다.
+// 제목과 본문은 따로 대조해, 둘을 이어 붙인 인용은 받지 않는다. 인용이 공고에 있어도 다른 항목의 문장일 수 있다
+// (예: "연령 제한 없음"의 "제한 없음"을 업력 근거로 씀). 이 경우는 막지 못한다(ADR 0009 Consequences의 해석 오류).
+export function verifyConditionOutput(output: ConditionOutput, notice: NoticeSource): VerifiedConditions {
+  const sources = [notice.productName, notice.text].map(compactForQuote);
   const verified: Record<string, VerifiedField<unknown>> = {};
   for (const name of Object.keys(conditionOutputSchema.shape) as ConditionFieldName[]) {
     const entry = output[name];
@@ -499,8 +502,8 @@ export function verifyConditionOutput(output: ConditionOutput, text: string): Ve
       verified[name] = { status: 'UNREADABLE', reason: `인용이 ${MIN_QUOTE_CHARS}자보다 짧아 근거로 보지 않습니다.` };
       continue;
     }
-    if (!body.includes(quote)) {
-      verified[name] = { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' };
+    if (!sources.some((source) => source.includes(quote))) {
+      verified[name] = { status: 'UNREADABLE', reason: '인용이 공고 제목과 본문에 없습니다.' };
       continue;
     }
     const checked = checkValue(name, entry.value);
@@ -649,7 +652,7 @@ export async function extractNoticeConditions(
       textChecksum,
       model: CONDITION_MODEL,
       promptVersion: CONDITION_PROMPT_VERSION,
-      fields: verifyConditionOutput(result.output, text),
+      fields: verifyConditionOutput(result.output, { productName: name, text }),
       rawOutput: result.output,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,

@@ -6,7 +6,14 @@ import { parseArgs } from 'node:util';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.ts';
-import { expectedFields, gradeCase, type GoldCase } from '../src/features/funding/condition-eval.ts';
+import {
+  EVAL_METRICS,
+  EVAL_SETS,
+  expectedFields,
+  gradeCase,
+  summarizeBySet,
+  type GoldCase,
+} from '../src/features/funding/condition-eval.ts';
 import { CONDITION_FIELD_NAMES } from '../src/features/funding/condition-fields.ts';
 import {
   CONDITION_MODEL,
@@ -15,16 +22,19 @@ import {
   createClaudeConditionExtractor,
   verifyConditionOutput,
   type ConditionOutput,
+  type NoticeSource,
 } from '../src/features/funding/notice-extraction.ts';
 import { secretMasker } from '../src/features/market/seoul-api.ts';
 
-// 공고 조건 추출 평가(app/eval/funding-conditions). funding:sync와 같은 추출 코드를 정답 30건에 돌려 채점한다.
+// 공고 조건 추출 평가(app/eval/funding-conditions). funding:sync와 같은 추출 코드를 정답 공고에 돌려 채점한다.
 // 실제 Claude API를 부르므로 운영자만 실행한다. 본문은 저장소에 두지 않고 앱 DB의 funding_notice_texts에서 읽는다.
 
-const HELP = `사용법: npm --prefix app run eval:funding-conditions -- [--variant <이름>] [--reps <n>]
+const HELP = `사용법: npm --prefix app run eval:funding-conditions -- [--variant <이름>] [--reps <n>] [--set <dev|test|all>]
 
   --variant <이름>  결과를 쓸 폴더 이름. baseline 또는 v1, v2 ... (기본값: baseline)
   --reps <n>        공고마다 몇 번 읽을지(기본값: 2). 같은 공고도 매번 결과가 조금씩 달라서 두 번 이상 본다.
+  --set <이름>      읽을 정답 공고. dev는 프롬프트를 고칠 때 보는 공고, test는 고친 뒤 비교할 때만 재는 공고다.
+                    고치는 동안에는 dev만 돌린다. (기본값: all)
 
 결과: .claude/hillclimb/funding-conditions/<variant>/results.jsonl, traces/, errors.jsonl
 이미 쓴 (공고, 회차)는 건너뛴다. 끊긴 뒤 다시 실행하면 이어서 한다.
@@ -81,6 +91,7 @@ async function main() {
     options: {
       variant: { type: 'string', default: 'baseline' },
       reps: { type: 'string', default: '2' },
+      set: { type: 'string', default: 'all' },
       help: { type: 'boolean' },
     },
   });
@@ -90,32 +101,37 @@ async function main() {
   }
   const variant = values.variant;
   const reps = Number(values.reps);
-  if (!/^(baseline|v\d+)$/.test(variant) || !Number.isInteger(reps) || reps < 1) throw new Error(HELP);
+  const sets = values.set === 'all' ? EVAL_SETS : EVAL_SETS.filter((set) => set === values.set);
+  if (!/^(baseline|v\d+)$/.test(variant) || !Number.isInteger(reps) || reps < 1 || sets.length === 0)
+    throw new Error(HELP);
   const databaseUrl = process.env.DATABASE_URL;
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim() ?? '';
   if (!databaseUrl || apiKey === '') throw new Error('DATABASE_URL과 ANTHROPIC_API_KEY가 필요합니다(app/.env.local).');
   const mask = secretMasker(apiKey);
 
-  const cases = JSON.parse(readFileSync(CASES, 'utf8')) as GoldCase[];
+  const allCases = JSON.parse(readFileSync(CASES, 'utf8')) as GoldCase[];
+  const cases = allCases.filter((item) => (sets as readonly string[]).includes(item.set));
+  const otherSets = new Set(allCases.filter((item) => !cases.includes(item)).map((item) => item.id));
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
-  const texts = new Map<string, string>();
+  // AI에 보내는 공고(상품 이름과 본문). 인용 검증도 같은 두 글로 한다.
+  const notices = new Map<string, NoticeSource>();
   try {
     for (const item of cases) {
       const row = await prisma.fundingNoticeText.findFirst({
         where: { productKey: item.productKey, textChecksum: item.textChecksum },
         select: { text: true },
       });
-      if (row) texts.set(item.id, row.text);
+      if (row) notices.set(item.id, { productName: item.productName, text: row.text });
     }
   } finally {
     await prisma.$disconnect();
   }
-  const missing = cases.filter((item) => !texts.has(item.id)).map((item) => item.id);
+  const missing = cases.filter((item) => !notices.has(item.id)).map((item) => item.id);
   if (missing.length > 0)
     throw new Error(`DB에 본문이 없습니다: ${missing.join(', ')}. funding:sync를 먼저 실행하세요.`);
 
   // 정답도 실제 검증을 통과해야 한다. 통과하지 못하면 정답이 틀렸으므로 채점하지 않는다.
-  const expected = new Map(cases.map((item) => [item.id, expectedFields(item, texts.get(item.id) as string)]));
+  const expected = new Map(cases.map((item) => [item.id, expectedFields(item, notices.get(item.id)!.text)]));
   const problems = [...expected.values()].flatMap((entry) => entry.problems);
   if (problems.length > 0) throw new Error(`정답 문제:\n${problems.join('\n')}`);
 
@@ -143,11 +159,11 @@ async function main() {
     Array.from({ length: reps }, (_, rep) => ({ item, rep })).filter(({ rep }) => !done.has(`${item.id}#${rep}`)),
   );
   console.log(
-    `${variant}: ${CONDITION_MODEL} · ${CONDITION_PROMPT_VERSION} · 프롬프트 ${fingerprint} · ${jobs.length}회 실행(이미 ${done.size}회)`,
+    `${variant}: ${CONDITION_MODEL} · ${CONDITION_PROMPT_VERSION} · 프롬프트 ${fingerprint} · ${sets.join('·')} 공고 ${cases.length}건 · ${jobs.length}회 실행(이미 ${cases.length * reps - jobs.length}회)`,
   );
 
   const runJob = async ({ item, rep }: (typeof jobs)[number]) => {
-    const text = texts.get(item.id) as string;
+    const notice = notices.get(item.id)!;
     // 실제 추출 코드를 그대로 부르고, 요청과 응답은 fetch에서 옮겨 적는다(모델·stop_reason·사용량 기록).
     const seen: { request?: Record<string, unknown>; response?: Record<string, unknown> } = {};
     // 시간 제한·재시도는 funding:sync처럼 SDK 기본값을 쓴다.
@@ -162,10 +178,10 @@ async function main() {
     });
     const started = Date.now();
     try {
-      const result = await createClaudeConditionExtractor(client)(text, item.productName);
+      const result = await createClaudeConditionExtractor(client)(notice.text, notice.productName);
       const model = String(seen.response?.model ?? '');
       if (!model.startsWith(CONDITION_MODEL)) throw new Error(`요청한 모델과 다른 모델이 답했습니다: ${model}`);
-      const verified = verifyConditionOutput(result.output, text);
+      const verified = verifyConditionOutput(result.output, notice);
       const { outcomes, scores } = gradeCase(verified, expected.get(item.id)!.acceptable);
       writeFileSync(
         join(dir, 'traces', `${item.id}_rep${rep}.json`),
@@ -218,7 +234,7 @@ async function main() {
       for (let job = queue.shift(); job; job = queue.shift()) await runJob(job);
     }),
   );
-  summarize(dir, expected, texts, reps);
+  summarize(dir, cases, otherSets, expected, notices, reps);
 }
 
 // 한 줄을 붙여 쓴다. 끊긴 실행이 남긴 잘린 줄이 있으면 먼저 끝내서 새 줄이 그 뒤에 붙지 않게 한다.
@@ -249,17 +265,23 @@ function writeStateOnce() {
   );
 }
 
-// 지표마다 평균과 95% 구간(공고별 평균의 표준오차 × 1.96), 항목별 결과 수를 보여 준다. 정답이나 검증 규칙을 고쳐도
-// 다시 부르지 않도록, 저장한 AI 원답(traces)을 지금 본문으로 다시 검증하고 지금 정답으로 다시 채점한다.
-// results.jsonl의 grade는 실행 당시의 점수이고, 이 요약이 기준이다.
-function summarize(dir: string, expected: Expected, texts: Map<string, string>, reps: number) {
-  const planned = new Set(
-    [...expected.keys()].flatMap((id) => Array.from({ length: reps }, (_, rep) => `${id}#${rep}`)),
-  );
+// set마다 지표의 평균과 95% 구간(공고별 평균의 표준오차 × 1.96), 항목별 결과 수를 보여 준다. 정답이나 검증 규칙을
+// 고쳐도 다시 부르지 않도록, 저장한 AI 원답(traces)을 지금 공고(제목·본문)로 다시 검증하고 지금 정답으로 다시 채점한다.
+// results.jsonl의 grade는 실행 당시의 점수이고, 이 요약이 기준이다. 고르지 않은 set의 결과는 요약에 넣지 않는다.
+function summarize(
+  dir: string,
+  cases: readonly GoldCase[],
+  otherSets: ReadonlySet<string>,
+  expected: Expected,
+  notices: Map<string, NoticeSource>,
+  reps: number,
+) {
+  const planned = new Set(cases.flatMap((item) => Array.from({ length: reps }, (_, rep) => `${item.id}#${rep}`)));
   const skipped: string[] = [];
   const seen = new Set<string>();
   const graded = readRows(join(dir, 'results.jsonl')).flatMap((row) => {
     const key = `${row.prompt_id}#${row.rep}`;
+    if (otherSets.has(row.prompt_id)) return [];
     if (!planned.has(key)) {
       skipped.push(`${key}(지금 공고·회차에 없음)`);
       return [];
@@ -277,39 +299,32 @@ function summarize(dir: string, expected: Expected, texts: Map<string, string>, 
     seen.add(key);
     const trace = JSON.parse(readFileSync(traceFile, 'utf8')) as Array<{ role: string; content: string }>;
     const output = JSON.parse(trace.find((turn) => turn.role === 'assistant')!.content) as ConditionOutput;
-    const verified = verifyConditionOutput(output, texts.get(row.prompt_id) as string);
-    return [{ id: row.prompt_id, key, ...gradeCase(verified, expected.get(row.prompt_id)!.acceptable) }];
+    const verified = verifyConditionOutput(output, notices.get(row.prompt_id)!);
+    return [{ id: row.prompt_id, ...gradeCase(verified, expected.get(row.prompt_id)!.acceptable) }];
   });
-  const scored = new Set(graded.map((row) => row.key));
-  const byCase = new Map<string, typeof graded>();
-  for (const row of graded) byCase.set(row.id, [...(byCase.get(row.id) ?? []), row]);
-  const lines = [`공고 ${byCase.size}건 · 채점한 실행 ${scored.size}/${planned.size}회`];
+  const lines: string[] = [];
   if (skipped.length > 0) lines.push(`채점하지 않은 결과: ${skipped.join(', ')}`);
-  // 실패한 회차는 평균에서 빠진다. 실패가 많은 프롬프트가 쉬운 공고로만 평균을 내지 않도록 빠진 수를 함께 보인다.
-  if (scored.size < planned.size) {
-    lines.push(`주의: ${planned.size - scored.size}회는 점수가 없습니다(errors.jsonl). 다시 실행하면 이어서 합니다.`);
-  }
-  if (graded.length === 0) {
-    console.log(lines.join('\n'));
-    return;
-  }
-  for (const metric of ['field_acc', 'confident_wrong', 'missed', 'exact_acc'] as const) {
-    const perCase = [...byCase.values()].map(
-      (list) => list.reduce((sum, row) => sum + row.scores[metric], 0) / list.length,
-    );
-    const mean = perCase.reduce((sum, value) => sum + value, 0) / perCase.length;
-    const sd = Math.sqrt(
-      perCase.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(perCase.length - 1, 1),
-    );
-    const half = (1.96 * sd) / Math.sqrt(perCase.length);
-    lines.push(`${metric}: ${(mean * 100).toFixed(1)}% (±${(half * 100).toFixed(1)}%p)`);
-  }
-  lines.push('항목별 (맞음/같은 확인 필요/위험한 오답/놓침/보여 주기 틀림):');
-  for (const name of CONDITION_FIELD_NAMES) {
-    const count = (kind: string) => graded.filter((row) => row.outcomes[name] === kind).length;
-    lines.push(
-      `  ${name}: ${count('CORRECT')}/${count('EQUIVALENT')}/${count('CONFIDENT_WRONG')}/${count('MISSED')}/${count('DISPLAY_WRONG')}`,
-    );
+  for (const summary of summarizeBySet(cases, graded)) {
+    const plannedRuns = cases.filter((item) => item.set === summary.set).length * reps;
+    lines.push(`[${summary.set}] 공고 ${summary.cases}건 · 채점한 실행 ${summary.runs}/${plannedRuns}회`);
+    // 실패한 회차는 평균에서 빠진다. 실패가 많은 프롬프트가 쉬운 공고로만 평균을 내지 않도록 빠진 수를 함께 보인다.
+    if (summary.runs < plannedRuns) {
+      lines.push(
+        `  주의: ${plannedRuns - summary.runs}회는 점수가 없습니다(errors.jsonl). 다시 실행하면 이어서 합니다.`,
+      );
+    }
+    if (summary.metrics === null) continue;
+    for (const metric of EVAL_METRICS) {
+      const { mean, half } = summary.metrics[metric];
+      lines.push(`  ${metric}: ${(mean * 100).toFixed(1)}% (±${(half * 100).toFixed(1)}%p)`);
+    }
+    lines.push('  항목별 (맞음/같은 확인 필요/위험한 오답/놓침/보여 주기 틀림):');
+    for (const name of CONDITION_FIELD_NAMES) {
+      const count = summary.fields[name];
+      lines.push(
+        `    ${name}: ${count.CORRECT}/${count.EQUIVALENT}/${count.CONFIDENT_WRONG}/${count.MISSED}/${count.DISPLAY_WRONG}`,
+      );
+    }
   }
   console.log(lines.join('\n'));
 }
