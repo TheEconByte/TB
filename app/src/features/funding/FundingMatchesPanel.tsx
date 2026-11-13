@@ -309,7 +309,8 @@ function TabPanel({
               </div>
               <p className="group-note">
                 안 맞아 보이는 항목은 없지만, AI가 읽지 못했거나 입력이 없거나 입력만으로는 정할 수 없어 맞춰 보지 못한
-                항목이 있는 공고입니다.
+                항목이 있는 공고입니다. 공고문에서 지역 조건을 찾지 못했는데 제목에 다른 지역 표시가 있는 공고도 여기에
+                둡니다.
               </p>
               {cards(needsCheck)}
             </div>
@@ -433,7 +434,12 @@ function MatchCard({
 
       <ul className="match-conditions" aria-label="조건별 맞춰 보기">
         {match.conditions.map((condition) => (
-          <ConditionItem key={condition.key} condition={condition} regionNote={match.operatorRegionNote} />
+          <ConditionItem
+            key={condition.key}
+            condition={condition}
+            regionNote={match.operatorRegionNote}
+            titleRegionMark={match.titleRegionMark}
+          />
         ))}
       </ul>
 
@@ -463,12 +469,14 @@ function MatchCard({
 function ConditionItem({
   condition,
   regionNote,
+  titleRegionMark,
 }: {
   readonly condition: ConditionMatch;
   readonly regionNote: string | null;
+  readonly titleRegionMark: string | null;
 }) {
   const value = conditionValueText(condition);
-  const reason = checkReasonText(condition);
+  const reason = checkReasonText(condition, titleRegionMark);
   const { reading } = condition;
   return (
     <li className={`match-condition condition-${condition.verdict.toLowerCase()}`}>

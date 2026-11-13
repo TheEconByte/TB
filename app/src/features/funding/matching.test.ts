@@ -227,6 +227,80 @@ describe('공고 그룹(ADR §4, 사용자 결정 2026-11-13: 마감이 아니�
     expect(result.group).toBe('NEEDS_CHECK');
   });
 
+  // ADR §4(2026-11-13): 지역이 언급 없음인데 제목 맨 앞에 서울도 전국도 아닌 표시가 있으면 걸리는 조건 안 보임으로 올리지
+  // 않는다. 표시는 내리는 데만 쓴다. 지역 값을 정하거나 안 맞음으로 만들지 않는다.
+  describe('제목의 [시·도] 표시', () => {
+    const regionUnmentioned = openConditions({ region: NOT_MENTIONED });
+    const titled = (name: string) => autoProduct('BIZINFO', { name });
+
+    it('지역이 언급 없음이고 제목 표시가 서울이 아니면 지역의 확인 필요 이유가 제목 표시이고 그룹은 확인 필요다', () => {
+      for (const name of [
+        '[부산] 동백전 카드수수료 지원사업 공고',
+        '[전남광주] 광양시 컨설팅 모집 공고',
+        ' [대구ㆍ경북] 모집 공고',
+      ]) {
+        const result = match(titled(name), regionUnmentioned, profile({ districtCode: GANGNAM }));
+        expect(condition(result, 'region'), name).toMatchObject({ verdict: 'CHECK', checkReason: 'TITLE_REGION_MARK' });
+        expect(result.group, name).toBe('NEEDS_CHECK');
+      }
+      expect(match(titled('[부산] 공고'), regionUnmentioned, NO_INPUT).titleRegionMark).toBe('부산');
+    });
+
+    it('표시가 없거나 서울·전국이면 언급 없음 그대로다', () => {
+      for (const name of [
+        '소상공인 온라인판로 지원사업 모집공고',
+        '[서울] 온라인 유통 MD 상담 모집 공고',
+        '[전국] 모집 공고',
+        '2026년 [부산] 공고',
+      ]) {
+        const result = match(titled(name), regionUnmentioned, profile({ districtCode: GANGNAM }));
+        expect(condition(result, 'region'), name).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_MENTIONED' });
+        expect(result.group, name).toBe('NOT_MENTIONED_ONLY');
+      }
+    });
+
+    // 표시 문장은 "AI가 지역 조건을 찾지 못했습니다"라고 말한다. AI가 지역을 읽었거나(입력이 없어 못 맞춰 본 경우 포함), 읽지
+    // 못했거나, 아직 읽지 않은 공고에 붙으면 카드가 스스로 어긋난다.
+    it('지역이 언급 없음이 아니면 확인 필요여도 이유를 바꾸지 않는다', () => {
+      const busan = read({
+        scope: 'PROVINCES',
+        provinces: ['부산'],
+        districts: [],
+        excludedProvinces: [],
+        excludedDistricts: [],
+        districtCodes: [],
+        excludedDistrictCodes: [],
+      }) as VerifiedConditions['region'];
+      const product = titled('[부산] 소상공인 모집 공고');
+      expect(condition(match(product, openConditions({ region: busan }), NO_INPUT), 'region').checkReason).toBe(
+        'INPUT_MISSING',
+      );
+      const unreadable = openConditions({ region: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' } });
+      expect(condition(match(product, unreadable, NO_INPUT), 'region').checkReason).toBe('UNREADABLE');
+      expect(condition(match(product, null, NO_INPUT), 'region').checkReason).toBe('NOT_READ');
+    });
+
+    // 표시가 틀린 공고가 있다(제목 [대구], 본문 대전 유성구). AI가 지역을 읽었으면 표시를 보지 않는다.
+    it('AI가 지역을 읽었으면 표시와 달라도 읽은 값으로 맞춰 본다', () => {
+      const result = match(
+        titled('[부산] 전국 소상공인 모집 공고'),
+        openConditions(),
+        profile({ districtCode: GANGNAM }),
+      );
+      expect(condition(result, 'region')).toMatchObject({ verdict: 'MATCH', checkReason: null });
+      expect(result.group).toBe('MATCHING');
+    });
+
+    // 제목 표시는 기업마당 공고의 관례다. 소진공 자금 이름과 사람이 등록한 상품에는 쓰지 않는다.
+    it('기업마당 자동 상품의 제목만 본다', () => {
+      const semas = autoProduct('SEMAS_OLS', { name: '[부산] 자금' });
+      expect(condition(match(semas, regionUnmentioned, NO_INPUT), 'region').checkReason).toBe('NOT_MENTIONED');
+      expect(match(semas, regionUnmentioned, NO_INPUT).titleRegionMark).toBeNull();
+      const manual = manualProduct({ name: '[부산] 대출', sourceRef: { source: 'BIZINFO', externalId: 'PBLN_1' } });
+      expect(match(manual, regionUnmentioned, NO_INPUT).titleRegionMark).toBeNull();
+    });
+  });
+
   // ADR 0009 4단계 인계: 추출 결과 행이 없으면 그 공고의 모든 항목이 읽지 못함(확인 필요)이다.
   it('추출 결과가 없는 공고는 여섯 항목이 모두 확인 필요다', () => {
     const result = match(

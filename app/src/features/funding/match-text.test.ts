@@ -59,6 +59,7 @@ function product(overrides: Partial<ProductMatch> = {}): ProductMatch {
     limit: { publicLimitKrw: null, limitText: null },
     operatorRegionNote: null,
     operatorRecord: null,
+    titleRegionMark: null,
     ...overrides,
   };
 }
@@ -148,26 +149,58 @@ describe('확인 필요 이유 문장', () => {
     }) as ConditionMatch;
 
   it('맞음·안 맞음에는 이유 문장이 없다', () => {
-    expect(checkReasonText({ ...checked('age', 'INPUT_MISSING'), verdict: 'MATCH', checkReason: null })).toBeNull();
+    expect(
+      checkReasonText({ ...checked('age', 'INPUT_MISSING'), verdict: 'MATCH', checkReason: null }, null),
+    ).toBeNull();
   });
 
   it('읽지 못한 이유를 그대로 보여 준다', () => {
     const text = checkReasonText(
       checked('age', 'UNREADABLE', { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' }),
+      null,
     );
     expect(text).toContain('인용이 본문에 없습니다.');
   });
 
   it('입력이 없으면 무엇을 입력하면 되는지 쓴다', () => {
-    expect(checkReasonText(checked('age', 'INPUT_MISSING'))).toContain('나이');
-    expect(checkReasonText(checked('region', 'INPUT_MISSING'))).toContain('자치구');
-    expect(checkReasonText(checked('businessAge', 'INPUT_MISSING'))).toContain('개업 연월');
-    expect(checkReasonText(checked('businessStage', 'INPUT_MISSING'))).toContain('사업자등록 여부');
-    expect(checkReasonText(checked('targetGroups', 'INPUT_MISSING'))).toContain('대상 한정');
+    expect(checkReasonText(checked('age', 'INPUT_MISSING'), null)).toContain('나이');
+    expect(checkReasonText(checked('region', 'INPUT_MISSING'), null)).toContain('자치구');
+    expect(checkReasonText(checked('businessAge', 'INPUT_MISSING'), null)).toContain('개업 연월');
+    expect(checkReasonText(checked('businessStage', 'INPUT_MISSING'), null)).toContain('사업자등록 여부');
+    expect(checkReasonText(checked('targetGroups', 'INPUT_MISSING'), null)).toContain('대상 한정');
+  });
+
+  // 표시는 지역을 정하지 않는다. 표시가 있다는 사실과 AI가 본문에서 지역 조건을 찾지 못했다는 사실만 쓴다.
+  it('제목 표시 때문에 남긴 지역은 그 표시를 그대로 보여 준다', () => {
+    const text = checkReasonText(checked('region', 'TITLE_REGION_MARK', { status: 'NOT_MENTIONED' }), '전남광주');
+    expect(text).toContain('[전남광주]');
+    expect(text).toContain('찾지 못했습니다');
+    expect(text).toContain('원 공고');
+  });
+
+  // 표시 없이 이 이유만 오면 없는 표시를 지어내지 않는다.
+  it('표시를 받지 못하면 언급 없음 문장을 쓴다', () => {
+    const text = checkReasonText(checked('region', 'TITLE_REGION_MARK', { status: 'NOT_MENTIONED' }), null);
+    expect(text).toContain('언급 없음');
+    expect(text).not.toContain('[');
+  });
+
+  // 화면이 표시를 넘기지 않으면 표시 문장이 나오지 않는다. 렌더링하지 않고 소스에서 확인한다.
+  it('카드가 지역 항목의 이유에 공고의 제목 표시를 넘긴다', () => {
+    const source = readFileSync(new URL('FundingMatchesPanel.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('checkReasonText(condition, titleRegionMark)');
+    expect(source).toContain('titleRegionMark={match.titleRegionMark}');
   });
 
   it('모든 이유에 문장이 있다', () => {
-    const reasons: CheckReason[] = ['NOT_MENTIONED', 'UNREADABLE', 'NOT_READ', 'INPUT_MISSING', 'UNCERTAIN'];
+    const reasons: CheckReason[] = [
+      'NOT_MENTIONED',
+      'UNREADABLE',
+      'NOT_READ',
+      'INPUT_MISSING',
+      'UNCERTAIN',
+      'TITLE_REGION_MARK',
+    ];
     for (const key of MATCH_CONDITION_KEYS) {
       for (const reason of reasons) {
         const reading =
@@ -178,7 +211,9 @@ describe('확인 필요 이유 문장', () => {
               : reason === 'NOT_READ'
                 ? ({ status: 'NOT_READ' } as const)
                 : undefined;
-        expect(checkReasonText(checked(key, reason, reading))?.length ?? 0, `${key} ${reason}`).toBeGreaterThan(10);
+        expect(checkReasonText(checked(key, reason, reading), '부산')?.length ?? 0, `${key} ${reason}`).toBeGreaterThan(
+          10,
+        );
       }
     }
   });

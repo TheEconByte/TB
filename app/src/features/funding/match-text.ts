@@ -199,10 +199,15 @@ const reasonOf = (reading: ConditionMatch['reading']) =>
   reading.status === 'UNREADABLE' ? reading.reason : '원문을 근거로 읽지 못했습니다.';
 
 // 확인 필요의 이유(matching.ts의 CheckReason)를 문장으로 쓴다. 맞음·안 맞음이면 null이다.
-export function checkReasonText(condition: ConditionMatch): string | null {
+export function checkReasonText(condition: ConditionMatch, titleRegionMark: string | null): string | null {
   const reason: CheckReason | null = condition.checkReason;
   if (condition.verdict !== 'CHECK' || reason === null) return null;
   switch (reason) {
+    case 'TITLE_REGION_MARK':
+      // 표시를 받지 못했으면 지어내지 않고, 그 밑에 있는 사실(언급 없음)만 쓴다.
+      if (titleRegionMark !== null)
+        return `제목에 [${titleRegionMark}] 표시가 있는데, AI가 공고문에서 지역 조건을 찾지 못했습니다. 서울에서도 신청할 수 있는지 원 공고에서 확인하세요.`;
+    // falls through
     case 'NOT_MENTIONED':
       return 'AI가 공고문에서 이 조건을 찾지 못했습니다(언급 없음). 원 공고에서 확인하세요.';
     case 'UNREADABLE':

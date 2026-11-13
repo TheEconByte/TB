@@ -60,7 +60,9 @@ export type MatchConditionKey = (typeof MATCH_CONDITION_KEYS)[number];
 export type MatchVerdict = 'MATCH' | 'MISMATCH' | 'CHECK';
 // 확인 필요의 이유. NOT_READ는 추출 결과가 없거나(읽지 않음·실패) 운영자 기록도 없는 경우다. UNCERTAIN은 값을 읽었고
 // 입력도 있지만 그것만으로 정할 수 없는 경우다(개업 연월의 날짜, 입력으로 알 수 없는 대상 등).
-export type CheckReason = 'NOT_MENTIONED' | 'UNREADABLE' | 'NOT_READ' | 'INPUT_MISSING' | 'UNCERTAIN';
+// TITLE_REGION_MARK는 지역이 언급 없음인데 기업마당 공고 제목 맨 앞에 서울도 전국도 아닌 [..] 표시가 있는 경우다(ADR §4).
+export type CheckReason =
+  'NOT_MENTIONED' | 'UNREADABLE' | 'NOT_READ' | 'INPUT_MISSING' | 'UNCERTAIN' | 'TITLE_REGION_MARK';
 
 // 조건을 어디서 읽었는지. 운영자 확인은 catalog.json에 사람이 적은 값이며 인용 대신 근거 요약이 있다(ADR §3).
 export type ConditionReading<T> =
@@ -83,7 +85,8 @@ export type ConditionMatch = {
 
 // 화면에 놓는 순서다(ADR §4). 마감이 아니면 여섯 항목의 판정으로만 정한다. 안 맞음이 하나라도 있으면 안 맞아 보임, 모두
 // 맞음이면 맞아 보임, 맞음이 아닌 항목이 모두 공고문에 언급 없음이면 걸리는 조건 안 보임(NOT_MENTIONED_ONLY), 나머지는
-// 확인 필요다. 언급 없음은 제한 없음이 아니라서(ADR §3) 맞아 보임과 섞지 않는다.
+// 확인 필요다. 지역이 언급 없음이어도 제목에 다른 지역 표시가 있으면 이유가 제목 표시라서 나머지에 든다(withTitleRegionMark).
+// 언급 없음은 제한 없음이 아니라서(ADR §3) 맞아 보임과 섞지 않는다.
 export const FUNDING_MATCH_GROUPS = [
   'MATCHING',
   'NOT_MENTIONED_ONLY',
@@ -133,6 +136,8 @@ export type ProductMatch = {
   // 사람이 등록한 상품의 기록일. 사람 상품은 출처 최신성을 따지지 않으므로 언제 기록한 내용인지 보여 준다.
   // 그룹에는 쓰지 않는다. 자동 상품은 null이다.
   operatorRecord: { observedAt: string } | null;
+  // 기업마당 공고 제목 맨 앞의 [..] 표시. 지역 항목의 확인 필요 이유를 문장으로 쓸 때 보여 준다. 없으면 null이다.
+  titleRegionMark: string | null;
 };
 
 export type FundingMatchList = {
@@ -418,6 +423,25 @@ function aiEndDatePassed(aiPeriod: ConditionReading<ConditionValues['application
   return aiPeriod.status === 'READ' && aiPeriod.value.end !== null && compareIsoDates(aiPeriod.value.end, asOfDate) < 0;
 }
 
+// 기업마당은 지자체 공고의 제목 맨 앞에 [시·도]를 붙인다. 표시가 틀린 공고도 있어 지역 값으로는 쓰지 않는다.
+function leadingTitleMark(product: FundingProduct): string | null {
+  if (product.origin !== 'SYNC' || product.sourceRef?.source !== 'BIZINFO') return null;
+  return /^\s*\[([^\]]+)\]/.exec(product.name)?.[1].trim() ?? null;
+}
+
+const NOT_LIMITING_MARKS = ['서울', '전국'];
+
+// 지역이 언급 없음인데 제목 표시가 다른 지역을 가리키면, 언급 없음으로 두지 않고 제목 표시를 이유로 남긴다. 그러면 걸리는 조건
+// 안 보임으로 올라가지 않는다. 내리는 데만 쓰고, AI가 지역을 읽었으면 그 값을 그대로 쓴다(ADR §4, 2026-11-13).
+function withTitleRegionMark(conditions: ConditionMatch[], mark: string | null): ConditionMatch[] {
+  if (mark === null || NOT_LIMITING_MARKS.some((name) => mark.includes(name))) return conditions;
+  return conditions.map((entry) =>
+    entry.key === 'region' && entry.checkReason === 'NOT_MENTIONED'
+      ? { ...entry, checkReason: 'TITLE_REGION_MARK' as const }
+      : entry,
+  );
+}
+
 export function applicationState(application: ProductMatch['application']): ApplicationState {
   if (application.closedBy !== null) return 'CLOSED';
   return application.unconfirmedReasons.length === 0 ? 'OPEN_CONFIRMED' : 'UNCONFIRMED';
@@ -437,7 +461,8 @@ export function matchProduct(
   context: { asOfDate: string; automation: FundingAutomation },
 ): ProductMatch {
   const readings = readProductConditions(product, extraction);
-  const conditions = matchConditions(readings, profile, context.asOfDate);
+  const titleRegionMark = leadingTitleMark(product);
+  const conditions = withTitleRegionMark(matchConditions(readings, profile, context.asOfDate), titleRegionMark);
   const auto = product.origin === 'SYNC';
   const source = auto ? product.sourceRef?.source : undefined;
   const fresh =
@@ -483,6 +508,7 @@ export function matchProduct(
     limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
     operatorRegionNote: auto ? null : product.region.note,
     operatorRecord: auto ? null : { observedAt: product.observedAt },
+    titleRegionMark,
   };
 }
 
