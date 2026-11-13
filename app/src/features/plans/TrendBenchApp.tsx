@@ -785,7 +785,7 @@ function PlanFundingPanel({
             )}
             {!loading && !error && !matches && (
               <p className="empty-state">
-                계획 조건으로 공고 맞춰 보기를 누르면 갈래·그룹별 공고와 이유를 보여 줍니다.
+                계획 조건으로 공고 맞춰 보기를 누르면 갈래마다 남은 공고와 공고가 밝힌 조건을 보여 줍니다.
               </p>
             )}
           </div>

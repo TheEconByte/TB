@@ -1066,7 +1066,7 @@ footer {
   font-size: 13px;
 }
 .status-counts.branch-counts {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 .status-counts.branch-counts .status-count {
@@ -1214,9 +1214,6 @@ footer {
   .status-counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .status-counts.branch-counts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .candidate-meta {
     grid-template-columns: 1fr;
   }
@@ -1300,7 +1297,7 @@ footer {
   font-size: 17px;
   font-weight: 800;
 }
-/* 그룹 수 세 개가 폰 폭의 탭보다 길다. 그룹 단위로 줄을 바꾸고, 한 그룹이 탭보다 길 때만 그 안에서 줄을 바꾼다. */
+/* 공고 수 두 개가 폰 폭의 탭보다 길 수 있다. 수 단위로 줄을 바꾸고, 하나가 탭보다 길 때만 그 안에서 줄을 바꾼다. */
 .funding-tab small {
   display: flex;
   flex-wrap: wrap;
@@ -1331,39 +1328,21 @@ footer {
 .match-limit-note p + p {
   margin-top: 4px;
 }
-.status-count.count-matching {
+.status-count.count-remaining {
   border-left: 4px solid var(--primary);
-}
-.status-count.count-not_mentioned_only {
-  border-left: 4px solid #0f8a5f;
-}
-.status-count.count-needs_check {
-  border-left: 4px solid #f2b630;
 }
 .status-count.count-not_matching {
   border-left: 4px solid #e5483f;
 }
-.match-folded > summary {
-  cursor: pointer;
-  list-style: none;
+.match-section-title {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  font-weight: 800;
 }
-.match-folded > summary::-webkit-details-marker {
-  display: none;
-}
-.match-folded[open] > summary span {
-  visibility: hidden;
-}
-.candidate-status.status-matching {
-  background: var(--primary);
-  color: white;
-}
-.candidate-status.status-not_mentioned_only {
-  background: #e6f6ef;
-  color: #0f8a5f;
-}
-.candidate-status.status-needs_check {
-  background: #fdf3d6;
-  color: #a16207;
+.match-unmentioned {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 .candidate-status.status-not_matching {
   background: #ffe4e2;

@@ -130,12 +130,12 @@ export default function FundingMatcher() {
             <h2 id="funding-limits">이 결과가 무엇이고 무엇이 아닌지</h2>
             <ul>
               <li>
-                맞아 보임은 AI가 공고문에서 읽은 조건과 입력이 맞아 보인다는 뜻이며 선정이나 지원 결정이 아닙니다. 접수
+                남은 공고는 AI가 공고문에서 읽은 조건 중 안 맞는 것이 없다는 뜻이며 선정이나 지원 결정이 아닙니다. 접수
                 중인지는 조건과 따로 카드마다 보여 줍니다.
               </li>
               <li>
-                AI가 잘못 읽을 수 있어 조건이 안 맞아 보이는 공고도 숨기지 않고 접어 둡니다. 마감은 출처·운영자
-                기록으로만 정합니다.
+                조건에 안 맞는 공고는 목록에서 뺍니다. 음식점·카페를 제외하는 공고는 입력이 없어도 빠집니다. AI가 잘못
+                읽을 수 있어 뺀 건수를 밝히고, 펼쳐서 다시 볼 수 있게 둡니다. 마감은 출처·운영자 기록으로만 정합니다.
               </li>
               <li>지원금·보증·공간·프로그램 지원은 대출 원금이나 월 상환액으로 바꾸지 않습니다.</li>
               <li>입력하지 않은 항목은 해당 없음으로 채우지 않고 확인 필요로 남깁니다. 입력은 AI에 보내지 않습니다.</li>
@@ -172,7 +172,7 @@ export default function FundingMatcher() {
             {!loading && error && <FundingMatchesErrorPanel error={error} />}
             {!loading && !error && !result && (
               <p className="empty-state">
-                조건을 입력하고 공고 맞춰 보기를 누르면 갈래·그룹별 공고와 이유를 보여 줍니다.
+                조건을 입력하고 공고 맞춰 보기를 누르면 갈래마다 남은 공고와 공고가 밝힌 조건을 보여 줍니다.
               </p>
             )}
             {!loading && !error && result && <FundingMatchesPanel result={result} />}

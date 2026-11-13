@@ -284,7 +284,7 @@ describe('POST /api/plans/{planId}/funding-matches 경계', () => {
     expect(body.profile.districtCode).toBe('11440');
     expect(body.districtSource).toBe('BUSINESS_PROFILE');
     expect(regionOf(body)).toBe('MISMATCH');
-    // 안 맞아도 숨기지 않는다.
+    // 안 맞아도 응답에서 지우지 않는다(화면이 목록에서 빼고 다시 펼쳐 볼 수 있게 한다).
     expect(body.tabs.SUPPORT_PROGRAM.products[0]?.group).toBe('NOT_MATCHING');
   });
 
