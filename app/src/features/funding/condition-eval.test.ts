@@ -344,7 +344,8 @@ describe('gradeCase', () => {
     expect(gradeCase(actual, acceptable).outcomes.targetGroups).toBe('MISSED');
   });
 
-  // 둘 다 화면에서 확인 필요가 되므로 맞춰 보기에는 같다. 정확도에는 넣고 완전 일치에는 넣지 않는다.
+  // 둘 다 항목 판정은 확인 필요다. 정확도에는 넣고 완전 일치에는 넣지 않는다. 화면의 그룹은 다를 수 있지만(언급 없음뿐이면
+  // 걸리는 조건 안 보임) 채점은 항목의 판정만 본다.
   it('treats not mentioned and unreadable as equivalent for matching but not exact', () => {
     const { acceptable } = expectedFields(gold(), BODY);
     const actual = asActual(acceptable);

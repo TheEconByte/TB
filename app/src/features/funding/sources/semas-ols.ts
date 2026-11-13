@@ -619,7 +619,7 @@ export function mapSemasFunds(input: SemasMappingInput, context: { asOfDate: str
       FOOD_EXCLUSION_PATTERN.test(line),
     );
     if (exclusionSignals.length > 0 && application.status === 'OPEN') {
-      // 제외 신호는 내리는 데만 쓴다. 접수 중으로 기록하지 않아 맞아 보임이 되지 않는다(ADR 0006 4절 3번, 6절).
+      // 제외 신호는 내리는 데만 쓴다. 접수 중으로 기록하지 않아 접수 중 확인이 되지 않는다(ADR 0006 4절 3번, 6절).
       application.status = 'UNKNOWN';
     }
 

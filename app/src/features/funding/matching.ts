@@ -24,6 +24,7 @@ import {
 // 공고에서 읽은 조건과 사용자 입력을 맞춰 본다(ADR 0009 §4). React·DB·외부 API에 의존하지 않는다.
 // AI가 읽은 값으로는 공고를 숨기지 않는다. AI 값은 항목별 맞음·안 맞음·확인 필요만 정하고(안 맞음은 접어 두되 보인다), 기본으로
 // 숨기는 마감은 출처·운영자 데이터로만 정한다(사용자 결정 2026-11-03).
+// 마감이 아닌 공고의 그룹은 항목의 판정으로만 정하고, 접수 상태는 그룹과 따로 넘긴다(사용자 결정 2026-11-13).
 // 사용자 입력은 AI에 보내지 않는다. 이 파일은 AI 클라이언트에 닿지 않는다(notice-extraction.test.ts가 확인한다).
 
 // 사용자가 고르는 대상 한정. 청년은 나이로 맞춰 보므로 고르지 않는다(ADR §4). 재난 피해 대상 공고는 범위 밖이라 피해
@@ -80,18 +81,29 @@ export type ConditionMatch = {
   };
 }[MatchConditionKey];
 
-export const FUNDING_MATCH_GROUPS = ['MATCHING', 'NEEDS_CHECK', 'NOT_MATCHING', 'CLOSED'] as const;
+// 화면에 놓는 순서다(ADR §4). 마감이 아니면 여섯 항목의 판정으로만 정한다. 안 맞음이 하나라도 있으면 안 맞아 보임, 모두
+// 맞음이면 맞아 보임, 맞음이 아닌 항목이 모두 공고문에 언급 없음이면 걸리는 조건 안 보임(NOT_MENTIONED_ONLY), 나머지는
+// 확인 필요다. 언급 없음은 제한 없음이 아니라서(ADR §3) 맞아 보임과 섞지 않는다.
+export const FUNDING_MATCH_GROUPS = [
+  'MATCHING',
+  'NOT_MENTIONED_ONLY',
+  'NEEDS_CHECK',
+  'NOT_MATCHING',
+  'CLOSED',
+] as const;
 export type FundingMatchGroup = (typeof FUNDING_MATCH_GROUPS)[number];
 
 // 갈래(ADR §1). 출처와 출처의 지원분야로만 정한다.
 export const FUNDING_TABS = ['POLICY_FUND', 'SUPPORT_PROGRAM'] as const;
 export type FundingTab = (typeof FUNDING_TABS)[number];
 
-// 조건이 모두 맞아도 맞아 보임으로 두지 않는 이유. 접수 중이 아님, 출처 확인이 끊김(3일 최신성, ADR §6이 유지), AI가 읽은
-// 신청 종료일이 지남(마감 대신 확인 필요로 둔다).
-export type MatchHold = 'STATUS_NOT_OPEN' | 'SOURCE_STALE' | 'AI_END_DATE_PASSED';
+// 마감이 아닌 공고를 접수 중으로 확인하지 못한 이유. 출처·운영자의 접수 상태가 접수 중이 아님, 출처 확인이 끊김(3일 최신성,
+// ADR §6이 유지), AI가 읽은 신청 종료일이 지남(마감으로 숨기지 않는다). 그룹은 바꾸지 않는다.
+export type OpenUnconfirmedReason = 'STATUS_NOT_OPEN' | 'SOURCE_STALE' | 'AI_END_DATE_PASSED';
 // 마감의 근거. 출처·운영자의 접수 상태와 신청 종료일만 쓴다.
 export type ClosedBy = 'SOURCE_STATUS' | 'SOURCE_END_DATE';
+// 카드에 그룹과 따로 보여 주는 접수 상태(ADR §4).
+export type ApplicationState = 'OPEN_CONFIRMED' | 'UNCONFIRMED' | 'CLOSED';
 
 export type ProductMatch = {
   productKey: string;
@@ -109,8 +121,9 @@ export type ProductMatch = {
     period: FundingProduct['applicationPeriod'];
     aiPeriod: ConditionReading<ConditionValues['applicationPeriod']>;
     closedBy: ClosedBy | null;
+    // 마감이 아니고 비어 있으면 접수 중으로 확인한 공고다. 마감이면 비어 있다.
+    unconfirmedReasons: OpenUnconfirmedReason[];
   };
-  holds: MatchHold[];
   conditions: ConditionMatch[];
   supportTypes: ConditionReading<ConditionValues['supportTypes']>;
   // 정책자금 카드의 한도. 공개 한도는 최대치이며 실제 금액은 심사로 정해진다(ADR §4).
@@ -400,9 +413,21 @@ function closedBy(product: FundingProduct, asOfDate: string): ClosedBy | null {
 }
 
 // AI가 읽은 종료일이 지났는지. 소진공은 다른 회차 공지의 날짜를 쓰지 않는데 AI는 그 공지 본문의 지난 날짜를 읽을 수 있어,
-// 마감으로 숨기지 않고 확인 필요로만 둔다.
+// 마감으로 숨기지 않고 접수 여부 미확인으로만 둔다.
 function aiEndDatePassed(aiPeriod: ConditionReading<ConditionValues['applicationPeriod']>, asOfDate: string): boolean {
   return aiPeriod.status === 'READ' && aiPeriod.value.end !== null && compareIsoDates(aiPeriod.value.end, asOfDate) < 0;
+}
+
+export function applicationState(application: ProductMatch['application']): ApplicationState {
+  if (application.closedBy !== null) return 'CLOSED';
+  return application.unconfirmedReasons.length === 0 ? 'OPEN_CONFIRMED' : 'UNCONFIRMED';
+}
+
+function conditionGroup(conditions: readonly ConditionMatch[]): Exclude<FundingMatchGroup, 'CLOSED'> {
+  if (conditions.some((entry) => entry.verdict === 'MISMATCH')) return 'NOT_MATCHING';
+  const checks = conditions.filter((entry) => entry.verdict === 'CHECK');
+  if (checks.length === 0) return 'MATCHING';
+  return checks.every((entry) => entry.checkReason === 'NOT_MENTIONED') ? 'NOT_MENTIONED_ONLY' : 'NEEDS_CHECK';
 }
 
 export function matchProduct(
@@ -418,7 +443,7 @@ export function matchProduct(
   const fresh =
     !auto || (source !== undefined && isSourceFresh(source, context.automation.sourceSyncs, context.asOfDate));
   const closed = closedBy(product, context.asOfDate);
-  const holds: MatchHold[] =
+  const unconfirmedReasons: OpenUnconfirmedReason[] =
     closed === null
       ? [
           ...(product.observedApplicationStatus === 'OPEN' ? [] : (['STATUS_NOT_OPEN'] as const)),
@@ -426,14 +451,7 @@ export function matchProduct(
           ...(aiEndDatePassed(readings.applicationPeriod, context.asOfDate) ? (['AI_END_DATE_PASSED'] as const) : []),
         ]
       : [];
-  const group: FundingMatchGroup =
-    closed !== null
-      ? 'CLOSED'
-      : conditions.some((entry) => entry.verdict === 'MISMATCH')
-        ? 'NOT_MATCHING'
-        : conditions.every((entry) => entry.verdict === 'MATCH') && holds.length === 0
-          ? 'MATCHING'
-          : 'NEEDS_CHECK';
+  const group: FundingMatchGroup = closed !== null ? 'CLOSED' : conditionGroup(conditions);
   return {
     productKey: product.productKey,
     version: product.version,
@@ -458,8 +476,8 @@ export function matchProduct(
       period: product.applicationPeriod,
       aiPeriod: readings.applicationPeriod,
       closedBy: closed,
+      unconfirmedReasons,
     },
-    holds,
     conditions,
     supportTypes: readings.supportTypes,
     limit: { publicLimitKrw: product.publicLimit, limitText: product.limitText ?? null },
@@ -469,7 +487,7 @@ export function matchProduct(
 }
 
 function emptyCounts(): Record<FundingMatchGroup, number> {
-  return { MATCHING: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 };
+  return { MATCHING: 0, NOT_MENTIONED_ONLY: 0, NEEDS_CHECK: 0, NOT_MATCHING: 0, CLOSED: 0 };
 }
 
 // 활성 카탈로그 전체를 맞춰 본다. extractions는 상품 키별로, 그 상품의 지금 본문(noticeTextChecksum)을 지금 모델·프롬프트로
@@ -492,11 +510,13 @@ export function matchCatalog(
     }
     return [matchProduct(product, extraction, profile, { asOfDate: options.asOfDate, automation: catalog.automation })];
   });
-  const order = (group: FundingMatchGroup) => FUNDING_MATCH_GROUPS.indexOf(group);
+  // 그룹 순서로 놓고, 같은 그룹 안에서는 접수 중으로 확인한 공고를 먼저 놓는다(ADR §4).
+  const order = (entry: ProductMatch) =>
+    FUNDING_MATCH_GROUPS.indexOf(entry.group) * 2 + (applicationState(entry.application) === 'OPEN_CONFIRMED' ? 0 : 1);
   const tabs = Object.fromEntries(
     FUNDING_TABS.map((tab) => {
-      // 그룹 순서로 놓고, 같은 그룹 안에서는 카탈로그 순서를 지킨다(Array.prototype.sort는 안정 정렬이다).
-      const products = matches.filter((entry) => entry.tab === tab).sort((a, b) => order(a.group) - order(b.group));
+      // 순서가 같은 공고끼리는 카탈로그 순서를 지킨다(Array.prototype.sort는 안정 정렬이다).
+      const products = matches.filter((entry) => entry.tab === tab).sort((a, b) => order(a) - order(b));
       const counts = emptyCounts();
       for (const entry of products) counts[entry.group] += 1;
       return [tab, { counts, products }];

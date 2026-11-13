@@ -607,7 +607,7 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
     });
   });
 
-  it('만든 상품은 카탈로그 검사를 통과하고, 맞춰 보기의 정책자금이며 마감·보류는 출처 데이터로 정한다', () => {
+  it('만든 상품은 카탈로그 검사를 통과하고, 맞춰 보기의 정책자금이며 마감·접수 상태는 출처 데이터로 정한다', () => {
     const { mapping } = mapDefault();
     const versions = mapping.products.map((product) => ({ ...product, version: '1.0.0', origin: 'SYNC' }));
     const noInput = { businessStatus: null, openedYearMonth: null, districtCode: null, age: null, targetGroups: null };
@@ -623,8 +623,12 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
 
     const fresh = matched();
     // 예전 판정의 회귀 테스트가 정한 접수 상태를 잇는다: 접수 중은 소공인특화자금·대환대출 둘, 혁신성장촉진자금은
-    // 최근 공지의 하루 접수(8. 10.)가 끝나 마감이다. 조건은 읽지 않았으므로(추출 결과 없음) 맞아 보임은 없다.
-    expect(Object.fromEntries([...fresh].map(([name, entry]) => [name, [entry.group, ...entry.holds]]))).toEqual({
+    // 최근 공지의 하루 접수(8. 10.)가 끝나 마감이다. 조건은 읽지 않았으므로(추출 결과 없음) 그룹은 모두 확인 필요다.
+    expect(
+      Object.fromEntries(
+        [...fresh].map(([name, entry]) => [name, [entry.group, ...entry.application.unconfirmedReasons]]),
+      ),
+    ).toEqual({
       '혁신성장촉진자금(직접대출)': ['CLOSED'],
       '일시적경영애로자금(직접대출)': ['NEEDS_CHECK', 'STATUS_NOT_OPEN'],
       '일반경영안정자금(대리대출)': ['NEEDS_CHECK', 'STATUS_NOT_OPEN'],
@@ -639,9 +643,9 @@ describe('소진공 자금을 카탈로그 상품으로 바꾸기', () => {
       fresh: true,
     });
 
-    // 출처 확인이 3일 넘게 끊기면 보류 이유가 붙는다(ADR 0006 3일 최신성).
+    // 출처 확인이 3일 넘게 끊기면 접수 여부 미확인 이유가 붙는다(ADR 0006 3일 최신성).
     const stale = matched({ sourceSyncs: [{ ...FRESH_SYNC, lastSucceededOn: '2026-09-25' }] });
-    expect(stale.get('소공인특화자금(대리대출)')?.holds).toEqual(['SOURCE_STALE']);
+    expect(stale.get('소공인특화자금(대리대출)')?.application.unconfirmedReasons).toEqual(['SOURCE_STALE']);
   });
 
   it("'고정금리(2.0%P)'처럼 모호한 금리와 여러 금액이 적힌 한도는 확정 값으로 옮기지 않는다", () => {

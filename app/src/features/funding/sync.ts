@@ -291,7 +291,7 @@ async function collectSource(
 
 // 출처별로 공고를 모아 사람이 관리하는 카탈로그와 합치고, 기존 적재기로 새 릴리스를 적재한다(ADR 0006).
 // 한 출처가 실패하면 그 출처의 상품은 직전 ACTIVE 릴리스의 것을 그대로 가져오고 마지막 성공일도
-// 그대로 둔다. 그 상품은 마지막 성공일에서 SOURCE_FRESHNESS_DAYS가 지나면 맞춰 보기에서 맞아 보임이 되지 않는다.
+// 그대로 둔다. 그 상품은 마지막 성공일에서 SOURCE_FRESHNESS_DAYS가 지나면 맞춰 보기에서 접수 중 확인이 되지 않는다.
 export async function runFundingSync(options: FundingSyncOptions): Promise<FundingSyncReport> {
   const log = options.log ?? (() => {});
   const now = options.now ?? (() => new Date());

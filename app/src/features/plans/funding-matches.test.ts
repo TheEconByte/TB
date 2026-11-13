@@ -136,7 +136,7 @@ function stubPrisma(plan: PlanRow | null, active = true) {
           schemaVersion: FUNDING_CATALOG_SCHEMA_VERSION,
           basisDate: new Date('2026-11-03T00:00:00.000Z'),
           activatedAt: new Date('2026-11-03T03:00:00.000Z'),
-          // 출처 확인을 오늘로 둬 최신성 보류가 결과를 가리지 않게 한다.
+          // 출처 확인을 오늘로 둔다. 끊겼으면 공고마다 접수 여부 미확인 이유(출처 확인 끊김)가 붙는다.
           automation: {
             blockedSources: [],
             sourceSyncs: [

@@ -32,7 +32,7 @@ export const FUNDING_SOURCE_LABELS: Record<FundingSource, string> = {
   BIZINFO: '기업마당 지원사업정보',
 };
 
-// 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 맞춰 보기에서 맞아 보임이 되지 않는다.
+// 출처의 마지막 성공 동기화가 이 일수를 넘기면 그 출처의 자동 상품은 맞춰 보기에서 접수 중 확인이 되지 않는다.
 export const SOURCE_FRESHNESS_DAYS = 3;
 
 // UNKNOWN은 원문이 지원 유형을 알려 주지 않는 공고(예: 기업마당 공고)다. 지원금이나

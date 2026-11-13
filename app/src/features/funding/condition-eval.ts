@@ -86,6 +86,9 @@ export function expectedFields(
 // CORRECT: 판정과 상태가 정답과 같다. EQUIVALENT: 판정은 같고 상태만 다르다(언급 없음·읽지 못함·확인 필요로 끝나는 읽음).
 // CONFIDENT_WRONG: 어떤 입력에서 정답과 다른 맞음·안 맞음을 낸다(사용자를 잘못 보낸다). MISSED: 정답과 다르지만 다른
 // 입력에서는 확인 필요만 낸다(안전하다, 리뷰 지적 2026-11-05). DISPLAY_WRONG: 보여 주기만 하는 지원 방식·신청기간이 틀렸다.
+// 알려진 한계: 채점은 항목의 판정만 본다. 화면의 그룹은 확인 필요의 이유도 보므로(맞음이 아닌 항목이 언급 없음뿐이면 걸리는
+// 조건 안 보임, matching.ts), EQUIVALENT와 MISSED 가운데 언급 없음이 엇갈린 것은 공고의 그룹을 바꿀 수 있다. 그 횟수는
+// 따로 세지 않는다(docs/domains/funding.md 조건 추출 평가).
 export type FieldOutcome = 'CORRECT' | 'EQUIVALENT' | 'CONFIDENT_WRONG' | 'MISSED' | 'DISPLAY_WRONG';
 
 const AS_OF = '2026-11-04';
@@ -192,7 +195,7 @@ function verdicts(
 const misleads = (actual: string[], gold: string[]) =>
   actual.some((verdict, index) => verdict !== 'CHECK' && verdict !== gold[index]);
 
-// 보여 주기만 하는 항목. 신청기간은 종료일만 쓰고(AI가 읽은 종료일이 지나면 확인 필요), 지원 방식은 종류만 본다.
+// 보여 주기만 하는 항목. 신청기간은 종료일만 쓰고(AI가 읽은 종료일이 지나면 접수 여부 미확인), 지원 방식은 종류만 본다.
 function displayed(name: 'applicationPeriod' | 'supportTypes', field: VerifiedField<unknown>): string {
   if (field.status !== 'READ') return name === 'supportTypes' ? '[]' : 'null';
   if (name === 'applicationPeriod') return String((field.value as { end: string | null }).end);

@@ -1,18 +1,20 @@
 import type { ValueResult } from '../finance/types.ts';
 import type { ConditionRange, ConditionTargetGroup, ConditionValues } from './condition-fields.ts';
+import { toDate } from './dates.ts';
 import { districtName } from './districts.ts';
 import type { DistrictSource } from './match-profile.ts';
-import type {
-  CheckReason,
-  ConditionMatch,
-  FundingMatchGroup,
-  FundingMatchProfile,
-  FundingTab,
-  MatchConditionKey,
-  MatchHold,
-  MatchVerdict,
-  ProductMatch,
-  UserTargetGroup,
+import {
+  applicationState,
+  type CheckReason,
+  type ConditionMatch,
+  type FundingMatchGroup,
+  type FundingMatchProfile,
+  type FundingTab,
+  type MatchConditionKey,
+  type MatchVerdict,
+  type OpenUnconfirmedReason,
+  type ProductMatch,
+  type UserTargetGroup,
 } from './matching.ts';
 import type { SupportType } from './types.ts';
 
@@ -29,10 +31,23 @@ export const FUNDING_TAB_LABELS: Record<FundingTab, string> = {
 
 export const FUNDING_GROUP_LABELS: Record<FundingMatchGroup, string> = {
   MATCHING: '맞아 보임',
+  NOT_MENTIONED_ONLY: '걸리는 조건 안 보임',
   NEEDS_CHECK: '확인 필요',
   NOT_MATCHING: '안 맞아 보임',
   CLOSED: '마감',
 };
+
+const TAB_COUNT_GROUPS = [
+  'MATCHING',
+  'NOT_MENTIONED_ONLY',
+  'NEEDS_CHECK',
+] as const satisfies readonly FundingMatchGroup[];
+
+// 탭 제목에 쓰는 그룹 수. 펼쳐 보여 주는 세 그룹만 쓴다(접어 두는 안 맞아 보임과 숨기는 마감은 탭 안의 개수 상자에 있다).
+// 폰 폭에서는 줄이 바뀌므로 그룹마다 따로 돌려주고, 수는 줄바꿈 없는 공백으로 이름에 붙인다.
+export function tabCountTexts(counts: Record<FundingMatchGroup, number>): string[] {
+  return TAB_COUNT_GROUPS.map((group) => `${FUNDING_GROUP_LABELS[group]} ${numberFormat.format(counts[group])}`);
+}
 
 export const MATCH_VERDICT_LABELS: Record<MatchVerdict, string> = {
   MATCH: '맞음',
@@ -201,9 +216,29 @@ export function checkReasonText(condition: ConditionMatch): string | null {
   }
 }
 
-// 조건이 모두 맞아도 맞아 보임으로 두지 않은 이유(matching.ts의 MatchHold).
-export function holdText(hold: MatchHold, product: ProductMatch): string {
-  switch (hold) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// 카드에 그룹과 따로 보여 주는 접수 상태(matching.ts의 ApplicationState). 마감은 그룹 표시가 이미 알리므로 따로 쓰지
+// 않는다(null). 접수 중으로 확인한 공고에만 출처 종료일까지 남은 날을 쓴다. 접수 중인지 모르는 공고에 남은 날을 쓰면 접수
+// 중으로 읽힌다.
+export function applicationStateText(product: ProductMatch, asOfDate: string): string | null {
+  switch (applicationState(product.application)) {
+    case 'CLOSED':
+      return null;
+    case 'UNCONFIRMED':
+      return '접수 여부 미확인';
+    case 'OPEN_CONFIRMED': {
+      const { end } = product.application.period;
+      if (end === null) return '접수 중 확인';
+      const days = Math.round((toDate(end).getTime() - toDate(asOfDate).getTime()) / DAY_MS);
+      return days === 0 ? '접수 중 확인 · 오늘 마감' : `접수 중 확인 · 마감까지 ${days}일`;
+    }
+  }
+}
+
+// 접수 중으로 확인하지 못한 이유(matching.ts의 OpenUnconfirmedReason).
+export function unconfirmedReasonText(reason: OpenUnconfirmedReason, product: ProductMatch): string {
+  switch (reason) {
     case 'STATUS_NOT_OPEN':
       return '출처에서 접수 중인지 확인하지 못했습니다. 원 공고에서 접수 여부를 확인하세요.';
     case 'SOURCE_STALE': {
