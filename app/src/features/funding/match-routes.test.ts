@@ -199,7 +199,7 @@ describe('POST /api/funding/candidates 경계', () => {
   });
 
   it('AI가 읽은 조건이 안 맞아도 공고를 빼지 않고 안 맞아 보임으로 돌려준다', async () => {
-    // 사용자 결정(2026-11-03): AI가 읽은 값으로는 공고를 숨기지 않는다.
+    // 사용자 결정(2026-11-13): 화면은 안 맞는 공고를 목록에서 빼지만 다시 펼쳐 볼 수 있어야 하므로, 응답에서는 지우지 않는다.
     mocks.getPrisma.mockReturnValue(stubPrisma(true).prisma);
     const body = (await (await postCandidates(jsonRequest({ ...VALID, age: 45 }))).json()) as FundingMatchesWithProfile;
     expect(body.tabs.SUPPORT_PROGRAM.products.map((entry) => entry.group)).toEqual(['NOT_MATCHING']);

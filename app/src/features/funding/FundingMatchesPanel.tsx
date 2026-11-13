@@ -7,7 +7,7 @@ import type { DistrictSource } from './match-profile.ts';
 import {
   AI_READING_NOTICE,
   CONDITION_LABELS,
-  FUNDING_GROUP_LABELS,
+  FUNDING_GROUP_BADGE_LABELS,
   FUNDING_TAB_LABELS,
   LIMIT_NOTE,
   MATCH_VERDICT_LABELS,
@@ -17,6 +17,7 @@ import {
   applicationStateText,
   checkReasonText,
   closedText,
+  conditionSections,
   conditionValueText,
   formatDate,
   fundingGapText,
@@ -25,11 +26,12 @@ import {
   supportTypesText,
   tabCountTexts,
   unconfirmedReasonText,
+  unmentionedText,
   type ViewedFundingGap,
 } from './match-text.ts';
 import {
-  FUNDING_MATCH_GROUPS,
   FUNDING_TABS,
+  REMAINING_GROUPS,
   applicationState,
   type ConditionMatch,
   type FundingTab,
@@ -37,9 +39,9 @@ import {
 } from './matching.ts';
 import type { ObservedApplicationStatus } from './types.ts';
 
-// 맞춰 보기 결과(ADR 0009 §4). /funding과 계획 화면이 같은 결과를 같은 모양으로 보여 준다. 정책자금·지원사업 탭마다
-// 맞아 보임 → 걸리는 조건 안 보임 → 확인 필요 → 안 맞아 보임(접어 둠) → 마감(기본으로 숨김) 순서다. 그룹은 조건으로만 나누고
-// 접수 상태는 카드마다 따로 보여 준다. AI가 읽은 값으로는 공고를 숨기지 않는다.
+// 맞춰 보기 결과(ADR 0009 §4). /funding과 계획 화면이 같은 결과를 같은 모양으로 보여 준다. 정책자금·지원사업 탭마다 조건에 안
+// 맞는 공고를 빼고 남은 공고를 한 목록으로 보여 주고, 뺀 공고와 마감 공고는 건수와 함께 두어 버튼으로 펼친다. 접수 상태는
+// 카드마다 따로 보여 준다.
 
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
@@ -174,8 +176,8 @@ export function FundingMatchesPanel({
             <div className="notice-box" role="status">
               <h2>입력한 조건이 없습니다.</h2>
               <p>
-                조건을 정한 공고(예: 나이·자치구 한정)는 대부분 확인 필요로 남습니다. 사업자등록 여부·자치구·나이·대상
-                한정을 입력하면 더 많이 맞춰 볼 수 있습니다.
+                입력이 없으면 음식점·카페를 제외하는 공고처럼 입력 없이 정해지는 조건으로만 공고를 뺍니다. 사업자등록
+                여부·자치구·나이·대상 한정을 입력하면 조건에 안 맞는 공고를 더 빼고 볼 수 있습니다.
               </p>
             </div>
           )}
@@ -218,15 +220,11 @@ function TabPanel({
   readonly asOfDate: string;
   readonly fundingGap: ViewedFundingGap | undefined;
 }) {
+  const [showEliminated, setShowEliminated] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
-  const of = (group: ProductMatch['group']) => list.products.filter((entry) => entry.group === group);
-  const [matching, notMentionedOnly, needsCheck, notMatching, closed] = [
-    of('MATCHING'),
-    of('NOT_MENTIONED_ONLY'),
-    of('NEEDS_CHECK'),
-    of('NOT_MATCHING'),
-    of('CLOSED'),
-  ];
+  const remaining = list.products.filter((entry) => REMAINING_GROUPS.includes(entry.group));
+  const eliminated = list.products.filter((entry) => entry.group === 'NOT_MATCHING');
+  const closed = list.products.filter((entry) => entry.group === 'CLOSED');
   const policy = tab === 'POLICY_FUND';
   const cards = (items: ProductMatch[]) => (
     <div className="candidate-list">
@@ -255,13 +253,19 @@ function TabPanel({
           {fundingGap !== undefined && <p>{fundingGapText(fundingGap)}</p>}
         </div>
       )}
-      <div className="status-counts branch-counts" aria-label={`${FUNDING_TAB_LABELS[tab]} 그룹별 개수`}>
-        {FUNDING_MATCH_GROUPS.map((group) => (
-          <div key={group} className={`status-count count-${group.toLowerCase()}`}>
-            <span>{FUNDING_GROUP_LABELS[group]}</span>
-            <strong>{numberFormat.format(list.counts[group])}건</strong>
-          </div>
-        ))}
+      <div className="status-counts branch-counts" aria-label={`${FUNDING_TAB_LABELS[tab]} 공고 수`}>
+        <div className="status-count count-remaining">
+          <span>남은 공고</span>
+          <strong>{numberFormat.format(remaining.length)}건</strong>
+        </div>
+        <div className="status-count count-not_matching">
+          <span>조건에 안 맞아 뺌</span>
+          <strong>{numberFormat.format(eliminated.length)}건</strong>
+        </div>
+        <div className="status-count count-closed">
+          <span>{FUNDING_GROUP_BADGE_LABELS.CLOSED}</span>
+          <strong>{numberFormat.format(closed.length)}건</strong>
+        </div>
       </div>
 
       {list.products.length === 0 ? (
@@ -270,63 +274,37 @@ function TabPanel({
         <>
           <div className="candidate-group">
             <div className="group-head">
-              <h3>맞아 보이는 공고</h3>
-              <span>{numberFormat.format(matching.length)}건</span>
+              <h3>남은 공고</h3>
+              <span>{numberFormat.format(remaining.length)}건</span>
             </div>
             <p className="group-note">
-              여섯 항목이 모두 맞아 보이는 공고입니다. 접수 중인지는 카드의 접수 상태로 따로 보여 주며, 선정이나 지원
-              결정을 뜻하지 않습니다.
+              조건에 안 맞는 공고를 빼고 남은 공고입니다. 공고마다 공고문이 밝힌 조건을 인용과 함께 적었습니다. 남았다는
+              것이 선정이나 지원 결정을 뜻하지는 않으며, 접수 중인지는 카드의 접수 상태로 따로 보여 줍니다.
             </p>
-            {matching.length === 0 ? (
+            {remaining.length === 0 ? (
               <p className="empty-state">
-                맞아 보이는 공고가 0건입니다. 정상 결과입니다. 여섯 조건을 모두 밝힌 공고는 드뭅니다. 아래 그룹을 살펴
-                주세요.
+                남은 공고가 0건입니다.
+                {eliminated.length > 0 && ' 아래에서 뺀 공고를 펼쳐 AI가 조건을 잘못 읽지 않았는지 확인해 보세요.'}
               </p>
             ) : (
-              cards(matching)
+              cards(remaining)
             )}
           </div>
 
-          {notMentionedOnly.length > 0 && (
-            <div className="candidate-group">
+          {eliminated.length > 0 && (
+            <div className="candidate-group separated-group">
               <div className="group-head">
-                <h3>걸리는 조건이 안 보이는 공고</h3>
-                <span>{numberFormat.format(notMentionedOnly.length)}건</span>
+                <h3>조건에 안 맞아 뺀 공고</h3>
+                <button type="button" className="link-button" onClick={() => setShowEliminated((current) => !current)}>
+                  {showEliminated ? '숨기기' : `${numberFormat.format(eliminated.length)}건 보기`}
+                </button>
               </div>
               <p className="group-note">
-                안 맞아 보이는 항목이 없고, 맞음이 아닌 항목은 모두 공고문에서 찾지 못한 공고입니다. 공고문에 없다고
-                제한이 없다는 뜻은 아니니 원 공고에서 확인해 주세요.
+                공고문에서 읽은 조건 중 안 맞는 것이 있어 목록에서 뺐습니다. AI가 잘못 읽었을 수 있으니, 찾는 공고가
+                없으면 펼쳐서 안 맞은 조건과 인용을 확인해 주세요.
               </p>
-              {cards(notMentionedOnly)}
+              {showEliminated && cards(eliminated)}
             </div>
-          )}
-
-          {needsCheck.length > 0 && (
-            <div className="candidate-group">
-              <div className="group-head">
-                <h3>확인이 필요한 공고</h3>
-                <span>{numberFormat.format(needsCheck.length)}건</span>
-              </div>
-              <p className="group-note">
-                안 맞아 보이는 항목은 없지만, AI가 읽지 못했거나 입력이 없거나 입력만으로는 정할 수 없어 맞춰 보지 못한
-                항목이 있는 공고입니다. 공고문에서 지역 조건을 찾지 못했는데 제목에 다른 지역 표시가 있는 공고도 여기에
-                둡니다.
-              </p>
-              {cards(needsCheck)}
-            </div>
-          )}
-
-          {notMatching.length > 0 && (
-            <details className="candidate-group separated-group match-folded">
-              <summary className="group-head">
-                <h3>조건이 안 맞아 보이는 공고</h3>
-                <span>{numberFormat.format(notMatching.length)}건 · 펼치기</span>
-              </summary>
-              <p className="group-note">
-                AI가 읽은 조건 중 안 맞아 보이는 항목이 있습니다. AI가 잘못 읽었을 수 있어 숨기지 않고 접어 둡니다.
-              </p>
-              {cards(notMatching)}
-            </details>
           )}
 
           {closed.length > 0 && (
@@ -361,6 +339,15 @@ function MatchCard({
   const closed = closedText(match);
   const applicationText = applicationStateText(match, asOfDate);
   const { aiPeriod, unconfirmedReasons } = match.application;
+  const sections = conditionSections(match.conditions);
+  const conditionItem = (condition: ConditionMatch) => (
+    <ConditionItem
+      key={condition.key}
+      condition={condition}
+      regionNote={match.operatorRegionNote}
+      titleRegionMark={match.titleRegionMark}
+    />
+  );
   return (
     <article className="candidate-card">
       <div className="candidate-head">
@@ -369,9 +356,11 @@ function MatchCard({
           <p className="candidate-org">{match.organization}</p>
         </div>
         <div className="candidate-tags">
-          <span className={`candidate-status status-${match.group.toLowerCase()}`}>
-            {FUNDING_GROUP_LABELS[match.group]}
-          </span>
+          {(match.group === 'NOT_MATCHING' || match.group === 'CLOSED') && (
+            <span className={`candidate-status status-${match.group.toLowerCase()}`}>
+              {FUNDING_GROUP_BADGE_LABELS[match.group]}
+            </span>
+          )}
           {applicationText !== null && (
             <span className={`application-badge application-${applicationState(match.application).toLowerCase()}`}>
               {applicationText}
@@ -432,16 +421,23 @@ function MatchCard({
         )}
       </dl>
 
-      <ul className="match-conditions" aria-label="조건별 맞춰 보기">
-        {match.conditions.map((condition) => (
-          <ConditionItem
-            key={condition.key}
-            condition={condition}
-            regionNote={match.operatorRegionNote}
-            titleRegionMark={match.titleRegionMark}
-          />
-        ))}
-      </ul>
+      {sections.stated.length > 0 && (
+        <>
+          <h5 className="match-section-title">공고가 밝힌 조건</h5>
+          <ul className="match-conditions" aria-label="공고가 밝힌 조건">
+            {sections.stated.map(conditionItem)}
+          </ul>
+        </>
+      )}
+      {sections.toCheck.length > 0 && (
+        <>
+          <h5 className="match-section-title">직접 확인할 조건</h5>
+          <ul className="match-conditions" aria-label="직접 확인할 조건">
+            {sections.toCheck.map(conditionItem)}
+          </ul>
+        </>
+      )}
+      {sections.unmentioned.length > 0 && <p className="match-unmentioned">{unmentionedText(sections.unmentioned)}</p>}
 
       {policy && (
         <div className="match-limit">

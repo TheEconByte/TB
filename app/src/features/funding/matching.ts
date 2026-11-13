@@ -22,8 +22,9 @@ import {
 } from './types.ts';
 
 // 공고에서 읽은 조건과 사용자 입력을 맞춰 본다(ADR 0009 §4). React·DB·외부 API에 의존하지 않는다.
-// AI가 읽은 값으로는 공고를 숨기지 않는다. AI 값은 항목별 맞음·안 맞음·확인 필요만 정하고(안 맞음은 접어 두되 보인다), 기본으로
-// 숨기는 마감은 출처·운영자 데이터로만 정한다(사용자 결정 2026-11-03).
+// AI 값은 항목별 맞음·안 맞음·확인 필요를 정한다. 안 맞음이 있는 공고는 화면이 목록에서 빼되 건수를 밝히고 다시 볼 수 있게
+// 하므로, 여기서는 지우지 않고 그룹만 붙여 모두 돌려준다(사용자 결정 2026-11-13). 기본으로 숨기는 마감은 출처·운영자
+// 데이터로만 정한다(사용자 결정 2026-11-03).
 // 마감이 아닌 공고의 그룹은 항목의 판정으로만 정하고, 접수 상태는 그룹과 따로 넘긴다(사용자 결정 2026-11-13).
 // 사용자 입력은 AI에 보내지 않는다. 이 파일은 AI 클라이언트에 닿지 않는다(notice-extraction.test.ts가 확인한다).
 
@@ -95,6 +96,8 @@ export const FUNDING_MATCH_GROUPS = [
   'CLOSED',
 ] as const;
 export type FundingMatchGroup = (typeof FUNDING_MATCH_GROUPS)[number];
+// 목록에 남기는 그룹. 안 맞아 보임은 목록에서 빼고 마감은 숨긴다(ADR §4, 2026-11-13).
+export const REMAINING_GROUPS: readonly FundingMatchGroup[] = ['MATCHING', 'NOT_MENTIONED_ONLY', 'NEEDS_CHECK'];
 
 // 갈래(ADR §1). 출처와 출처의 지원분야로만 정한다.
 export const FUNDING_TABS = ['POLICY_FUND', 'SUPPORT_PROGRAM'] as const;

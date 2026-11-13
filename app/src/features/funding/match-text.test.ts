@@ -3,19 +3,21 @@ import { describe, expect, it } from 'vitest';
 import type { ConditionValues } from './condition-fields.ts';
 import {
   AI_READING_NOTICE,
-  FUNDING_GROUP_LABELS,
+  FUNDING_GROUP_BADGE_LABELS,
   LIMIT_NOTE,
   aiPeriodText,
   applicationPeriodText,
   applicationStateText,
   checkReasonText,
   closedText,
+  conditionSections,
   conditionValueText,
   fundingGapText,
   fundingProfileSummary,
   limitText,
   rangeText,
   tabCountTexts,
+  unmentionedText,
   unconfirmedReasonText,
 } from './match-text.ts';
 import {
@@ -296,15 +298,43 @@ describe('신청기간 문장', () => {
   });
 });
 
-describe('탭 제목의 그룹 수', () => {
-  // 펼쳐 보여 주는 세 그룹의 수를 쓴다. 입력이 없거나 일부면 공고가 확인 필요에 몰리는데(2026-11-13 릴리스에서 입력 없이
-  // 정책자금 80건·지원사업 149건), 그 수가 빠지면 공고가 있는 탭이 비어 보인다. 접어 두는 안 맞아 보임과 숨기는 마감은 뺀다.
-  // 폰 폭에서는 탭 안에서 줄이 바뀐다. 그룹마다 따로 주어 줄이 그룹 단위로 바뀌게 하고, 수는 줄바꿈 없는 공백(U+00A0)으로
-  // 이름에 붙여 수만 다음 줄로 떨어져 다른 그룹의 수로 읽히지 않게 한다.
-  it('맞아 보임·걸리는 조건 안 보임·확인 필요의 수를 그룹마다 따로 쓰고, 수를 이름에서 떼지 않는다', () => {
+describe('탭 제목의 공고 수', () => {
+  // ADR 0009 §4(2026-11-13): 조건에 안 맞는 공고는 목록에서 빼되 건수를 밝힌다. 남은 공고는 맞아 보임·걸리는 조건 안 보임·
+  // 확인 필요를 합친 수다. 마감은 넣지 않는다. 수는 줄바꿈 없는 공백(U+00A0)으로 이름에 붙여 폰 폭에서 떨어지지 않게 한다.
+  it('남은 공고와 조건에 안 맞아 뺀 공고의 수를 쓴다', () => {
     expect(
-      tabCountTexts({ MATCHING: 0, NOT_MENTIONED_ONLY: 2, NEEDS_CHECK: 1234, NOT_MATCHING: 75, CLOSED: 2 }),
-    ).toEqual(['맞아 보임 0', '걸리는 조건 안 보임 2', '확인 필요 1,234']);
+      tabCountTexts({ MATCHING: 1, NOT_MENTIONED_ONLY: 2, NEEDS_CHECK: 1234, NOT_MATCHING: 75, CLOSED: 9 }),
+    ).toEqual(['남은 공고\u00a01,237', '조건에 안 맞아 뺌\u00a075']);
+  });
+});
+
+describe('카드의 조건 묶음', () => {
+  const entry = (key: ConditionMatch['key'], reading: ConditionMatch['reading'], checkReason: CheckReason | null) =>
+    ({ key, reading, verdict: checkReason === null ? 'MATCH' : 'CHECK', checkReason }) as ConditionMatch;
+  const read = { status: 'READ', source: 'AI', value: 'BOTH', quote: '원문' } as ConditionMatch['reading'];
+  const conditions = [
+    entry('businessStage', read, null),
+    entry('businessAge', read, 'INPUT_MISSING'),
+    entry('age', { status: 'NOT_MENTIONED' }, 'NOT_MENTIONED'),
+    entry('region', { status: 'NOT_MENTIONED' }, 'TITLE_REGION_MARK'),
+    entry('foodBusiness', { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' }, 'UNREADABLE'),
+    entry('targetGroups', { status: 'NOT_READ' }, 'NOT_READ'),
+  ];
+
+  // 공고가 밝힌 조건은 입력이 없어 맞춰 보지 못했어도 값과 인용이 있으므로 밝힌 조건에 둔다. 제목 표시 때문에 남긴 지역은
+  // 공고문에는 없지만 사용자가 확인해야 하므로 언급 없음 한 줄에 묻지 않는다.
+  it('밝힌 조건, 직접 확인할 조건, 공고문에서 찾지 못한 조건으로 빠짐없이 나눈다', () => {
+    const sections = conditionSections(conditions);
+    expect(sections.stated.map((item) => item.key)).toEqual(['businessStage', 'businessAge']);
+    expect(sections.toCheck.map((item) => item.key)).toEqual(['region', 'foodBusiness', 'targetGroups']);
+    expect(sections.unmentioned).toEqual(['age']);
+  });
+
+  it('찾지 못한 조건은 이름만 적고, 제한이 없다는 뜻이 아님을 함께 쓴다', () => {
+    // 이름에 가운뎃점이 든 조건(음식점·카페)이 있어 쉼표로 잇는다.
+    const text = unmentionedText(['businessAge', 'foodBusiness', 'targetGroups']);
+    expect(text).toContain('업력, 음식점·카페, 대상 한정.');
+    expect(text).toContain('제한이 없다는 뜻은 아니니');
   });
 });
 
@@ -372,7 +402,7 @@ describe('쓰지 않는 문구', () => {
     const texts = [
       AI_READING_NOTICE,
       LIMIT_NOTE,
-      ...Object.values(FUNDING_GROUP_LABELS),
+      ...Object.values(FUNDING_GROUP_BADGE_LABELS),
       ...(['STATUS_NOT_OPEN', 'SOURCE_STALE', 'AI_END_DATE_PASSED'] as OpenUnconfirmedReason[]).map((reason) =>
         unconfirmedReasonText(reason, product()),
       ),

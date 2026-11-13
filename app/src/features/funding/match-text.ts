@@ -4,6 +4,7 @@ import { toDate } from './dates.ts';
 import { districtName } from './districts.ts';
 import type { DistrictSource } from './match-profile.ts';
 import {
+  REMAINING_GROUPS,
   applicationState,
   type CheckReason,
   type ConditionMatch,
@@ -29,24 +30,41 @@ export const FUNDING_TAB_LABELS: Record<FundingTab, string> = {
   SUPPORT_PROGRAM: '지원사업',
 };
 
-export const FUNDING_GROUP_LABELS: Record<FundingMatchGroup, string> = {
-  MATCHING: '맞아 보임',
-  NOT_MENTIONED_ONLY: '걸리는 조건 안 보임',
-  NEEDS_CHECK: '확인 필요',
+// 카드에 그룹을 표시하는 것은 목록에서 뺀 공고와 마감 공고뿐이다. 남은 공고는 그룹 제목 없이 한 목록이다.
+export const FUNDING_GROUP_BADGE_LABELS: Record<Extract<FundingMatchGroup, 'NOT_MATCHING' | 'CLOSED'>, string> = {
   NOT_MATCHING: '안 맞아 보임',
   CLOSED: '마감',
 };
 
-const TAB_COUNT_GROUPS = [
-  'MATCHING',
-  'NOT_MENTIONED_ONLY',
-  'NEEDS_CHECK',
-] as const satisfies readonly FundingMatchGroup[];
-
-// 탭 제목에 쓰는 그룹 수. 펼쳐 보여 주는 세 그룹만 쓴다(접어 두는 안 맞아 보임과 숨기는 마감은 탭 안의 개수 상자에 있다).
-// 폰 폭에서는 줄이 바뀌므로 그룹마다 따로 돌려주고, 수는 줄바꿈 없는 공백으로 이름에 붙인다.
+// 탭 제목에 쓰는 공고 수. 목록에 남은 공고와 조건에 안 맞아 뺀 공고를 쓴다(마감은 탭 안에 있다). 폰 폭에서는 줄이 바뀌므로
+// 따로 돌려주고, 수는 줄바꿈 없는 공백으로 이름에 붙인다.
 export function tabCountTexts(counts: Record<FundingMatchGroup, number>): string[] {
-  return TAB_COUNT_GROUPS.map((group) => `${FUNDING_GROUP_LABELS[group]} ${numberFormat.format(counts[group])}`);
+  const remaining = REMAINING_GROUPS.reduce((sum, group) => sum + counts[group], 0);
+  return [
+    `남은 공고\u00a0${numberFormat.format(remaining)}`,
+    `조건에 안 맞아 뺌\u00a0${numberFormat.format(counts.NOT_MATCHING)}`,
+  ];
+}
+
+// 카드에 조건을 나눠 적는 세 묶음. 공고가 밝힌 조건(읽은 값과 인용이 있다), 직접 확인할 조건(AI가 읽지 못했거나 아직 읽지
+// 않았거나, 공고문에는 없는데 제목에 다른 지역 표시가 있다), 공고문에서 찾지 못한 조건(이름만 적는다).
+export function conditionSections(conditions: readonly ConditionMatch[]): {
+  stated: ConditionMatch[];
+  toCheck: ConditionMatch[];
+  unmentioned: MatchConditionKey[];
+} {
+  const stated = conditions.filter((entry) => entry.reading.status === 'READ');
+  const unmentioned = conditions.filter((entry) => entry.checkReason === 'NOT_MENTIONED');
+  return {
+    stated,
+    toCheck: conditions.filter((entry) => !stated.includes(entry) && !unmentioned.includes(entry)),
+    unmentioned: unmentioned.map((entry) => entry.key),
+  };
+}
+
+// 언급이 없다는 것은 제한이 없다는 뜻이 아니다(ADR 0009 §3).
+export function unmentionedText(keys: readonly MatchConditionKey[]): string {
+  return `공고문에서 찾지 못한 조건: ${keys.map((key) => CONDITION_LABELS[key]).join(', ')}. 공고문에 없다고 제한이 없다는 뜻은 아니니 원 공고에서 확인하세요.`;
 }
 
 export const MATCH_VERDICT_LABELS: Record<MatchVerdict, string> = {
