@@ -361,11 +361,64 @@ describe('verifyConditionOutput', () => {
       region({ scope: 'SEOUL_DISTRICTS', provinces: ['서울특별시'], districts: ['은평구'] }, '은평구 관내에 사업장이'),
     ).toMatchObject({ status: 'READ', value: { provinces: ['서울'], districtCodes: ['11380'] } });
     expect(
-      region({ scope: 'PROVINCES', provinces: ['서울특별시'], excludedDistricts: ['강남구'] }, '서울특별시 소재 기업'),
+      region(
+        { scope: 'PROVINCES', provinces: ['서울특별시'], excludedDistricts: ['강남구'] },
+        '서울특별시 소재 기업(강남구 제외)',
+      ),
     ).toMatchObject({
       status: 'READ',
       value: { provinces: ['서울'], districtCodes: [], excludedDistrictCodes: ['11680'] },
     });
+  });
+
+  // 자치구는 공고에 적힌 이름을 옮겨 적는 값이다. 인용이 공고에 있어도 그 이름이 인용과 제목 어디에도 없으면 값은 공고
+  // 밖에서 온 것이다(사용자 결정 2026-11-13, 재현: 평가에서 "[대구] 동구 …" 공고를 "동구에 … 소상공인" 인용으로 강남구
+  // 한정으로 적었다. 강남구는 프롬프트 형식 설명의 예시 이름이다). 그대로 두면 강남구 사용자에게 대구 공고가 맞아 보인다.
+  it('reads a Seoul district only when its name is in the quote or the title', () => {
+    const daegu = {
+      productName: '[대구] 동구 2026년 소상공인 경영안정자금 지원사업 공고',
+      text: '신청대상: 동구에 3개월 이상 영업 중인 소상공인',
+    };
+    const seoul = {
+      productName: '[서울] 2026년 소상공인 경영개선 지원사업 공고',
+      text: ['신청대상: 서울시 소재 소상공인(송파구 제외)', '우선 지원: 강남·서초 소재 사업장'].join('\n'),
+    };
+    const eunpyeong = {
+      productName: '[서울] 은평구 2026년 소규모 자영업자 간판 지원사업 공고',
+      text: '신청대상: 관내에 사업장이 등록된 소규모 자영업자',
+    };
+    const region = (value: Record<string, unknown>, quote: string, notice: { productName: string; text: string }) =>
+      verifyConditionOutput(
+        output({
+          region: {
+            mentioned: true,
+            value: { provinces: ['서울'], districts: [], excludedProvinces: [], excludedDistricts: [], ...value },
+            quote,
+          },
+        }),
+        notice,
+      ).region;
+
+    expect(
+      region({ scope: 'SEOUL_DISTRICTS', districts: ['강남구'] }, '동구에 3개월 이상 영업 중인 소상공인', daegu),
+    ).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('강남구') });
+    // 제외 자치구도 같다. 빼지 않은 자치구를 빼면 그 자치구 사용자에게 신청할 수 있는 공고가 안 맞아 보인다.
+    expect(
+      region({ scope: 'PROVINCES', excludedDistricts: ['강남구'] }, '서울시 소재 소상공인(송파구 제외)', seoul),
+    ).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('강남구') });
+    // 줄인 이름(강남·서초)은 그 자치구의 이름으로 보지 않는다. '중구'를 줄이면 한 글자라 아무 데나 맞는다. 버린 값은
+    // 확인 필요로 남는다.
+    expect(
+      region({ scope: 'SEOUL_DISTRICTS', districts: ['강남구', '서초구'] }, '강남·서초 소재 사업장', seoul).status,
+    ).toBe('UNREADABLE');
+
+    // 기업마당 자치구 공고는 자치구 이름을 제목에만 두는 일이 많다. 제목도 공고의 일부다(2026-11-12).
+    expect(
+      region({ scope: 'SEOUL_DISTRICTS', districts: ['은평구'] }, '관내에 사업장이 등록된 소규모 자영업자', eunpyeong),
+    ).toMatchObject({ status: 'READ', value: { districtCodes: ['11380'] } });
+    expect(
+      region({ scope: 'PROVINCES', excludedDistricts: ['송파구'] }, '서울시 소재 소상공인(송파구 제외)', seoul),
+    ).toMatchObject({ status: 'READ', value: { excludedDistrictCodes: ['11710'] } });
   });
 
   it('accepts only real province names, and keeps the scope and the lists consistent', () => {
