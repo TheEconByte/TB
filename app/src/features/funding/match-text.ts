@@ -46,25 +46,17 @@ export function tabCountTexts(counts: Record<FundingMatchGroup, number>): string
   ];
 }
 
-// 카드에 조건을 나눠 적는 세 묶음. 공고가 밝힌 조건(읽은 값과 인용이 있다), 직접 확인할 조건(AI가 읽지 못했거나 아직 읽지
-// 않았거나, 공고문에는 없는데 제목에 다른 지역 표시가 있다), 공고문에서 찾지 못한 조건(이름만 적는다).
+// 카드에 조건을 나눠 적는 두 묶음. 공고가 밝힌 조건(읽은 값과 인용이 있다)과 직접 확인할 조건(AI가 읽지 못했거나 아직 읽지
+// 않았거나, 공고문에는 없는데 제목에 다른 지역 표시가 있다)이다. 공고문에서 찾지 못한 조건은 카드에 적지 않는다(사용자 결정
+// 2026-11-13). 없다고 제한이 없다는 뜻은 아니라는 점은 목록 설명에서 한 번 알린다.
 export function conditionSections(conditions: readonly ConditionMatch[]): {
   stated: ConditionMatch[];
   toCheck: ConditionMatch[];
-  unmentioned: MatchConditionKey[];
 } {
-  const stated = conditions.filter((entry) => entry.reading.status === 'READ');
-  const unmentioned = conditions.filter((entry) => entry.checkReason === 'NOT_MENTIONED');
   return {
-    stated,
-    toCheck: conditions.filter((entry) => !stated.includes(entry) && !unmentioned.includes(entry)),
-    unmentioned: unmentioned.map((entry) => entry.key),
+    stated: conditions.filter((entry) => entry.reading.status === 'READ'),
+    toCheck: conditions.filter((entry) => entry.reading.status !== 'READ' && entry.checkReason !== 'NOT_MENTIONED'),
   };
-}
-
-// 언급이 없다는 것은 제한이 없다는 뜻이 아니다(ADR 0009 §3).
-export function unmentionedText(keys: readonly MatchConditionKey[]): string {
-  return `공고문에서 찾지 못한 조건: ${keys.map((key) => CONDITION_LABELS[key]).join(', ')}. 공고문에 없다고 제한이 없다는 뜻은 아니니 원 공고에서 확인하세요.`;
 }
 
 export const MATCH_VERDICT_LABELS: Record<MatchVerdict, string> = {

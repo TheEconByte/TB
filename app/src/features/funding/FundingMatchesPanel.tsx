@@ -26,7 +26,6 @@ import {
   supportTypesText,
   tabCountTexts,
   unconfirmedReasonText,
-  unmentionedText,
   type ViewedFundingGap,
 } from './match-text.ts';
 import {
@@ -278,7 +277,8 @@ function TabPanel({
               <span>{numberFormat.format(remaining.length)}건</span>
             </div>
             <p className="group-note">
-              조건에 안 맞는 공고를 빼고 남은 공고입니다. 공고마다 공고문이 밝힌 조건을 인용과 함께 적었습니다. 남았다는
+              조건에 안 맞는 공고를 빼고 남은 공고입니다. 공고마다 공고문이 밝힌 조건만 인용과 함께 적었습니다. 카드에
+              없는 조건은 공고문에서 찾지 못한 것이며, 제한이 없다는 뜻은 아니니 원 공고에서 확인해 주세요. 남았다는
               것이 선정이나 지원 결정을 뜻하지는 않으며, 접수 중인지는 카드의 접수 상태로 따로 보여 줍니다.
             </p>
             {remaining.length === 0 ? (
@@ -437,7 +437,6 @@ function MatchCard({
           </ul>
         </>
       )}
-      {sections.unmentioned.length > 0 && <p className="match-unmentioned">{unmentionedText(sections.unmentioned)}</p>}
 
       {policy && (
         <div className="match-limit">

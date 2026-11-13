@@ -1339,11 +1339,6 @@ footer {
   font-size: 13px;
   font-weight: 800;
 }
-.match-unmentioned {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
 .candidate-status.status-not_matching {
   background: #ffe4e2;
   color: #c4271b;

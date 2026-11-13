@@ -17,7 +17,6 @@ import {
   limitText,
   rangeText,
   tabCountTexts,
-  unmentionedText,
   unconfirmedReasonText,
 } from './match-text.ts';
 import {
@@ -321,20 +320,14 @@ describe('카드의 조건 묶음', () => {
     entry('targetGroups', { status: 'NOT_READ' }, 'NOT_READ'),
   ];
 
-  // 공고가 밝힌 조건은 입력이 없어 맞춰 보지 못했어도 값과 인용이 있으므로 밝힌 조건에 둔다. 제목 표시 때문에 남긴 지역은
-  // 공고문에는 없지만 사용자가 확인해야 하므로 언급 없음 한 줄에 묻지 않는다.
-  it('밝힌 조건, 직접 확인할 조건, 공고문에서 찾지 못한 조건으로 빠짐없이 나눈다', () => {
+  // 공고가 밝힌 조건은 입력이 없어 맞춰 보지 못했어도 값과 인용이 있으므로 밝힌 조건에 둔다. 공고문에서 찾지 못한 조건은
+  // 카드에 적지 않는다(사용자 결정 2026-11-13). 제목 표시 때문에 남긴 지역은 공고문에는 없지만 사용자가 확인해야 하므로
+  // 직접 확인할 조건에 남긴다.
+  it('밝힌 조건과 직접 확인할 조건으로 나누고, 공고문에서 찾지 못한 조건은 어디에도 넣지 않는다', () => {
     const sections = conditionSections(conditions);
     expect(sections.stated.map((item) => item.key)).toEqual(['businessStage', 'businessAge']);
     expect(sections.toCheck.map((item) => item.key)).toEqual(['region', 'foodBusiness', 'targetGroups']);
-    expect(sections.unmentioned).toEqual(['age']);
-  });
-
-  it('찾지 못한 조건은 이름만 적고, 제한이 없다는 뜻이 아님을 함께 쓴다', () => {
-    // 이름에 가운뎃점이 든 조건(음식점·카페)이 있어 쉼표로 잇는다.
-    const text = unmentionedText(['businessAge', 'foodBusiness', 'targetGroups']);
-    expect(text).toContain('업력, 음식점·카페, 대상 한정.');
-    expect(text).toContain('제한이 없다는 뜻은 아니니');
+    expect(Object.keys(sections)).toEqual(['stated', 'toCheck']);
   });
 });
 
