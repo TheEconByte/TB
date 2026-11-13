@@ -69,6 +69,8 @@ export type CheckReason =
 export type ConditionReading<T> =
   | { status: 'READ'; source: 'AI'; value: T; quote: string }
   | { status: 'READ'; source: 'OPERATOR'; value: T; evidence: string[] }
+  // 기업마당 공고 제목 맨 앞의 [서울] 표시로 정한 지역(서울 전체). AI가 지역을 값으로 읽지 못했을 때만 쓴다.
+  | { status: 'READ'; source: 'TITLE'; value: T; mark: string }
   | { status: 'NOT_MENTIONED' }
   | { status: 'UNREADABLE'; reason: string }
   | { status: 'NOT_READ' };
@@ -177,6 +179,11 @@ function operatorEvidence(product: FundingProduct, subject: EvidenceSubject): st
   return summaries.length > 0 ? summaries : null;
 }
 
+function recordedEvidence(product: FundingProduct, subject: EvidenceSubject): string[] | null {
+  const summaries = product.evidence.filter((entry) => entry.subject === subject).map((entry) => entry.summary);
+  return summaries.length > 0 ? summaries : null;
+}
+
 function operatorStage(product: FundingProduct): ConditionValues['businessStage'] | null {
   const stages = new Set(product.eligibleBusinessStages);
   if (stages.has('PRE_REGISTRATION') && stages.has('POST_REGISTRATION')) return 'BOTH';
@@ -232,8 +239,10 @@ export function readProductConditions(product: FundingProduct, extraction: Verif
   if (stage !== null && stageEvidence !== null) {
     readings.businessStage = { status: 'READ', source: 'OPERATOR', value: stage, evidence: stageEvidence };
   }
+  // 지역은 운영자가 기록했으면 근거가 검색 결과 요약뿐이어도 쓴다(사용자 결정 2026-11-13). 서울시 사업으로 등록한 상품의
+  // 지역이 읽지 않음으로 남아 서울 사용자에게도 확인 필요로 보이던 것을 막는다. 사업 단계는 공식 원문 근거가 있어야 쓴다.
   const region = operatorRegion(product);
-  const regionEvidence = operatorEvidence(product, 'REGION');
+  const regionEvidence = operatorEvidence(product, 'REGION') ?? recordedEvidence(product, 'REGION');
   if (region !== null && regionEvidence !== null) {
     readings.region = { status: 'READ', source: 'OPERATOR', value: region, evidence: regionEvidence };
   }
@@ -322,7 +331,10 @@ function regionJudgment(value: ConditionValues['region'], profile: FundingMatchP
   const district = profile.districtCode;
   if (district === null) {
     const noExclusion = value.excludedProvinces.length === 0 && value.excludedDistrictCodes.length === 0;
-    return value.scope === 'NATIONWIDE' && noExclusion ? MATCH : check('INPUT_MISSING');
+    // 자치구는 서울 자치구만 고를 수 있다. 제외 지역 없는 전국과 서울 전체는 어느 자치구를 골라도 맞음이다.
+    const everySeoulDistrict =
+      value.scope === 'NATIONWIDE' || (value.scope === 'PROVINCES' && value.provinces.includes('서울'));
+    return everySeoulDistrict && noExclusion ? MATCH : check('INPUT_MISSING');
   }
   // 자치구는 서울 자치구만 고를 수 있다.
   if (value.excludedProvinces.includes('서울') || value.excludedDistrictCodes.includes(district)) return MISMATCH;
@@ -437,10 +449,34 @@ function leadingTitleMark(product: FundingProduct): string | null {
 }
 
 const NOT_LIMITING_MARKS = ['서울', '전국'];
+const SEOUL_MARK = '서울';
+const SEOUL_WIDE: ConditionValues['region'] = {
+  scope: 'PROVINCES',
+  provinces: ['서울'],
+  districts: [],
+  excludedProvinces: [],
+  excludedDistricts: [],
+  districtCodes: [],
+  excludedDistrictCodes: [],
+};
 
-// 지역이 언급 없음인데 제목 표시가 다른 지역을 가리키면, 언급 없음으로 두지 않고 제목 표시를 이유로 남긴다. 그러면 걸리는 조건
-// 안 보임으로 올라가지 않는다. 내리는 데만 쓰고, AI가 지역을 읽었으면 그 값을 그대로 쓴다(ADR §4, 2026-11-13).
+// 제목 표시로 지역 항목을 고친다(ADR §4, 2026-11-13). AI가 지역을 값으로 읽었으면 그 값을 그대로 쓴다.
+// - [서울] 표시: AI가 지역을 값으로 읽지 못했으면(언급 없음·읽지 못함·읽지 않음) 서울 전체로 본다. 서울시 사업인데 자치구
+//   조건이 따로 없으면 서울 전체가 대상이다.
+// - 서울도 전국도 아닌 표시: 지역이 언급 없음이면 제목 표시를 이유로 확인 필요에 남긴다. 걸리는 조건 안 보임으로 올리지 않는다.
 function withTitleRegionMark(conditions: ConditionMatch[], mark: string | null): ConditionMatch[] {
+  if (mark === SEOUL_MARK) {
+    return conditions.map((entry) =>
+      entry.key === 'region' && entry.reading.status !== 'READ'
+        ? {
+            key: 'region',
+            reading: { status: 'READ', source: 'TITLE', value: SEOUL_WIDE, mark },
+            verdict: 'MATCH',
+            checkReason: null,
+          }
+        : entry,
+    );
+  }
   if (mark === null || NOT_LIMITING_MARKS.some((name) => mark.includes(name))) return conditions;
   return conditions.map((entry) =>
     entry.key === 'region' && entry.checkReason === 'NOT_MENTIONED'

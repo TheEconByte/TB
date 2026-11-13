@@ -10,6 +10,7 @@ import {
   FUNDING_GROUP_BADGE_LABELS,
   FUNDING_TAB_LABELS,
   LIMIT_NOTE,
+  UNREAD_NOTICE,
   MATCH_VERDICT_LABELS,
   SUPPORT_TYPE_LABELS,
   aiPeriodText,
@@ -24,6 +25,7 @@ import {
   fundingProfileSummary,
   limitText,
   supportTypesText,
+  titleRegionText,
   tabCountTexts,
   unconfirmedReasonText,
   type ViewedFundingGap,
@@ -437,6 +439,7 @@ function MatchCard({
           </ul>
         </>
       )}
+      {sections.hasUnread && <p className="match-reason">{UNREAD_NOTICE}</p>}
 
       {policy && (
         <div className="match-limit">
@@ -483,6 +486,9 @@ function ConditionItem({
       </div>
       {value !== null && <p className="match-condition-value">{value}</p>}
       {reading.status === 'READ' && reading.source === 'AI' && <q className="match-quote">{reading.quote}</q>}
+      {reading.status === 'READ' && reading.source === 'TITLE' && (
+        <p className="match-evidence">{titleRegionText(reading.mark)}</p>
+      )}
       {reading.status === 'READ' && reading.source === 'OPERATOR' && (
         <p className="match-evidence">운영자 확인 근거: {reading.evidence.join(' / ')}</p>
       )}

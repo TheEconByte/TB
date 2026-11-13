@@ -47,16 +47,29 @@ export function tabCountTexts(counts: Record<FundingMatchGroup, number>): string
 }
 
 // 카드에 조건을 나눠 적는 두 묶음. 공고가 밝힌 조건(읽은 값과 인용이 있다)과 직접 확인할 조건(AI가 읽지 못했거나 아직 읽지
-// 않았거나, 공고문에는 없는데 제목에 다른 지역 표시가 있다)이다. 공고문에서 찾지 못한 조건은 카드에 적지 않는다(사용자 결정
+// 못했거나, 공고문에는 없는데 제목에 다른 지역 표시가 있다)이다. 본문이 없어 아직 읽지 않은 조건은 항목으로 적지 않는다. 공고문에서 찾지 못한 조건은 카드에 적지 않는다(사용자 결정
 // 2026-11-13). 없다고 제한이 없다는 뜻은 아니라는 점은 목록 설명에서 한 번 알린다.
 export function conditionSections(conditions: readonly ConditionMatch[]): {
   stated: ConditionMatch[];
   toCheck: ConditionMatch[];
+  // 읽을 본문이 없거나 추출 전이라 읽지 않은 조건이 있는지. 항목마다 적지 않고 카드에 한 줄로만 알린다.
+  hasUnread: boolean;
 } {
+  const unread = conditions.filter((entry) => entry.reading.status === 'NOT_READ');
   return {
     stated: conditions.filter((entry) => entry.reading.status === 'READ'),
-    toCheck: conditions.filter((entry) => entry.reading.status !== 'READ' && entry.checkReason !== 'NOT_MENTIONED'),
+    toCheck: conditions.filter(
+      (entry) => entry.reading.status !== 'READ' && entry.checkReason !== 'NOT_MENTIONED' && !unread.includes(entry),
+    ),
+    hasUnread: unread.length > 0,
   };
+}
+
+export const UNREAD_NOTICE = '이 공고는 본문을 읽지 못해 조건을 다 확인하지 못했습니다. 원 공고에서 확인하세요.';
+
+// 제목의 [서울] 표시로 지역을 서울 전체로 본 근거.
+export function titleRegionText(mark: string): string {
+  return `제목의 [${mark}] 표시로 서울 전체로 봤습니다. 자치구를 따로 정했는지는 원 공고에서 확인하세요.`;
 }
 
 export const MATCH_VERDICT_LABELS: Record<MatchVerdict, string> = {

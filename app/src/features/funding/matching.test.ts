@@ -247,12 +247,7 @@ describe('공고 그룹(ADR §4, 사용자 결정 2026-11-13: 마감이 아니�
     });
 
     it('표시가 없거나 서울·전국이면 언급 없음 그대로다', () => {
-      for (const name of [
-        '소상공인 온라인판로 지원사업 모집공고',
-        '[서울] 온라인 유통 MD 상담 모집 공고',
-        '[전국] 모집 공고',
-        '2026년 [부산] 공고',
-      ]) {
+      for (const name of ['소상공인 온라인판로 지원사업 모집공고', '[전국] 모집 공고', '2026년 [부산] 공고']) {
         const result = match(titled(name), regionUnmentioned, profile({ districtCode: GANGNAM }));
         expect(condition(result, 'region'), name).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_MENTIONED' });
         expect(result.group, name).toBe('NOT_MENTIONED_ONLY');
@@ -278,6 +273,48 @@ describe('공고 그룹(ADR §4, 사용자 결정 2026-11-13: 마감이 아니�
       const unreadable = openConditions({ region: { status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' } });
       expect(condition(match(product, unreadable, NO_INPUT), 'region').checkReason).toBe('UNREADABLE');
       expect(condition(match(product, null, NO_INPUT), 'region').checkReason).toBe('NOT_READ');
+    });
+
+    // 서울시 사업인데 자치구 조건이 따로 없으면 서울 전체가 대상이다(사용자 결정 2026-11-13). AI가 지역을 값으로 읽지
+    // 못했으면(언급 없음·읽지 못함·읽지 않음) [서울] 표시로 서울 전체로 보고, 자치구 입력이 없어도 맞음이다.
+    it('[서울] 표시가 있고 AI가 지역을 값으로 읽지 못했으면 서울 전체로 본다', () => {
+      const product = titled('[서울] 2026년 소상공인 지원사업 모집 공고');
+      const unreadable = openConditions({
+        region: { status: 'UNREADABLE', reason: '자치구 한정인데 자치구가 없습니다.' },
+      });
+      for (const conditions of [regionUnmentioned, unreadable, null]) {
+        const region = condition(match(product, conditions, NO_INPUT), 'region');
+        expect(region).toMatchObject({
+          verdict: 'MATCH',
+          checkReason: null,
+          reading: {
+            status: 'READ',
+            source: 'TITLE',
+            mark: '서울',
+            value: { scope: 'PROVINCES', provinces: ['서울'] },
+          },
+        });
+      }
+      expect(match(product, regionUnmentioned, profile({ districtCode: GANGNAM })).group).toBe('MATCHING');
+    });
+
+    // AI가 서울의 특정 자치구로 읽었으면 그 값을 쓴다. 표시는 읽은 값을 덮지 않는다.
+    it('[서울] 표시가 있어도 AI가 읽은 자치구 한정은 그대로 쓴다', () => {
+      const jongnoOnly = read({
+        scope: 'SEOUL_DISTRICTS',
+        provinces: ['서울'],
+        districts: ['종로구'],
+        excludedProvinces: [],
+        excludedDistricts: [],
+        districtCodes: [JONGNO],
+        excludedDistrictCodes: [],
+      }) as VerifiedConditions['region'];
+      const result = match(
+        titled('[서울] 종로구 모집 공고'),
+        openConditions({ region: jongnoOnly }),
+        profile({ districtCode: GANGNAM }),
+      );
+      expect(condition(result, 'region')).toMatchObject({ verdict: 'MISMATCH', reading: { source: 'AI' } });
     });
 
     // 표시가 틀린 공고가 있다(제목 [대구], 본문 대전 유성구). AI가 지역을 읽었으면 표시를 보지 않는다.
@@ -552,7 +589,13 @@ describe('지역(ADR §4: 자치구는 코드로 맞춘다, 기본값: 결과가
     expect(verdictOf(region({ scope: 'PROVINCES', provinces: ['경기'] }), inGangnam, 'region').verdict).toBe(
       'MISMATCH',
     );
+    // 자치구는 서울 자치구만 고를 수 있어 서울 전체는 어느 자치구든 맞는다. 입력이 없어도 맞음이다(사용자 결정 2026-11-13).
     expect(verdictOf(region({ scope: 'PROVINCES', provinces: ['서울'] }), NO_INPUT, 'region')).toEqual({
+      verdict: 'MATCH',
+      checkReason: null,
+    });
+    // 서울이 없는 시·도 한정은 입력이 없으면 그대로 확인 필요다.
+    expect(verdictOf(region({ scope: 'PROVINCES', provinces: ['경기'] }), NO_INPUT, 'region')).toEqual({
       verdict: 'CHECK',
       checkReason: 'INPUT_MISSING',
     });
@@ -710,7 +753,7 @@ describe('운영자 확인 값(ADR §3: catalog.json에 사람이 적은 조건�
   });
 
   // 직접 확인한 공식 근거가 없으면 미확인이다. 검색 결과 요약은 원문이 아니다.
-  it('공식 원문 근거가 없거나 미확인으로 적은 값은 쓰지 않는다', () => {
+  it('사업 단계는 공식 원문 근거가 있어야 쓰고, 지역은 기록했으면 쓰며, 미확인으로 적은 값은 쓰지 않는다', () => {
     const summaryOnly = manualProduct({
       evidence: [
         evidence('identity', 'IDENTITY', 'SEARCH_RESULT_SUMMARY'),
@@ -722,7 +765,12 @@ describe('운영자 확인 값(ADR §3: catalog.json에 사람이 적은 조건�
     });
     const result = match(summaryOnly, null, NO_INPUT);
     expect(condition(result, 'businessStage')).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_READ' });
-    expect(condition(result, 'region')).toMatchObject({ verdict: 'CHECK', checkReason: 'NOT_READ' });
+    // 지역은 운영자가 기록했으면 근거가 검색 요약뿐이어도 쓴다(사용자 결정 2026-11-13). 서울시 사업으로 등록한 상품의 지역이
+    // 읽지 않음으로 남지 않게 한다. 서울 전체는 자치구 입력 없이도 맞음이다.
+    expect(condition(result, 'region')).toMatchObject({
+      verdict: 'MATCH',
+      reading: { status: 'READ', source: 'OPERATOR', value: { scope: 'PROVINCES', provinces: ['서울'] } },
+    });
 
     const unknown = manualProduct({
       eligibleBusinessStages: [],
