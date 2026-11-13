@@ -14,6 +14,7 @@ const BODY = [
   '□ 접수기간 : 2026. 11. 2. ～ 2026. 11. 20.',
   '□ 지원내용 : 운영자금 대출',
 ].join('\n');
+const NOTICE = { productName: '2026년 청년 창업 지원', text: BODY };
 
 const OUTPUT: ConditionOutput = {
   businessStage: { mentioned: true, value: 'BOTH', quote: '예비창업자 및 업력 3년 이내 소상공인' },
@@ -42,7 +43,7 @@ const OUTPUT: ConditionOutput = {
 
 describe('parseStoredConditions', () => {
   it('funding:sync가 검증해 저장한 값을 그대로 읽는다', () => {
-    const stored = JSON.parse(JSON.stringify(verifyConditionOutput(OUTPUT, BODY)));
+    const stored = JSON.parse(JSON.stringify(verifyConditionOutput(OUTPUT, NOTICE)));
     const parsed = parseStoredConditions(stored);
     expect(parsed).toEqual(stored);
     expect(Object.values(parsed).every((field) => field.status === 'READ')).toBe(true);
@@ -57,17 +58,17 @@ describe('parseStoredConditions', () => {
             age: { mentioned: false, value: null, quote: '' },
             region: { ...OUTPUT.region, quote: '본문에 없는 인용 문장' },
           },
-          BODY,
+          NOTICE,
         ),
       ),
     );
     const parsed = parseStoredConditions(stored);
     expect(parsed.age).toEqual({ status: 'NOT_MENTIONED' });
-    expect(parsed.region).toEqual({ status: 'UNREADABLE', reason: '인용이 본문에 없습니다.' });
+    expect(parsed.region).toEqual({ status: 'UNREADABLE', reason: '인용이 공고 제목과 본문에 없습니다.' });
   });
 
   it('모양이 다른 항목은 그 항목만 읽지 못함이고 나머지는 그대로 읽는다', () => {
-    const stored = JSON.parse(JSON.stringify(verifyConditionOutput(OUTPUT, BODY)));
+    const stored = JSON.parse(JSON.stringify(verifyConditionOutput(OUTPUT, NOTICE)));
     stored.age = { status: 'READ', value: { min: 19, max: 39 }, quote: '만 39세 이하' };
     stored.foodBusiness = { status: 'READ', value: 'MAYBE', quote: '제외 : 음식점업' };
     delete stored.targetGroups;

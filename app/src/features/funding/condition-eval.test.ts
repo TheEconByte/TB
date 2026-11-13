@@ -1,5 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { expectedFields, gradeCase, type GoldCase, type GoldField } from './condition-eval.ts';
+import {
+  EVAL_SETS,
+  expectedFields,
+  gradeCase,
+  summarizeBySet,
+  type GoldCase,
+  type GoldField,
+} from './condition-eval.ts';
 import type { ConditionValues, VerifiedConditions } from './condition-fields.ts';
 
 // 공고 조건 추출 평가의 채점(ADR 0009 §3). 위험한 오답(어떤 사용자에게 정답과 다른 맞음·안 맞음을 냄)과 안전한
@@ -16,6 +25,7 @@ const notMentioned: GoldField = { mentioned: false, value: null, quote: '', conf
 function gold(fields: Partial<GoldCase['fields']> = {}): GoldCase {
   return {
     id: 'c00',
+    set: 'dev',
     productKey: 'bizinfo-pbln-test',
     textChecksum: 'x',
     productName: '청년 창업 지원',
@@ -61,6 +71,21 @@ const nothingRead = Object.fromEntries(
 ) as VerifiedConditions;
 
 describe('expectedFields', () => {
+  // 정답도 실제 검증을 거친다. 제목 구절을 인용한 정답이 검증을 통과하지 못하면 평가를 돌릴 수 없다(사용자 결정
+  // 2026-11-12: 제목도 공고의 일부).
+  it('accepts a gold answer quoted from the product name', () => {
+    const region: GoldField = {
+      mentioned: true,
+      value: { scope: 'PROVINCES', provinces: ['부산'], districts: [], excludedProvinces: [], excludedDistricts: [] },
+      quote: '[부산] 청년 창업 지원',
+      confidence: 'clear',
+    };
+    const titled = gold({ region });
+    const { acceptable, problems } = expectedFields({ ...titled, productName: '[부산] 청년 창업 지원' }, BODY);
+    expect(problems).toEqual([]);
+    expect(acceptable.region[0]).toMatchObject({ status: 'READ', value: { provinces: ['부산'] } });
+  });
+
   it('turns gold labels into the stored shape through the real verification', () => {
     const { acceptable, problems } = expectedFields(gold(), BODY);
     expect(problems).toEqual([]);
@@ -72,7 +97,7 @@ describe('expectedFields', () => {
     expect(acceptable.foodBusiness).toEqual([{ status: 'NOT_MENTIONED' }]);
   });
 
-  // 정답 인용이 본문에 없으면 정답 자체가 틀렸다. 채점에 쓰지 않고 알린다.
+  // 정답 인용이 공고 제목과 본문에 없으면 정답 자체가 틀렸다. 채점에 쓰지 않고 알린다.
   it('reports a gold label whose quote is not in the body', () => {
     const { problems } = expectedFields(gold({ age: { ...gold().fields.age, quote: '만 34세 이하' } }), BODY);
     expect(problems).toEqual([expect.stringContaining('age')]);
@@ -390,5 +415,84 @@ describe('gradeCase', () => {
     const actual = asActual(acceptable);
     actual.supportTypes = { status: 'READ', value: ['GRANT', 'PROGRAM'], quote: '경영 컨설팅 및 판로 지원' };
     expect(gradeCase(actual, acceptable).outcomes.supportTypes).toBe('CORRECT');
+  });
+});
+
+// 정답은 프롬프트를 고칠 때 보는 공고(dev)와 고친 뒤에만 재는 공고(test)로 나뉜다(사용자 결정 2026-11-12). dev만으로
+// 재면 고칠 때 본 공고의 점수라 새 공고에서 나빠진 것을 모른다. 한 공고가 양쪽에 있으면 test가 dev를 다시 재는 셈이다.
+describe('the gold cases', () => {
+  const cases = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../../../eval/funding-conditions/cases.json', import.meta.url)), 'utf8'),
+  ) as GoldCase[];
+
+  it('put every case in exactly one set, and both sets have cases', () => {
+    for (const item of cases) expect(EVAL_SETS, item.id).toContain(item.set);
+    expect(new Set(cases.map((item) => item.id)).size).toBe(cases.length);
+    for (const set of EVAL_SETS)
+      expect(
+        cases.some((item) => item.set === set),
+        set,
+      ).toBe(true);
+  });
+
+  it('do not share a notice between the sets', () => {
+    const inDev = cases.filter((item) => item.set === 'dev');
+    const shared = cases
+      .filter((item) => item.set === 'test')
+      .filter((item) =>
+        inDev.some((dev) => dev.productKey === item.productKey || dev.textChecksum === item.textChecksum),
+      )
+      .map((item) => item.id);
+    expect(shared).toEqual([]);
+  });
+});
+
+describe('summarizeBySet', () => {
+  const testCase = (id: string): GoldCase => ({ ...gold(), id, set: 'test' });
+  const devCase = (id: string): GoldCase => ({ ...gold(), id, set: 'dev' });
+  const { acceptable } = expectedFields(gold(), BODY);
+  const perfect = gradeCase(asActual(acceptable), acceptable);
+  const blank = gradeCase(nothingRead, acceptable);
+
+  // 한쪽 결과가 다른 쪽 평균에 섞이면 test로 재는 뜻이 없어진다.
+  it('keeps the runs of each set apart', () => {
+    const cases = [devCase('c01'), testCase('t01')];
+    const summary = summarizeBySet(cases, [
+      { id: 'c01', ...perfect },
+      { id: 't01', ...blank },
+    ]);
+    expect(summary.map((entry) => [entry.set, entry.cases, entry.runs])).toEqual([
+      ['dev', 1, 1],
+      ['test', 1, 1],
+    ]);
+    expect(summary[0].metrics?.field_acc.mean).toBe(1);
+    expect(summary[1].metrics?.field_acc.mean).toBe(blank.scores.field_acc);
+    expect(summary[0].fields.age.CORRECT).toBe(1);
+    expect(summary[1].fields.age.MISSED).toBe(1);
+  });
+
+  // 같은 공고의 회차는 공고 평균으로 묶는다. 구간은 공고별 평균의 표준오차 × 1.96이다(docs/domains/funding.md).
+  it('averages runs per case before averaging cases', () => {
+    const cases = [devCase('c01'), devCase('c02')];
+    const [dev] = summarizeBySet(cases, [
+      { id: 'c01', ...perfect },
+      { id: 'c01', ...perfect },
+      { id: 'c02', ...perfect },
+      { id: 'c02', ...blank },
+    ]);
+    const second = (1 + blank.scores.field_acc) / 2;
+    expect(dev.metrics?.field_acc.mean).toBeCloseTo((1 + second) / 2);
+    const sd = Math.abs(1 - second) / Math.sqrt(2);
+    expect(dev.metrics?.field_acc.half).toBeCloseTo((1.96 * sd) / Math.sqrt(2));
+  });
+
+  // 결과가 없는 set도 보인다. 0회를 0%로 보이면 안 된다.
+  it('reports a set without runs as having no scores', () => {
+    const summary = summarizeBySet([devCase('c01'), testCase('t01')], [{ id: 'c01', ...perfect }]);
+    expect(summary[1]).toMatchObject({ set: 'test', cases: 0, runs: 0, metrics: null });
+  });
+
+  it('refuses a run of a case it was not given', () => {
+    expect(() => summarizeBySet([devCase('c01')], [{ id: 't09', ...perfect }])).toThrow('t09');
   });
 });

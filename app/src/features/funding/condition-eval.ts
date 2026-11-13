@@ -21,8 +21,14 @@ export type GoldField = {
   note?: string;
 };
 
+// 프롬프트를 고칠 때 결과를 보는 공고(dev)와, 고친 뒤 비교할 때만 재는 공고(test). test 결과를 보며 프롬프트를 고치면
+// test도 고칠 때 본 공고가 되어 새 공고에서 나빠진 것을 잡지 못한다(사용자 결정 2026-11-12).
+export const EVAL_SETS = ['dev', 'test'] as const;
+export type EvalSet = (typeof EVAL_SETS)[number];
+
 export type GoldCase = {
   id: string;
+  set: EvalSet;
   productKey: string;
   textChecksum: string;
   productName: string;
@@ -45,7 +51,8 @@ export function expectedFields(
         ];
       }),
     ) as ConditionOutput;
-  const primary = verifyConditionOutput(raw(undefined), text);
+  const notice = { productName: gold.productName, text };
+  const primary = verifyConditionOutput(raw(undefined), notice);
   const problems: string[] = [];
   const acceptable = {} as Record<ConditionFieldName, VerifiedField<unknown>[]>;
   for (const name of CONDITION_FIELD_NAMES) {
@@ -64,7 +71,7 @@ export function expectedFields(
       }
       // 채점은 값만 비교한다. 주 정답이 언급 없음이라 인용이 없으면, 값 검사를 거치도록 본문의 첫 구절을 인용으로 쓴다.
       const entry = { mentioned: true, value: alternative, quote: field.quote || text.trim().slice(0, 30) };
-      const checked = verifyConditionOutput({ ...raw(undefined), [name]: entry }, text)[name];
+      const checked = verifyConditionOutput({ ...raw(undefined), [name]: entry }, notice)[name];
       if (checked.status === 'READ') options.push(checked);
       else problems.push(`${gold.id} ${name}: 대안 정답이 검증을 통과하지 못합니다`);
     }
@@ -216,13 +223,17 @@ function gradeField(
   return golds.some((gold) => !misleads(actualVerdicts, gold.verdicts)) ? 'MISSED' : 'CONFIDENT_WRONG';
 }
 
+export const EVAL_METRICS = ['field_acc', 'confident_wrong', 'missed', 'exact_acc'] as const;
+export type EvalMetric = (typeof EVAL_METRICS)[number];
+export type CaseGrade = {
+  outcomes: Record<ConditionFieldName, FieldOutcome>;
+  scores: Record<EvalMetric, number>;
+};
+
 export function gradeCase(
   actual: VerifiedConditions,
   acceptable: Record<ConditionFieldName, VerifiedField<unknown>[]>,
-): {
-  outcomes: Record<ConditionFieldName, FieldOutcome>;
-  scores: { field_acc: number; exact_acc: number; confident_wrong: number; missed: number };
-} {
+): CaseGrade {
   const context = Object.fromEntries(
     CONDITION_FIELD_NAMES.map((name) => [name, acceptable[name][0]]),
   ) as VerifiedConditions;
@@ -241,4 +252,55 @@ export function gradeCase(
       missed: count('MISSED') / CONDITION_FIELD_NAMES.length,
     },
   };
+}
+
+export type GradedRun = { id: string } & CaseGrade;
+
+export type SetSummary = {
+  set: EvalSet;
+  // 채점한 공고 수와 회차 수.
+  cases: number;
+  runs: number;
+  // 지표마다 공고별 평균의 평균과 95% 구간의 반폭(공고별 평균의 표준오차 × 1.96). 채점한 회차가 없으면 null이다.
+  metrics: Record<EvalMetric, { mean: number; half: number }> | null;
+  // 항목마다 결과별 회차 수.
+  fields: Record<ConditionFieldName, Record<FieldOutcome, number>>;
+};
+
+const OUTCOMES: readonly FieldOutcome[] = ['CORRECT', 'EQUIVALENT', 'CONFIDENT_WRONG', 'MISSED', 'DISPLAY_WRONG'];
+
+// 채점한 회차를 정답의 set마다 따로 요약한다. 같은 공고의 회차는 공고 평균으로 묶어, 회차가 많은 공고가 평균을 끌지 않게 한다.
+export function summarizeBySet(cases: readonly GoldCase[], runs: readonly GradedRun[]): SetSummary[] {
+  const setOf = new Map(cases.map((item) => [item.id, item.set]));
+  for (const run of runs) if (!setOf.has(run.id)) throw new Error(`정답에 없는 공고의 결과입니다: ${run.id}`);
+  return EVAL_SETS.filter((set) => cases.some((item) => item.set === set)).map((set) => {
+    const inSet = runs.filter((run) => setOf.get(run.id) === set);
+    const byCase = new Map<string, GradedRun[]>();
+    for (const run of inSet) byCase.set(run.id, [...(byCase.get(run.id) ?? []), run]);
+    const metric = (name: EvalMetric) => {
+      const perCase = [...byCase.values()].map(
+        (list) => list.reduce((sum, run) => sum + run.scores[name], 0) / list.length,
+      );
+      const mean = perCase.reduce((sum, value) => sum + value, 0) / perCase.length;
+      const sd = Math.sqrt(
+        perCase.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(perCase.length - 1, 1),
+      );
+      return { mean, half: (1.96 * sd) / Math.sqrt(perCase.length) };
+    };
+    return {
+      set,
+      cases: byCase.size,
+      runs: inSet.length,
+      metrics:
+        inSet.length === 0
+          ? null
+          : (Object.fromEntries(EVAL_METRICS.map((name) => [name, metric(name)])) as SetSummary['metrics']),
+      fields: Object.fromEntries(
+        CONDITION_FIELD_NAMES.map((name) => [
+          name,
+          Object.fromEntries(OUTCOMES.map((kind) => [kind, inSet.filter((run) => run.outcomes[name] === kind).length])),
+        ]),
+      ) as SetSummary['fields'],
+    };
+  });
 }

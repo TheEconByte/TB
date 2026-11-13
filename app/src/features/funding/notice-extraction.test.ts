@@ -32,7 +32,7 @@ import {
   type ConditionOutput,
 } from './notice-extraction.ts';
 
-// ADR 0009 §3·Validation: AI가 읽은 값은 원문 인용이 본문에 그대로 있을 때만 쓴다. 실제 AI는 부르지 않는다.
+// ADR 0009 §3·Validation: AI가 읽은 값은 원문 인용이 공고 제목이나 본문에 그대로 있을 때만 쓴다. 실제 AI는 부르지 않는다.
 
 const BODY = [
   '[공지 본문: 2026년 청년 창업 지원]',
@@ -44,6 +44,18 @@ const BODY = [
   '성장 트랙은 업력 3년 이상 소상공인이 대상입니다.',
   '업력 제한 없음(재창업자 포함)는 별도 트랙에 해당합니다.',
 ].join('\n');
+const NOTICE = { productName: '청년 창업 지원', text: BODY };
+const exampleNotice = (example: (typeof PROMPT_EXAMPLES)[number]) => ({
+  productName: example.product,
+  text: example.notice,
+});
+// 본문에 지역이 없고 제목의 [시·도] 표시로만 지역을 밝힌 공고. 기업마당 지자체 공고에 흔하다.
+const TITLED = { productName: '[부산] 2026년 소상공인 보증료 지원사업 공고', text: BODY };
+const busanRegion = {
+  mentioned: true,
+  value: { scope: 'PROVINCES', provinces: ['부산'], districts: [], excludedProvinces: [], excludedDistricts: [] },
+  quote: '[부산] 2026년 소상공인 보증료 지원사업',
+};
 
 // 인용 칸은 null을 받지 않는다(스키마 참고). 언급이 없으면 빈 문자열이다.
 const notMentioned = { mentioned: false, value: null, quote: '' };
@@ -81,18 +93,21 @@ function output(overrides: Record<string, unknown> = {}): ConditionOutput {
 
 describe('verifyConditionOutput', () => {
   it('keeps values whose quote is in the body, ignoring spacing and punctuation variants', () => {
-    const fields = verifyConditionOutput(output(), BODY);
+    const fields = verifyConditionOutput(output(), NOTICE);
     // 본문은 '만 39세'(묶음 빈칸)이고 인용은 보통 빈칸이다.
     expect(fields.age).toEqual({ status: 'READ', value: upTo(39), quote: '만 39세 이하' });
     expect(fields.businessAge).toMatchObject({ status: 'READ', value: upTo(3) });
     expect(fields.applicationPeriod.status).toBe('READ');
     // PDF는 낱말 중간에서도 줄을 바꾼다. 빈칸과 줄바꿈을 무시하고 맞춘다.
-    const wrapped = verifyConditionOutput(output(), BODY.replace('업력 3년 이내', '업\n력 3년 이­내'));
+    const wrapped = verifyConditionOutput(output(), {
+      ...NOTICE,
+      text: BODY.replace('업력 3년 이내', '업\n력 3년 이­내'),
+    });
     expect(wrapped.businessAge.status).toBe('READ');
   });
 
   it('turns Seoul district names into district codes, including excluded ones', () => {
-    const fields = verifyConditionOutput(output(), BODY);
+    const fields = verifyConditionOutput(output(), NOTICE);
     expect(fields.region).toMatchObject({
       status: 'READ',
       value: {
@@ -112,25 +127,47 @@ describe('verifyConditionOutput', () => {
         businessAge: { mentioned: true, value: { min: 3, max: null, maxExclusive: false }, quote: '업력 3년 이상' },
         age: { mentioned: true, value: upTo(40, true), quote: '만 39세 이하' },
       }),
-      BODY,
+      NOTICE,
     );
     expect(fields.businessAge).toMatchObject({ status: 'READ', value: { min: 3, max: null } });
     expect(fields.age).toMatchObject({ status: 'READ', value: { max: 40, maxExclusive: true } });
   });
 
   // AI가 지어낸 인용을 기계적으로 걸러 낸다.
-  it('marks a value unreadable when its quote is not in the body', () => {
+  it('marks a value unreadable when its quote is in neither the title nor the body', () => {
     const fields = verifyConditionOutput(
       output({
         age: { mentioned: true, value: { min: 19, max: 34, maxExclusive: false }, quote: '만 19세 이상 34세 이하' },
       }),
-      BODY,
+      NOTICE,
     );
-    expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('본문에 없') });
+    expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('제목과 본문에 없') });
+  });
+
+  // 제목도 공고의 일부다(사용자 결정 2026-11-12). 지역을 제목의 [시·도] 표시로만 밝히는 공고가 흔하다. 제목 구절을
+  // 인용으로 받지 않으면 그 지역이 버려져, 서울 사용자에게 다른 시·도 공고가 확인 필요로 남는다(v7 동기화 2026-11-12:
+  // 인용으로 제목을 적은 괴산·부산 공고의 지역이 "인용이 본문에 없음"으로 버려졌다).
+  it('keeps a value quoted from the title', () => {
+    const fields = verifyConditionOutput(output({ region: busanRegion }), TITLED);
+    expect(fields.region).toMatchObject({
+      status: 'READ',
+      value: { scope: 'PROVINCES', provinces: ['부산'] },
+      quote: busanRegion.quote,
+    });
+  });
+
+  // 제목과 본문은 따로 쓰인 글이다. 둘을 이어 붙인 인용은 공고 어디에도 없는 문장이다.
+  it('does not accept a quote that runs from the title into the body', () => {
+    expect(BODY.startsWith('[공지 본문')).toBe(true);
+    const fields = verifyConditionOutput(
+      output({ businessStage: { mentioned: true, value: 'BOTH', quote: '보증료 지원사업 공고 [공지 본문' } }),
+      TITLED,
+    );
+    expect(fields.businessStage).toMatchObject({ status: 'UNREADABLE' });
   });
 
   it('does not accept a quote too short to prove anything', () => {
-    const fields = verifyConditionOutput(output({ age: { mentioned: true, value: upTo(39), quote: '39세' } }), BODY);
+    const fields = verifyConditionOutput(output({ age: { mentioned: true, value: upTo(39), quote: '39세' } }), NOTICE);
     expect(fields.age.status).toBe('UNREADABLE');
   });
 
@@ -141,7 +178,7 @@ describe('verifyConditionOutput', () => {
         age: notMentioned,
         businessAge: { mentioned: true, value: upTo(null), quote: '업력 제한 없음' },
       }),
-      BODY,
+      NOTICE,
     );
     expect(fields.age).toEqual({ status: 'NOT_MENTIONED' });
     expect(fields.businessAge).toEqual({ status: 'READ', value: upTo(null), quote: '업력 제한 없음' });
@@ -151,7 +188,7 @@ describe('verifyConditionOutput', () => {
   it('ignores the value and quote of a field the notice does not mention', () => {
     const fields = verifyConditionOutput(
       output({ age: { mentioned: false, value: upTo(39), quote: '만 39세 이하' } }),
-      BODY,
+      NOTICE,
     );
     expect(fields.age).toEqual({ status: 'NOT_MENTIONED' });
   });
@@ -162,7 +199,7 @@ describe('verifyConditionOutput', () => {
         region: { mentioned: true, value: output().region.value, quote: '' },
         businessStage: { mentioned: true, value: '', quote: '예비창업자 및 업력 3년 이내 소상공인' },
       }),
-      BODY,
+      NOTICE,
     );
     expect(fields.region).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('인용이 없') });
     expect(fields.businessStage.status).toBe('UNREADABLE');
@@ -173,7 +210,7 @@ describe('verifyConditionOutput', () => {
   // createClaudeConditionExtractor 테스트가 보내는 스키마에서 본다.
   it('marks a stated field whose value the AI left empty unreadable', () => {
     const stated = { mentioned: true, value: null, quote: '만 39세 이하' };
-    const fields = verifyConditionOutput(output({ age: stated }), BODY);
+    const fields = verifyConditionOutput(output({ age: stated }), NOTICE);
     expect(fields.age).toEqual({ status: 'UNREADABLE', reason: expect.stringContaining('값이 없') });
   });
 
@@ -184,7 +221,7 @@ describe('verifyConditionOutput', () => {
         businessStage: { mentioned: true, value: '예비창업자', quote: '예비창업자 및 업력 3년 이내 소상공인' },
         targetGroups: { mentioned: true, value: { groups: ['청년'], note: null }, quote: '2026년 청년 창업 지원' },
       }),
-      BODY,
+      NOTICE,
     );
     expect(fields.businessStage.status).toBe('UNREADABLE');
     expect(fields.targetGroups.status).toBe('UNREADABLE');
@@ -228,7 +265,7 @@ describe('verifyConditionOutput', () => {
       ['empty support types', { supportTypes: { mentioned: true, value: [], quote: '2026년 청년 창업 지원' } }],
     ];
     for (const [label, overrides] of cases) {
-      const fields = verifyConditionOutput(output(overrides), BODY);
+      const fields = verifyConditionOutput(output(overrides), NOTICE);
       const name = Object.keys(overrides)[0] as keyof typeof fields;
       expect(fields[name].status, label).toBe('UNREADABLE');
     }
@@ -237,7 +274,7 @@ describe('verifyConditionOutput', () => {
   // 범위 안에 들어갈 값이 없으면 어떤 사용자도 맞지 않는다. 잘못 읽은 것으로 본다.
   it('does not keep a range no value can satisfy', () => {
     const businessAge = (value: Record<string, unknown>) =>
-      verifyConditionOutput(output({ businessAge: { mentioned: true, value, quote: '업력 3년 이내' } }), BODY)
+      verifyConditionOutput(output({ businessAge: { mentioned: true, value, quote: '업력 3년 이내' } }), NOTICE)
         .businessAge;
     expect(businessAge({ min: 3, max: 3, maxExclusive: true })).toMatchObject({
       status: 'UNREADABLE',
@@ -252,7 +289,7 @@ describe('verifyConditionOutput', () => {
   });
 
   it('matches a quote against full-width digits in the body', () => {
-    const fields = verifyConditionOutput(output(), BODY.replace('만 39세', '만 ３９세'));
+    const fields = verifyConditionOutput(output(), { ...NOTICE, text: BODY.replace('만 39세', '만 ３９세') });
     expect(fields.age.status).toBe('READ');
   });
 
@@ -279,7 +316,7 @@ describe('verifyConditionOutput', () => {
             quote,
           },
         }),
-        body,
+        { ...NOTICE, text: body },
       ).region;
     const notSeoulDistricts: Array<[string, Record<string, unknown>, string]> = [
       ['district without a province', { scope: 'SEOUL_DISTRICTS', districts: ['중구'] }, '중구에 사업장을 둔 소상공인'],
@@ -342,7 +379,7 @@ describe('verifyConditionOutput', () => {
             quote: '서울특별시·부산광역시 소재 기업',
           },
         }),
-        body,
+        { ...NOTICE, text: body },
       ).region;
     expect(region({ scope: 'PROVINCES', provinces: ['서울특별시', '부산시'] })).toMatchObject({
       status: 'READ',
@@ -415,6 +452,21 @@ describe('extractNoticeConditions', () => {
       }),
     ]);
     expect(store.saved[0].fields.age).toMatchObject({ status: 'READ' });
+  });
+
+  // 동기화가 상품 이름을 검증에 넘기지 않으면 제목을 인용한 값이 버려진다.
+  it('verifies quotes against the product name as well as the body', async () => {
+    const store = memoryStore({ 'bizinfo-pbln-a': BODY });
+    const extractor = vi.fn<ConditionExtractor>(async () => ({
+      output: output({ region: busanRegion }),
+      inputTokens: 1,
+      outputTokens: 1,
+    }));
+    await extractNoticeConditions(
+      [{ productKey: 'bizinfo-pbln-a', name: TITLED.productName, textChecksum: sha256Hex(BODY) }],
+      { store, extractor, now: () => NOW },
+    );
+    expect(store.saved[0].fields.region).toMatchObject({ status: 'READ', value: { provinces: ['부산'] } });
   });
 
   // 같은 본문·프롬프트·모델이면 다시 부르지 않는다(ADR 0009 §3).
@@ -569,7 +621,7 @@ describe('createClaudeConditionExtractor', () => {
     });
     const { extractor } = client({ stop_reason: 'end_turn', text: JSON.stringify(answer) });
     const result = await extractor(BODY, '청년 창업 지원');
-    expect(verifyConditionOutput(result.output, BODY).businessStage.status).toBe('UNREADABLE');
+    expect(verifyConditionOutput(result.output, NOTICE).businessStage.status).toBe('UNREADABLE');
   });
 });
 
@@ -587,7 +639,7 @@ describe('the extraction prompt', () => {
     return system;
   }
   const verified = (index: number) =>
-    verifyConditionOutput(PROMPT_EXAMPLES[index].output, PROMPT_EXAMPLES[index].notice);
+    verifyConditionOutput(PROMPT_EXAMPLES[index].output, exampleNotice(PROMPT_EXAMPLES[index]));
   const district = (name: string) => SEOUL_DISTRICTS.find((item) => item.name === name)!.code;
   const seoulUser: FundingMatchProfile = {
     businessStatus: 'BUSINESS',
@@ -613,14 +665,20 @@ describe('the extraction prompt', () => {
     'shows an answer the checks accept: %s',
     (_, example) => {
       expect(conditionOutputSchema.safeParse(example.output).success).toBe(true);
-      const fields = verifyConditionOutput(example.output, example.notice);
+      const fields = verifyConditionOutput(example.output, exampleNotice(example));
       for (const name of CONDITION_FIELD_NAMES) {
         const field = example.output[name];
         // 밝혔지만 옮길 수 없는 조건만 읽지 못함으로 끝난다. 값이 있는데 읽지 못하면 인용이나 값이 틀린 예시다.
         const expected = !field.mentioned ? 'NOT_MENTIONED' : field.value === null ? 'UNREADABLE' : 'READ';
         expect(fields[name].status, name).toBe(expected);
         // 값이 null이면 검증이 인용을 보지 않으므로 여기서 본다. 지어낸 인용을 가르치면 안 된다.
-        if (field.mentioned) expect(compactForQuote(example.notice), name).toContain(compactForQuote(field.quote));
+        if (field.mentioned) {
+          const sources = [example.product, example.notice].map(compactForQuote);
+          expect(
+            sources.some((source) => source.includes(compactForQuote(field.quote))),
+            name,
+          ).toBe(true);
+        }
         if (field.mentioned) expect(field.quote, name).not.toBe('');
       }
     },
@@ -684,7 +742,7 @@ describe('the extraction prompt', () => {
             quote: '서울 강남구ㆍ서초구 소재 사업장',
           },
         }),
-        BODY,
+        NOTICE,
       );
       expect(fields.region.status, province).toBe('READ');
     }
@@ -695,8 +753,9 @@ describe('the extraction prompt', () => {
     const cases = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../../eval/funding-conditions/cases.json', import.meta.url)), 'utf8'),
     ) as GoldCase[];
-    // 정답 30건을 다 읽지 못하고 0건으로 통과하지 않게 한다.
-    expect(cases.length).toBeGreaterThanOrEqual(30);
+    // 정답을 다 읽지 못하고 0건으로 통과하지 않게 한다. dev와 test를 모두 본다.
+    expect(cases.filter((item) => item.set === 'dev').length).toBeGreaterThanOrEqual(30);
+    expect(cases.filter((item) => item.set === 'test').length).toBeGreaterThanOrEqual(20);
     const leaked = cases.flatMap((item) =>
       [item.productName, ...CONDITION_FIELD_NAMES.map((name) => item.fields[name].quote)]
         .map(compactForQuote)
