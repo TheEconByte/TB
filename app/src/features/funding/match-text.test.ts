@@ -5,6 +5,7 @@ import {
   AI_READING_NOTICE,
   FUNDING_GROUP_BADGE_LABELS,
   LIMIT_NOTE,
+  UNREAD_NOTICE,
   aiPeriodText,
   applicationPeriodText,
   applicationStateText,
@@ -17,6 +18,7 @@ import {
   limitText,
   rangeText,
   tabCountTexts,
+  titleRegionText,
   unconfirmedReasonText,
 } from './match-text.ts';
 import {
@@ -326,8 +328,15 @@ describe('카드의 조건 묶음', () => {
   it('밝힌 조건과 직접 확인할 조건으로 나누고, 공고문에서 찾지 못한 조건은 어디에도 넣지 않는다', () => {
     const sections = conditionSections(conditions);
     expect(sections.stated.map((item) => item.key)).toEqual(['businessStage', 'businessAge']);
-    expect(sections.toCheck.map((item) => item.key)).toEqual(['region', 'foodBusiness', 'targetGroups']);
-    expect(Object.keys(sections)).toEqual(['stated', 'toCheck']);
+    // 본문이 없어 아직 읽지 않은 조건(대상 한정)은 항목으로 적지 않고, 있다는 것만 알린다(사용자 결정 2026-11-13).
+    expect(sections.toCheck.map((item) => item.key)).toEqual(['region', 'foodBusiness']);
+    expect(sections.hasUnread).toBe(true);
+    expect(conditionSections(conditions.slice(0, 5)).hasUnread).toBe(false);
+  });
+
+  it('제목 표시로 서울 전체로 본 지역은 그 표시를 근거로 밝힌다', () => {
+    expect(titleRegionText('서울')).toContain('[서울]');
+    expect(titleRegionText('서울')).toContain('서울 전체');
   });
 });
 
@@ -403,6 +412,8 @@ describe('쓰지 않는 문구', () => {
       applicationStateText(product(), '2026-10-01') ?? '',
       closedText(product({ application: { ...product().application, closedBy: 'SOURCE_STATUS' } })) ?? '',
       limitText({ publicLimitKrw: '1', limitText: null }),
+      UNREAD_NOTICE,
+      titleRegionText('서울'),
       fundingGapText(null),
     ];
     for (const text of texts) for (const word of FORBIDDEN) expect(text, text).not.toContain(word);
