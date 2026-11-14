@@ -57,12 +57,38 @@ export function conditionSections(conditions: readonly ConditionMatch[]): {
 } {
   const unread = conditions.filter((entry) => entry.reading.status === 'NOT_READ');
   return {
-    stated: conditions.filter((entry) => entry.reading.status === 'READ'),
+    stated: conditions.filter((entry) => entry.reading.status === 'READ' && !isNoRestriction(entry)),
     toCheck: conditions.filter(
       (entry) => entry.reading.status !== 'READ' && entry.checkReason !== 'NOT_MENTIONED' && !unread.includes(entry),
     ),
     hasUnread: unread.length > 0,
   };
+}
+
+// 공고가 "제한 없음"이라고 밝힌 항목은 사용자가 맞춰야 할 조건이 아니라서 카드에 조건으로 적지 않는다(사용자 결정
+// 2026-11-15). 음식점·카페를 빼지 않음, 예비 창업자·사업자 모두, 업력·나이 제한 없음, 대상 한정 없음, 제외 지역 없는 전국이다.
+// 누구에게나 맞음이라 목록과 판정에는 영향이 없다.
+// 음식점·카페 항목은 지금 요식업 전체를 한 덩어리로 본다(MVP는 한식·카페만 다룬다). 요식업 안의 업종을 나눠 받게 되면
+// 주점업만 빼는 공고처럼 일부 사용자에게만 걸리는 제외가 생기므로, 이 항목은 업종 입력과 맞춰 보고 그때 다시 적어야 한다.
+function isNoRestriction(entry: ConditionMatch): boolean {
+  if (entry.reading.status !== 'READ') return false;
+  switch (entry.key) {
+    case 'businessStage':
+      return entry.reading.value === 'BOTH';
+    case 'businessAge':
+    case 'age':
+      return entry.reading.value.min === null && entry.reading.value.max === null;
+    case 'region':
+      return (
+        entry.reading.value.scope === 'NATIONWIDE' &&
+        entry.reading.value.excludedProvinces.length === 0 &&
+        entry.reading.value.excludedDistrictCodes.length === 0
+      );
+    case 'foodBusiness':
+      return entry.reading.value === 'NOT_EXCLUDED';
+    case 'targetGroups':
+      return entry.reading.value.groups.length === 0;
+  }
 }
 
 export const UNREAD_NOTICE = '이 공고는 본문을 읽지 못해 조건을 다 확인하지 못했습니다. 원 공고에서 확인하세요.';
