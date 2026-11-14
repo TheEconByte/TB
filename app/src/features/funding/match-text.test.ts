@@ -312,7 +312,7 @@ describe('탭 제목의 공고 수', () => {
 describe('카드의 조건 묶음', () => {
   const entry = (key: ConditionMatch['key'], reading: ConditionMatch['reading'], checkReason: CheckReason | null) =>
     ({ key, reading, verdict: checkReason === null ? 'MATCH' : 'CHECK', checkReason }) as ConditionMatch;
-  const read = { status: 'READ', source: 'AI', value: 'BOTH', quote: '원문' } as ConditionMatch['reading'];
+  const read = { status: 'READ', source: 'AI', value: 'BUSINESS_ONLY', quote: '원문' } as ConditionMatch['reading'];
   const conditions = [
     entry('businessStage', read, null),
     entry('businessAge', read, 'INPUT_MISSING'),
@@ -332,6 +332,61 @@ describe('카드의 조건 묶음', () => {
     expect(sections.toCheck.map((item) => item.key)).toEqual(['region', 'foodBusiness']);
     expect(sections.hasUnread).toBe(true);
     expect(conditionSections(conditions.slice(0, 5)).hasUnread).toBe(false);
+  });
+
+  // 음식점·카페를 빼지 않는다는 것은 사용자가 맞춰야 할 조건이 아니라서 카드에 적지 않는다(사용자 결정 2026-11-15).
+  // 음식점·카페를 빼는 공고는 목록에서 빠지고, 펼쳐 보면 안 맞은 조건으로 나와야 하므로 그때는 적는다.
+  it('음식점·카페를 빼지 않는 공고는 그 항목을 적지 않고, 빼는 공고는 적는다', () => {
+    const food = (value: 'EXCLUDED' | 'NOT_EXCLUDED') =>
+      ({
+        key: 'foodBusiness',
+        reading: { status: 'READ', source: 'AI', value, quote: '원문' },
+        verdict: value === 'EXCLUDED' ? 'MISMATCH' : 'MATCH',
+        checkReason: null,
+      }) as ConditionMatch;
+    const sections = conditionSections([conditions[0], food('NOT_EXCLUDED')]);
+    expect(sections.stated.map((item) => item.key)).toEqual(['businessStage']);
+    expect(sections.toCheck).toEqual([]);
+    expect(conditionSections([food('EXCLUDED')]).stated.map((item) => item.key)).toEqual(['foodBusiness']);
+  });
+
+  // 공고가 제한 없음이라고 밝힌 항목은 맞춰야 할 조건이 아니라서 적지 않는다(사용자 결정 2026-11-15). 같은 항목이라도
+  // 실제로 제한하는 값이면 적는다.
+  it('제한 없음을 밝힌 항목은 적지 않고, 제한하는 값은 적는다', () => {
+    const stated = (key: ConditionMatch['key'], value: unknown) =>
+      ({
+        key,
+        reading: { status: 'READ', source: 'AI', value, quote: '원문' },
+        verdict: 'MATCH',
+        checkReason: null,
+      }) as ConditionMatch;
+    const region = (scope: string, excludedProvinces: string[] = []) => ({
+      scope,
+      provinces: scope === 'PROVINCES' ? ['서울'] : [],
+      districts: [],
+      excludedProvinces,
+      excludedDistricts: [],
+      districtCodes: [],
+      excludedDistrictCodes: [],
+    });
+    const noRestriction = [
+      stated('businessStage', 'BOTH'),
+      stated('businessAge', { min: null, max: null, maxExclusive: false }),
+      stated('age', { min: null, max: null, maxExclusive: false }),
+      stated('region', region('NATIONWIDE')),
+      stated('foodBusiness', 'NOT_EXCLUDED'),
+      stated('targetGroups', { groups: [], note: null }),
+    ];
+    expect(conditionSections(noRestriction)).toEqual({ stated: [], toCheck: [], hasUnread: false });
+    const restricting = [
+      stated('businessStage', 'BUSINESS_ONLY'),
+      stated('businessAge', { min: null, max: 7, maxExclusive: false }),
+      stated('age', { min: 19, max: null, maxExclusive: false }),
+      stated('region', region('PROVINCES')),
+      stated('region', region('NATIONWIDE', ['제주'])),
+      stated('targetGroups', { groups: ['WOMEN'], note: null }),
+    ];
+    expect(conditionSections(restricting).stated).toHaveLength(6);
   });
 
   it('제목 표시로 서울 전체로 본 지역은 그 표시를 근거로 밝힌다', () => {
