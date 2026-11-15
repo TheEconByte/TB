@@ -9,17 +9,21 @@ import type { FeatureKey, Grade } from './config.ts';
 import type { DisplayUnit } from './dataset.ts';
 import { revenueOutlier, topPercent } from './build.ts';
 import { marketScoreModelSchema } from './model.ts';
+import { interpretationPhrase, recordedInterpretation, type MonthlyRevenueInterpretation } from './revenue.ts';
 
 // 공개 점수 API(/api/markets/score)의 응답과 조회. 활성 점수 릴리스만 읽고 웹 요청 중에 계산하지 않는다.
 
 export const MAX_CONTRIBUTIONS = 4;
 
-export const SCORE_LIMITATIONS: readonly string[] = [
-  '서울시 상권분석서비스의 공공 추정 데이터로 계산했습니다.',
-  '개별 점포의 생존 확률이나 예상매출이 아닙니다. 같은 업종 점포들의 향후 1년 폐업률이 서울 중간 수준보다 낮을 가능성입니다.',
-  '서울의 한식·커피 상권만 학습했고, 테스트 정확도가 기준에 못 미친 업종은 점수를 내지 않습니다.',
-  '점포당 월매출은 매출 원값을 분기 월평균으로 본 잠정 해석입니다(ADR 0002).',
-];
+// 마지막 문장의 매출 해석은 응답하는 점수 릴리스의 해석을 따른다.
+export function scoreLimitations(interpretation: MonthlyRevenueInterpretation): readonly string[] {
+  return [
+    '서울시 상권분석서비스의 공공 추정 데이터로 계산했습니다.',
+    '개별 점포의 생존 확률이나 예상매출이 아닙니다. 같은 업종 점포들의 향후 1년 폐업률이 서울 중간 수준보다 낮을 가능성입니다.',
+    '서울의 한식·커피 상권만 학습했고, 테스트 정확도가 기준에 못 미친 업종은 점수를 내지 않습니다.',
+    `점포당 월매출은 매출 원값을 ${interpretationPhrase(interpretation)} 잠정 해석입니다.`,
+  ];
+}
 
 export const marketScoreQuerySchema = z.object({
   areaCode: z.string().trim().min(1).max(20),
@@ -59,6 +63,7 @@ export type MarketScoreResponse = {
   financeDefault: {
     monthlyRevenue: string;
     provisional: true;
+    interpretation: MonthlyRevenueInterpretation;
     basis: string;
     salesSum: string;
     storeCountSum: number;
@@ -170,6 +175,7 @@ export async function getMarketScore(
   }
   const area = candidates[0];
   const summary = release.summaryJson as unknown as ScoreSummary;
+  const interpretation = recordedInterpretation(summary.monthlyRevenueInterpretation);
   const model = marketScoreModelSchema.parse(release.modelJson);
   const servedIndustries = summary.servedIndustryCodes.map((code) => ({
     code,
@@ -205,7 +211,7 @@ export async function getMarketScore(
     distribution: null,
     financeDefault: null,
     model: null,
-    limitations: SCORE_LIMITATIONS,
+    limitations: scoreLimitations(interpretation),
   };
   const servedNames = servedIndustries.map((item) => item.displayName);
   if (!served || !industrySummary || !industryModel) {
@@ -288,6 +294,7 @@ export async function getMarketScore(
           : {
               monthlyRevenue: row.monthlyRevenueDefault.toFixed(0),
               provisional: true,
+              interpretation,
               basis: `${base.area.displayName} ${base.industry.displayName} 점포당 평균 기준`,
               salesSum: detail.monthlyRevenueBasis.salesSum,
               storeCountSum: detail.monthlyRevenueBasis.storeCountSum,

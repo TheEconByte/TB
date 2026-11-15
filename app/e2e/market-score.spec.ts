@@ -90,6 +90,7 @@ async function seedScore(suffix: string): Promise<string> {
   };
   const summary = {
     baseQuarter: '20262',
+    monthlyRevenueInterpretation: 'QUARTER_TOTAL',
     minTestAuc: 0.6,
     servedIndustryCodes: ['CS100001'],
     industries: [
@@ -142,7 +143,7 @@ async function seedScore(suffix: string): Promise<string> {
         contribution: 0.22,
       },
     ],
-    monthlyRevenueBasis: { quarters: ['20253', '20254', '20261', '20262'], salesSum: '96000000', storeCountSum: 32 },
+    monthlyRevenueBasis: { quarters: ['20253', '20254', '20261', '20262'], salesSum: '288000000', storeCountSum: 32 },
   };
   try {
     // 활성화 시각을 미래로 두어 기존 ACTIVE보다 먼저 조회되게 한다.
@@ -284,6 +285,8 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await page.getByRole('button', { name: /E2E 상권 한식 계획/ }).click();
   await expect(source).toContainText('등급 A');
   await expect(source).toContainText('계획을 만들 때 저장한 값입니다');
+  // 지금 해석(ADR 0011)으로 채운 계획에는 이전 해석 안내를 붙이지 않는다.
+  await expect(page.getByTestId('legacy-revenue-interpretation')).toHaveCount(0);
   await expect(page.locator('#monthlyRevenue')).toHaveValue('2,500,000');
 
   const stored = await page.evaluate(async () => {

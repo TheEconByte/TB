@@ -6,6 +6,7 @@ import { DEFAULT_GRADE_BOUNDARIES } from './config.ts';
 import type { AreaSeries, QuarterObservation } from './dataset.ts';
 import { handoffFromSearch, handoffSearch, parseHandoff } from './handoff.ts';
 import type { IndustryModel, MarketScoreModel } from './model.ts';
+import { monthlyRevenuePerStore, recordedInterpretation } from './revenue.ts';
 
 function series(areaCode: string, entries: Record<string, Partial<QuarterObservation>>): AreaSeries {
   const byQuarter = new Map<string, QuarterObservation>();
@@ -135,10 +136,12 @@ describe('점수 생성', () => {
     expect(byArea['3110004']).toMatchObject({ status: 'NO_DATA', storeCount: null, score: null });
   });
 
-  it('월매출 기본값은 최근 4분기 매출 원값 합 ÷ 점포 수 합이다(ADR 0002)', () => {
+  // ADR 0011: 원값은 분기 합계라 3으로 나눈다. 반올림은 마지막에 한 번만 한다.
+  it('월매출 기본값은 최근 4분기 매출 원값 합 ÷ (점포 수 합 × 3)이다', () => {
     const row = rows.find((item) => item.areaCode === '3110001')!;
-    // 1000원 × 4분기 ÷ 점포 10개 × 4분기
-    expect(row.monthlyRevenueDefault).toBe('100');
+    // 1000원 × 4분기 ÷ (점포 10개 × 4분기 × 3) = 33.33… → 33
+    expect(row.monthlyRevenueDefault).toBe('33');
+    expect(rows.find((item) => item.areaCode === '3110002')!.monthlyRevenueDefault).toBe('267');
     expect(row.detail?.monthlyRevenueBasis).toEqual({
       quarters: ['20253', '20254', '20261', '20262'],
       salesSum: '4000',
@@ -154,10 +157,41 @@ describe('점수 생성', () => {
     expect(korean.scoredCount).toBe(2);
     expect(korean.bins.reduce((sum, bin) => sum + bin.count, 0)).toBe(2);
     expect(Object.values(korean.gradeCounts).reduce((sum, count) => sum + count, 0)).toBe(2);
-    expect(korean.featureAverages.salesPerStore).toBe('450');
+    // 화면의 점포당 월매출(잠정)도 기본값과 같은 해석이다: (33 + 267) ÷ 2
+    expect(korean.featureAverages.salesPerStore).toBe('150');
     expect(korean.featureAverages.storeCount).toBe('10');
-    expect(korean.monthlyRevenueWarningRange).toEqual({ low: '100', high: '800' });
+    expect(korean.monthlyRevenueWarningRange).toEqual({ low: '33', high: '267' });
     expect(korean.exclusions.FEW_STORES).toBe(1);
+  });
+
+  // 계획 스냅샷과 화면 문구가 릴리스마다 맞는 해석을 고르려면 릴리스에 해석이 남아야 한다.
+  it('어떤 매출 해석으로 만들었는지 요약에 남긴다', () => {
+    expect(summary.monthlyRevenueInterpretation).toBe('QUARTER_TOTAL');
+  });
+});
+
+describe('매출 원값의 월매출 해석', () => {
+  it('해석이 기록되지 않은 이전 점수 릴리스는 ADR 0002 해석이다', () => {
+    expect(recordedInterpretation(undefined)).toBe('QUARTER_MONTHLY_AVERAGE');
+    expect(recordedInterpretation('QUARTER_TOTAL')).toBe('QUARTER_TOTAL');
+    expect(recordedInterpretation('QUARTER_MONTHLY_AVERAGE')).toBe('QUARTER_MONTHLY_AVERAGE');
+  });
+
+  it('알 수 없는 해석은 조용히 고르지 않고 거부한다', () => {
+    expect(() => recordedInterpretation('MONTHLY')).toThrow();
+  });
+
+  // ADR 0011 Validation의 수기 검산: 뚝섬역 발달상권 한식, 기준분기 2026년 2분기
+  it('점포당 월매출은 원값 합 ÷ (점포 수 합 × 3)이다', () => {
+    expect(monthlyRevenuePerStore('53041346765', 499).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toFixed(0)).toBe(
+      '35431761',
+    );
+    // 이전 해석(ADR 0002)으로는 화면에 보이던 106,295,284원이다.
+    expect(
+      monthlyRevenuePerStore('53041346765', 499, 'QUARTER_MONTHLY_AVERAGE')
+        .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+        .toFixed(0),
+    ).toBe('106295284');
   });
 });
 

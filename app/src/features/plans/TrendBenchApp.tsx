@@ -6,6 +6,11 @@ import FinancePlanner, { defaultInputWith } from '@/features/finance/FinancePlan
 import { quarterLabel } from '@/features/market/quarter';
 import type { MarketScoreResponse } from '@/features/market/score/api';
 import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
+import {
+  CURRENT_MONTHLY_REVENUE_INTERPRETATION,
+  interpretationDivisor,
+  interpretationPhrase,
+} from '@/features/market/score/revenue';
 import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
 import { parsePlanMarketScore } from '@/features/plans/market-score';
 import type { FinanceInput, FinanceResult } from '@/features/finance/types';
@@ -625,9 +630,11 @@ function MarketSourceNotice({
         </strong>
         <p>
           월매출 기본값 {formatWon(score.financeDefault!.monthlyRevenue)}은 {score.baseQuarterLabel}까지 최근 4분기
-          서울시 매출 원값을 점포당 월평균으로 본 잠정값입니다(원값 합 {formatWon(score.financeDefault!.salesSum)} ÷
-          점포 수 합 {wonFormat.format(score.financeDefault!.storeCountSum)}). 개인 예상매출이 아니며 고쳐서 쓸 수
-          있습니다. 저장하면 상권 코드·등급·모델 버전을 함께 보존합니다.
+          서울시 매출 원값을 {interpretationPhrase(score.financeDefault!.interpretation)} 점포당 월평균
+          잠정값입니다(원값 합 {formatWon(score.financeDefault!.salesSum)} ÷ 점포 수 합{' '}
+          {wonFormat.format(score.financeDefault!.storeCountSum)}
+          {interpretationDivisor(score.financeDefault!.interpretation)}). 개인 예상매출이 아니며 고쳐서 쓸 수 있습니다.
+          저장하면 상권 코드·등급·모델 버전을 함께 보존합니다.
         </p>
         {score.financeDefault!.unusual && <UnusualRevenueWarning score={score} />}
         <button type="button" onClick={onDisconnect}>
@@ -650,6 +657,13 @@ function MarketSourceNotice({
           <p className="inline-error" role="note">
             저장 당시 기본값이 같은 업종 상권의 하위·상위 1% 범위를 벗어났습니다. 개인 점포 매출과 크게 다를 수
             있습니다.
+          </p>
+        )}
+        {stored.monthlyRevenueInterpretation !== CURRENT_MONTHLY_REVENUE_INTERPRETATION && (
+          <p className="inline-error" role="note" data-testid="legacy-revenue-interpretation">
+            이 기본값은 서울시 매출 원값을 {interpretationPhrase(stored.monthlyRevenueInterpretation)} 이전 해석으로
+            채웠습니다. 지금은 원값을 {interpretationPhrase(CURRENT_MONTHLY_REVENUE_INTERPRETATION)} 값을 쓰며, 이전
+            값은 약 3배 클 수 있습니다. 월매출을 그대로 두었다면 직접 확인해 고쳐 주세요.
           </p>
         )}
       </div>

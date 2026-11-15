@@ -9,6 +9,11 @@ import {
   type ExclusionReason,
 } from './dataset.ts';
 import { scoreFeatures, type MarketScoreModel } from './model.ts';
+import {
+  CURRENT_MONTHLY_REVENUE_INTERPRETATION,
+  monthlyRevenuePerStore,
+  type MonthlyRevenueInterpretation,
+} from './revenue.ts';
 import { scoreBins } from './train.ts';
 
 // score:build가 최신 기준분기의 상권별 점수를 만든다(ADR 0008). DB와 React에 의존하지 않는다.
@@ -66,6 +71,8 @@ export type IndustryScoreSummary = {
 
 export type ScoreSummary = {
   baseQuarter: string;
+  // 월매출 기본값을 만든 해석. 이 필드가 생기기 전 릴리스에는 없으며 그때는 ADR 0002 해석이다(recordedInterpretation).
+  monthlyRevenueInterpretation?: MonthlyRevenueInterpretation;
   minTestAuc: number;
   servedIndustryCodes: string[];
   industries: IndustryScoreSummary[];
@@ -183,6 +190,8 @@ export function buildScores(input: {
       const scored = scoreFeatures(industryModel, row.features, input.model.gradeBoundaries);
       const salesSum = new Decimal(row.window.window.reduce((sum, item) => sum + item.salesAmount, 0));
       const storeCountSum = row.window.window.reduce((sum, item) => sum + item.storeCount, 0);
+      // 월매출 기본값과 화면의 점포당 월매출(잠정)은 같은 값이다.
+      const perStore = monthlyRevenuePerStore(salesSum, storeCountSum);
       industryRows.push({
         ...base,
         status: 'SCORED',
@@ -191,8 +200,7 @@ export function buildScores(input: {
         grade: scored.grade,
         probability: scored.probability,
         rank: null,
-        // ADR 0002: 원값은 분기 월평균이다. 4분기 평균 ÷ 평균 점포 수 = 매출 합 ÷ 점포 수 합.
-        monthlyRevenueDefault: salesSum.div(storeCountSum).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toFixed(0),
+        monthlyRevenueDefault: perStore.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toFixed(0),
         detail: {
           features: scored.contributions.map((item) => {
             const definition = FEATURE_DEFINITIONS[item.key];
@@ -203,9 +211,7 @@ export function buildScores(input: {
               unit: definition.display.unit,
               displayValue: formatDisplay(
                 definition.display.unit,
-                item.key === 'salesPerStore'
-                  ? salesSum.div(storeCountSum)
-                  : new Decimal(definition.display.value(row.window)),
+                item.key === 'salesPerStore' ? perStore : new Decimal(definition.display.value(row.window)),
               ),
               value: item.value,
               z: item.z,
@@ -251,6 +257,7 @@ export function buildScores(input: {
     rows,
     summary: {
       baseQuarter: input.quarter,
+      monthlyRevenueInterpretation: CURRENT_MONTHLY_REVENUE_INTERPRETATION,
       minTestAuc: MIN_TEST_AUC,
       servedIndustryCodes: industries.filter((item) => item.served).map((item) => item.industryCode),
       industries,

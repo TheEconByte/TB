@@ -2,8 +2,8 @@
 // 같은 설정을 읽는다. 변수를 추가할 때는 dataset.ts에 정의를 더하고 ACTIVE_FEATURE_KEYS에 넣는다.
 
 export const MODEL_DEFINITION_VERSION = 'market-score-def-v3';
-// 점수 릴리스 행·요약의 저장 형식 버전. 바꾸면 같은 계수 파일로도 새 점수 릴리스를 만든다.
-export const SCORE_BUILD_VERSION = 'market-score-build-v1';
+// 점수 릴리스 행·요약의 저장 형식과 월매출 해석(revenue.ts)의 버전. 바꾸면 같은 계수 파일로도 새 점수 릴리스를 만든다.
+export const SCORE_BUILD_VERSION = 'market-score-build-v2';
 
 // 표준화 값을 ±Z_CLIP에서 자른다. 극단값 상권 하나가 점수를 좌우하지 않게 하려는 것이며, 원값은 바꾸지 않는다.
 export const Z_CLIP = 3;

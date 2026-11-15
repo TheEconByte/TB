@@ -40,7 +40,9 @@ const request = (body: unknown, method = 'POST') =>
     body: JSON.stringify(body),
   });
 
-function prismaWith(overrides: { releaseStatus?: string; rowStatus?: string; monthly?: string } = {}) {
+function prismaWith(
+  overrides: { releaseStatus?: string; rowStatus?: string; monthly?: string; interpretation?: string } = {},
+) {
   const create = vi.fn(async ({ data }) => ({ id: 'plan-a', revision: 1, ...data }));
   return {
     create,
@@ -55,6 +57,9 @@ function prismaWith(overrides: { releaseStatus?: string; rowStatus?: string; mon
           marketReleaseKey: 'seoul-market-2021q1-2026q2-x',
           baseQuarter: '20262',
           summaryJson: {
+            ...(overrides.interpretation === undefined
+              ? {}
+              : { monthlyRevenueInterpretation: overrides.interpretation }),
             industries: [
               { industryCode: 'CS100001', monthlyRevenueWarningRange: { low: '1000000', high: '189115558' } },
             ],
@@ -110,6 +115,46 @@ describe('상권 점수에서 시작한 계획 저장', () => {
     });
     // 사용자가 입력한 월매출은 재무 입력에만 들어간다.
     expect(create.mock.calls[0][0].data.inputJson.monthlyRevenue).toBe('29684576');
+  });
+
+  // ADR 0011: 저장 근거는 코드에 고정하지 않고 릴리스의 해석에서 만든다.
+  // 이전 해석 릴리스(SUPERSEDED)로 저장해도 근거와 값이 어긋나지 않아야 한다.
+  it('스냅샷에 점수 릴리스의 매출 해석과 그 근거를 남긴다', async () => {
+    for (const [interpretation, expected, basis] of [
+      ['QUARTER_TOTAL', 'QUARTER_TOTAL', 'ADR 0011'],
+      [undefined, 'QUARTER_MONTHLY_AVERAGE', 'ADR 0002'],
+    ] as const) {
+      const { prisma, create } = prismaWith({ interpretation, releaseStatus: 'SUPERSEDED' });
+      mocks.getPrisma.mockReturnValue(prisma);
+      expect((await createPlan(request({ title: '계획', input, marketScore: reference }))).status).toBe(201);
+      const snapshot = parsePlanMarketScore(create.mock.calls[0][0].data.marketScoreJson);
+      expect(snapshot?.monthlyRevenueInterpretation).toBe(expected);
+      expect(snapshot?.monthlyRevenueBasis).toContain(basis);
+    }
+  });
+
+  it('해석이 없는 이전 스냅샷은 ADR 0002 해석으로 읽는다', () => {
+    const legacy = {
+      schemaVersion: 'plan-market-score-v1',
+      releaseKey: reference.releaseKey,
+      modelVersion: 'market-score-v3-20262',
+      marketReleaseKey: 'seoul-market-2021q1-2026q2-x',
+      baseQuarter: '20262',
+      areaType: 'A',
+      areaCode: '3110020',
+      areaName: '서울국제고등학교',
+      districtCode: '11110',
+      districtName: '종로구',
+      industryCode: 'CS100001',
+      industryName: '한식',
+      score: 48,
+      grade: 'B',
+      monthlyRevenueDefault: '29684576',
+      monthlyRevenueBasis: 'ADR 0002 잠정 해석: 최근 4분기 매출 원값 합 ÷ 같은 기간 점포 수 합(점포당 월평균)',
+      monthlyRevenueUnusual: false,
+      savedAt: '2026-10-31T00:00:00.000Z',
+    };
+    expect(parsePlanMarketScore(legacy)?.monthlyRevenueInterpretation).toBe('QUARTER_MONTHLY_AVERAGE');
   });
 
   it('하위·상위 1% 경계 밖의 기본값은 스냅샷에 표시한다', async () => {
