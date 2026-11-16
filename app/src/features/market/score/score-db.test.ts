@@ -147,7 +147,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
             areaType: 'A',
             areaCode,
             industryCode: 'CS100001',
-            salesAmount: '4000',
+            salesAmount: '6000',
             similarIndustryStoreCount: stores,
             storeCount: stores,
             franchiseStoreCount: 0,
@@ -188,7 +188,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       orderBy: { areaCode: 'asc' },
     });
     expect(rows.map((row) => row.status)).toEqual(['SCORED', 'INSUFFICIENT_STORES', 'NO_DATA']);
-    expect(rows[0].monthlyRevenueDefault?.toFixed(0)).toBe('400');
+    // ADR 0011: 6000원 × 4분기 ÷ (점포 10개 × 4분기 × 3)
+    expect(rows[0].monthlyRevenueDefault?.toFixed(0)).toBe('200');
+    expect(report.summary.monthlyRevenueInterpretation).toBe('QUARTER_TOTAL');
 
     const again = await buildScoreRelease({ prisma: db(), modelPath: path });
     expect(again.outcome).toBe('ALREADY_ACTIVE');
@@ -215,8 +217,11 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       storeCount: 10,
       area: { displayName: '정상 상권', districtCode: '11200' },
       score: { rank: 1, total: 1, topPercent: 100 },
-      financeDefault: { monthlyRevenue: '400', provisional: true, unusual: null },
+      financeDefault: { monthlyRevenue: '200', provisional: true, unusual: null, interpretation: 'QUARTER_TOTAL' },
     });
+    expect(ok.payload.limitations).toContain(
+      '점포당 월매출은 매출 원값을 분기 합계로 보고 3으로 나눈 잠정 해석입니다.',
+    );
     expect(ok.payload.contributions.length).toBeLessThanOrEqual(4);
     expect(ok.payload.distribution?.total).toBe(1);
     expect(ok.payload.model?.coefficients).toHaveLength(2);
@@ -252,7 +257,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       modelVersion: model.version,
       areaName: '정상 상권',
       districtName: '성동구',
-      monthlyRevenueDefault: '400',
+      monthlyRevenueDefault: '200',
+      monthlyRevenueInterpretation: 'QUARTER_TOTAL',
       savedAt: '2026-10-31T00:00:00.000Z',
     });
     expect(await resolvePlanMarketScore(db(), { ...reference, areaCode: '3119902' })).toBeNull();

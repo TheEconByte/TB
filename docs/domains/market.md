@@ -37,10 +37,11 @@
 
 - 코드: `app/src/features/market/score`. 변수·라벨(`dataset.ts`), 로지스틱 회귀(`logistic.ts`), 학습·기준선 비교(`train.ts`), 점수 생성(`build.ts`), 점수 릴리스 적재(`loader.ts`), 공개 API 조립(`api.ts`), 화면(`ScorePanel.tsx`, `MarketGradeBanner.tsx`), `/`로 넘기는 상권 참조(`handoff.ts`). 모델 설정은 `config.ts` 하나에 있다.
 - 학습: `npm --prefix app run score:train [-- --version <버전>]`. ACTIVE 상권 릴리스로 업종별 모델을 학습하고 `app/models/market-score/<버전>.json`(계수)과 `<버전>.report.md`(학습 리포트)를 만든다. 같은 버전 파일은 덮어쓰지 않는다. 계수 파일과 리포트는 Git에 포함한다.
-- 점수 적재: `npm --prefix app run score:build [-- --model <계수 파일>]`. 기본은 `app/models/market-score`의 이름순 마지막 계수 파일이다. 최신 기준분기의 모든 상권 × 제공 업종 행을 `PENDING`으로 저장하고 행 수·점수 범위를 검증한 뒤 한 트랜잭션으로 활성화한다. 실패하면 행을 지우고 `FAILED`로 남기며 기존 ACTIVE를 유지한다. 계수 파일 checksum·상권 릴리스 키·기준분기가 같으면 `ALREADY_ACTIVE`다. 상권을 다시 적재하면 `score:build`를 다시 실행한다.
+- 점수 적재: `npm --prefix app run score:build [-- --model <계수 파일>]`. 기본은 `app/models/market-score`의 이름순 마지막 계수 파일이다. 최신 기준분기의 모든 상권 × 제공 업종 행을 `PENDING`으로 저장하고 행 수·점수 범위를 검증한 뒤 한 트랜잭션으로 활성화한다. 실패하면 행을 지우고 `FAILED`로 남기며 기존 ACTIVE를 유지한다. 점수 빌드 버전(`config.ts`의 `SCORE_BUILD_VERSION`)·계수 파일 checksum·상권 릴리스 키·기준분기가 같으면 `ALREADY_ACTIVE`다. 상권을 다시 적재하면 `score:build`를 다시 실행한다.
 - 테스트 AUC가 0.6 미만인 업종은 행을 만들지 않고 요약에 미지원으로 남긴다.
 - `/api/markets/score?areaCode=...&industryCode=...[&areaType=...]`(로그인 불필요): 활성 점수 릴리스가 없으면 503 `SCORE_UNAVAILABLE`, 형식 오류는 400, 점수 릴리스의 상권 영역에 없으면 404 `AREA_NOT_FOUND`다. 그 밖에는 200과 `status`(`OK`·`INSUFFICIENT_STORES`·`UNSUPPORTED_INDUSTRY`·`NO_DATA`), 상태 문구, 점수·등급·순위·상위 %, 기여 변수 최대 4개(이 상권 값·업종 평균·높음/낮음·올림/내림), 10점 구간 분포, 모델 정보(학습 기간·표본·AUC·계수표·등급 구간), 월매출 기본값(원 단위 정수 문자열, 잠정, 근거 원값, 같은 업종 하위·상위 1% 경계 밖인지), 한계 문구를 돌려준다.
 - 상위 %는 ⌈순위 ÷ 점수 낸 상권 수 × 100⌉이고, 점수가 같으면 같은 순위다. 업종 평균은 점수 낸 상권의 화면 표시값 산술 평균이다.
+- 월매출 기본값과 화면의 점포당 월매출(잠정)은 같은 값이며, 최근 4분기 매출 원값 합 ÷ (같은 기간 점포 수 합 × 3)이다([ADR 0011](../decisions/0011-market-sales-quarter-total.md)). 해석은 `revenue.ts` 한 곳에 있고 점수 릴리스 요약의 `monthlyRevenueInterpretation`에 남는다. 이 필드가 없는 이전 릴리스는 ADR 0002 해석(3으로 나누지 않음)이며, API의 `financeDefault.interpretation`과 한계 문구가 릴리스의 해석을 따른다. 점수 변수 `salesPerStore`는 시간 단위를 환산하지 않는 비율이라 해석이 바뀌어도 점수·등급·순위는 같다.
 - `/markets`는 지표와 점수를 따로 불러온다. 점수를 불러오지 못해도 지표는 그대로 보여 준다.
 
 ## 테스트

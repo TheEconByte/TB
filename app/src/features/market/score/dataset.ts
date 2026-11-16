@@ -6,6 +6,7 @@ import {
   PER_STORE_WINDOW_QUARTERS,
   type FeatureKey,
 } from './config.ts';
+import { monthlyRevenuePerStore } from './revenue.ts';
 
 // 한 상권·업종의 분기 관측값. 점포 수는 유사_업종_점포_수(ADR 0002의 분모)다.
 // 행이 없거나 값이 없으면 null이며 0으로 바꾸지 않는다.
@@ -93,8 +94,12 @@ export const FEATURE_DEFINITIONS: Record<FeatureKey, FeatureDefinition> = {
     expectedScoreDirection: 1,
     definition: 'log(t−3~t 매출 합 ÷ t−3~t 평균 점포 수)',
     compute: (w) => Math.log(windowSales(w) / (windowStores(w) / w.window.length)),
-    // ADR 0002: 원값은 분기 월평균이므로 4분기 평균 ÷ 평균 점포 수 = 매출 합 ÷ 점포 수 합이다.
-    display: { label: '점포당 월매출(잠정)', unit: 'WON', value: (w) => windowSales(w) / windowStores(w) },
+    // 점수 변수는 시간 단위를 환산하지 않는 비율이라 매출 해석(revenue.ts)이 바뀌어도 그대로다. 표시값만 해석을 따른다.
+    display: {
+      label: '점포당 월매출(잠정)',
+      unit: 'WON',
+      value: (w) => monthlyRevenuePerStore(windowSales(w), windowStores(w)).toNumber(),
+    },
   },
   storeCount: {
     label: '동일 업종 점포 수',

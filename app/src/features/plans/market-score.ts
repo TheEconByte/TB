@@ -2,6 +2,11 @@ import { z } from 'zod';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { revenueOutlier, type ScoreSummary } from '@/features/market/score/build';
 import { GRADES } from '@/features/market/score/config';
+import {
+  MONTHLY_REVENUE_INTERPRETATIONS,
+  interpretationBasis,
+  recordedInterpretation,
+} from '@/features/market/score/revenue';
 import { supportedIndustry } from '@/features/market/types';
 
 // /markets의 [이 상권으로 재무 계획 시작]으로 만든 계획에 붙이는 상권 점수 스냅샷(ADR 0008).
@@ -34,6 +39,8 @@ export const planMarketScoreSchema = z.object({
   grade: z.enum(GRADES),
   // 원 단위 정수 문자열. 잠정 값이며 사용자가 재무 입력에서 고칠 수 있다.
   monthlyRevenueDefault: z.string().regex(/^\d+$/),
+  // 기본값을 만든 매출 해석. 이 필드가 생기기 전 스냅샷에는 없으며 그때는 ADR 0002 해석이다.
+  monthlyRevenueInterpretation: z.enum(MONTHLY_REVENUE_INTERPRETATIONS).default('QUARTER_MONTHLY_AVERAGE'),
   monthlyRevenueBasis: z.string(),
   // 같은 업종 하위·상위 1% 경계 밖의 기본값이었는지(화면 경고용)
   monthlyRevenueUnusual: z.boolean(),
@@ -80,10 +87,12 @@ export async function resolvePlanMarketScore(
     },
   });
   if (!area) return null;
+  const summary = release.summaryJson as unknown as ScoreSummary;
   const warningRange =
-    (release.summaryJson as unknown as ScoreSummary).industries.find(
-      (industry) => industry.industryCode === reference.industryCode,
-    )?.monthlyRevenueWarningRange ?? null;
+    summary.industries.find((industry) => industry.industryCode === reference.industryCode)
+      ?.monthlyRevenueWarningRange ?? null;
+  // 이전 해석 릴리스(SUPERSEDED)로 저장해도 근거가 값과 맞도록 릴리스에 기록된 해석을 쓴다.
+  const interpretation = recordedInterpretation(summary.monthlyRevenueInterpretation);
   return planMarketScoreSchema.parse({
     schemaVersion: PLAN_MARKET_SCORE_VERSION,
     releaseKey: release.releaseKey,
@@ -100,7 +109,8 @@ export async function resolvePlanMarketScore(
     score: row.score,
     grade: row.grade,
     monthlyRevenueDefault: row.monthlyRevenueDefault.toFixed(0),
-    monthlyRevenueBasis: 'ADR 0002 잠정 해석: 최근 4분기 매출 원값 합 ÷ 같은 기간 점포 수 합(점포당 월평균)',
+    monthlyRevenueInterpretation: interpretation,
+    monthlyRevenueBasis: interpretationBasis(interpretation),
     monthlyRevenueUnusual: revenueOutlier(row.monthlyRevenueDefault.toFixed(0), warningRange) !== null,
     savedAt: now.toISOString(),
   });
