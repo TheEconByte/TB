@@ -11,7 +11,7 @@ import {
   MIN_STORE_COUNT,
   MODEL_DEFINITION_VERSION,
 } from '../src/features/market/score/config.ts';
-import { INDUSTRY_CODES } from '../src/features/industries.ts';
+import { OPEN_INDUSTRY_CODES } from '../src/features/industries.ts';
 import { loadScoreSeries } from '../src/features/market/score/read.ts';
 import { marketScoreModelSchema, type MarketScoreModel } from '../src/features/market/score/model.ts';
 import { renderTrainingReport, type LatestQuarterSummary } from '../src/features/market/score/report.ts';
@@ -51,7 +51,7 @@ async function main() {
     throw new Error('DATABASE_URL이 없습니다. app/.env.local을 준비하거나 DATABASE_URL을 지정해 주세요.');
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   try {
-    const data = await loadScoreSeries(prisma, INDUSTRY_CODES);
+    const data = await loadScoreSeries(prisma, OPEN_INDUSTRY_CODES);
     const expected = quartersBetween(data.quarters[0], data.quarters.at(-1)!);
     if (expected.join() !== data.quarters.join())
       throw new Error(`분기가 연속되지 않습니다: ${data.quarters.join(',')}`);
@@ -68,7 +68,7 @@ async function main() {
     }
     console.log(`상권 릴리스 ${data.releaseKey}, 분기 ${dataStart}~${dataEnd} (${data.quarters.length}개)`);
 
-    const results = INDUSTRY_CODES.map((industryCode) => {
+    const results = OPEN_INDUSTRY_CODES.map((industryCode) => {
       const industryName = supportedIndustry(industryCode)?.displayName ?? industryCode;
       const result = trainIndustryModel({
         industryCode,

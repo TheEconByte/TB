@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
-import { INDUSTRIES, industryByCode } from '@/features/industries';
+import { OPEN_INDUSTRIES, industryByCode } from '@/features/industries';
 import { BUILDING_TYPE_CRITERIA, BUILDING_TYPE_LABELS, BUILDING_TYPES } from '@/features/rent-benchmark/types';
 import {
   EMPTY_BUSINESS_PROFILE_FORM,
@@ -140,7 +140,7 @@ export default function BusinessProfileWizard({
                 onChange={(event) => onChange(selectMarketIndustry(form, event.target.value))}
               >
                 <option value="">업종을 선택하세요</option>
-                {INDUSTRIES.map(({ code, name }) => (
+                {OPEN_INDUSTRIES.map(({ code, name }) => (
                   <option key={code} value={code}>
                     {name}
                   </option>
