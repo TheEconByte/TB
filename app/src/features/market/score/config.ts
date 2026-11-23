@@ -15,14 +15,6 @@ export const MIN_TEST_AUC = 0.6;
 // 등급 단조성 판정에서 테스트 표본이 이보다 적은 등급은 따로 표시하고 판정에서 뺀다.
 export const MONOTONIC_MIN_GRADE_COUNT = 30;
 
-// 서울시 상위 업종 중 점수를 내는 업종. 업종마다 모델을 따로 학습한다.
-export const SCORE_INDUSTRY_CODES = ['CS100001', 'CS100010'] as const;
-export type ScoreIndustryCode = (typeof SCORE_INDUSTRY_CODES)[number];
-
-export function isScoreIndustry(code: string): code is ScoreIndustryCode {
-  return (SCORE_INDUSTRY_CODES as readonly string[]).includes(code);
-}
-
 // t 분기 점포 수가 이보다 적으면 학습과 화면에서 모두 뺀다.
 export const MIN_STORE_COUNT = 5;
 

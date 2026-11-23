@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
+import { industryByCode, type IndustryCode } from '../industries.ts';
 import {
   FRANCHISE_SOURCE_NAME,
   FTC_COMPARE_URL,
@@ -7,13 +8,7 @@ import {
   type FranchiseBrand,
   type FranchisePayload,
   type FranchiseYearStats,
-  type MarketIndustryCode,
 } from './types.ts';
-
-const INDUSTRY_LABELS: Readonly<Record<MarketIndustryCode, string>> = {
-  CS100001: '한식',
-  CS100010: '커피·음료',
-};
 
 export type FranchiseOutcome = { kind: 'OK'; payload: FranchisePayload } | { kind: 'RELEASE_UNAVAILABLE' };
 
@@ -67,7 +62,7 @@ function brandKey(row: Pick<StatRow, 'corpName' | 'brandName' | 'industryMiddle'
 
 export async function getFranchises(
   prisma: PrismaClient,
-  input: Readonly<{ industryCode: MarketIndustryCode; query: string; limit: number }>,
+  input: Readonly<{ industryCode: IndustryCode; query: string; limit: number }>,
 ): Promise<FranchiseOutcome> {
   const release = await prisma.franchiseRelease.findFirst({
     where: { status: 'ACTIVE' },
@@ -140,7 +135,7 @@ export async function getFranchises(
       },
       industry: {
         code: input.industryCode,
-        label: INDUSTRY_LABELS[input.industryCode],
+        label: industryByCode(input.industryCode)?.shortName ?? input.industryCode,
         ftcMiddleNames: Object.entries(INDUSTRY_MIDDLE_TO_MARKET)
           .filter(([, code]) => code === input.industryCode)
           .map(([name]) => name),
