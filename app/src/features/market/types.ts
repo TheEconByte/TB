@@ -1,4 +1,4 @@
-import { INDUSTRIES } from '../industries.ts';
+import { OPEN_INDUSTRIES } from '../industries.ts';
 
 export const MARKET_SCHEMA_VERSION = 'market-schema-v1.1.0';
 export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v2';
@@ -13,7 +13,7 @@ export type DisplayNameSource = 'PRODUCT_DOCUMENT' | 'AREA_FILE' | 'OBSERVED_FIL
 // Product-document display names for the industries this release exposes.
 // Priority for an industry display name is PRODUCT_DOCUMENT first, then the
 // name recorded in the source files.
-export const SUPPORTED_INDUSTRIES: readonly { code: string; displayName: string }[] = INDUSTRIES.map(
+export const SUPPORTED_INDUSTRIES: readonly { code: string; displayName: string }[] = OPEN_INDUSTRIES.map(
   ({ code, shortName }) => ({ code, displayName: shortName }),
 );
 

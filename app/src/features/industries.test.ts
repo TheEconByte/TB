@@ -3,52 +3,83 @@ import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { marketIndustryForSemas } from './business-directory/mapping.ts';
-import { businessProfileFormFromStored } from './business-profile/form.ts';
+import {
+  EMPTY_BUSINESS_PROFILE_FORM,
+  businessProfileFormFromStored,
+  selectMarketIndustry,
+} from './business-profile/form.ts';
 import { businessProfileInputSchema } from './business-profile/schema.ts';
 import { franchiseQuerySchema } from './franchise/schema.ts';
 import { INDUSTRY_MIDDLE_TO_MARKET } from './franchise/types.ts';
-import { INDUSTRIES, INDUSTRY_CODES, isIndustryCode } from './industries.ts';
+import {
+  INDUSTRIES,
+  INDUSTRY_CODES,
+  OPEN_INDUSTRIES,
+  OPEN_INDUSTRY_CODES,
+  isIndustryCode,
+  isOpenIndustryCode,
+} from './industries.ts';
 import { SUPPORTED_INDUSTRIES } from './market/types.ts';
 
 // ADR 0010: 업종 목록은 한 파일에서 정하고 모든 도메인이 그 목록을 쓴다.
 describe('업종 목록', () => {
-  it('지금 다루는 업종은 한식과 커피·음료다', () => {
-    // 근거: PRODUCT.md "상위 업종은 한식(CS100001)과 커피·음료(CS100010)만 노출한다".
-    // ADR 0010 2단계는 목록을 모으기만 하고 업종을 열지 않는다.
-    expect(INDUSTRY_CODES).toEqual(['CS100001', 'CS100010']);
+  it('목록은 서울시 외식업 상위 업종 열 개다', () => {
+    // 근거: ADR 0010 "확인한 사실"(원자료 sales-2025.zip의 CS100001~CS100010)과 §1 범위 결정.
+    // 이름은 원자료 이름이며 "-"는 지금 화면처럼 "·"로 쓴다.
+    expect(INDUSTRIES.map(({ code, name }) => [code, name])).toEqual([
+      ['CS100001', '한식음식점'],
+      ['CS100002', '중식음식점'],
+      ['CS100003', '일식음식점'],
+      ['CS100004', '양식음식점'],
+      ['CS100005', '제과점'],
+      ['CS100006', '패스트푸드점'],
+      ['CS100007', '치킨전문점'],
+      ['CS100008', '분식전문점'],
+      ['CS100009', '호프·간이주점'],
+      ['CS100010', '커피·음료'],
+    ]);
   });
 
-  it('업종 이름은 지금 화면의 이름 그대로다', () => {
-    // 근거: 업종을 고르는 화면은 "한식음식점", 상권·프랜차이즈 화면은 "한식"으로 보여 왔다. 2단계는 화면을 바꾸지 않는다.
-    expect(INDUSTRIES.map(({ code, name, shortName }) => ({ code, name, shortName }))).toEqual([
+  it('열린 업종은 아직 한식과 커피·음료뿐이고 이름은 지금 화면 그대로다', () => {
+    // 근거: PRODUCT.md "상위 업종은 한식(CS100001)과 커피·음료(CS100010)만 노출한다". 업종은 7단계에서 연다.
+    // 업종을 고르는 화면은 "한식음식점", 상권·프랜차이즈 화면은 "한식"으로 보여 왔다.
+    expect(OPEN_INDUSTRIES.map(({ code, name, shortName }) => ({ code, name, shortName }))).toEqual([
       { code: 'CS100001', name: '한식음식점', shortName: '한식' },
       { code: 'CS100010', name: '커피·음료', shortName: '커피·음료' },
     ]);
   });
 
-  it('여러 도메인이 같은 목록을 받는다', () => {
+  it('사업 조건은 요식업 업종 코드를 모두 받는다', () => {
+    // ADR 0010 3단계. 고를 수 있는지는 활성 상권 릴리스가 정한다(resolve.test.ts).
     expect(businessProfileInputSchema.shape.marketIndustryCode.options).toEqual(INDUSTRY_CODES);
-    expect(franchiseQuerySchema.shape.industryCode.options).toEqual(INDUSTRY_CODES);
-    expect(SUPPORTED_INDUSTRIES.map((item) => item.code)).toEqual(INDUSTRY_CODES);
   });
 
-  it('대응표는 목록 안의 업종으로만 보낸다', () => {
-    for (const code of Object.values(INDUSTRY_MIDDLE_TO_MARKET)) expect(isIndustryCode(code)).toBe(true);
+  it('조회와 업종 선택은 열린 업종만 받는다', () => {
+    // 열지 않은 업종을 받으면 적재되지 않은 업종의 빈 결과를 성공처럼 보인다(ADR 0010 Validation).
+    expect(franchiseQuerySchema.shape.industryCode.options).toEqual(OPEN_INDUSTRY_CODES);
+    expect(SUPPORTED_INDUSTRIES.map((item) => item.code)).toEqual(OPEN_INDUSTRY_CODES);
+    expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100002').success).toBe(false);
+    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100002').marketIndustryCode).toBe('');
+    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100010').marketIndustryCode).toBe('CS100010');
+    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100002' }).marketIndustryCode).toBe('');
+    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100010' }).marketIndustryCode).toBe('CS100010');
+  });
+
+  it('목록 밖 코드는 업종이 아니다', () => {
+    // 외식업 상위 업종은 CS100001~CS100010이다(ADR 0010). 그 밖의 코드는 형식이 같아도 받지 않는다.
+    expect(isIndustryCode('CS100011')).toBe(false);
+    expect(businessProfileInputSchema.shape.marketIndustryCode.safeParse('CS100011').success).toBe(false);
+  });
+
+  it('대응표는 열린 업종으로만 보낸다', () => {
+    // 대응표를 넓히는 일은 6단계이고, 그 전에는 열지 않은 업종의 점포를 적재하지 않는다.
+    for (const code of Object.values(INDUSTRY_MIDDLE_TO_MARKET)) expect(isOpenIndustryCode(code)).toBe(true);
     const semas = [
       { middleName: '한식', smallCode: 'I20107', smallName: '돼지고기 구이/찜' },
       { middleName: '비알코올 음료점업', smallCode: 'I21201', smallName: '카페' },
       { middleName: '일식', smallCode: 'I20301', smallName: '일식 회/초밥' },
     ].map(marketIndustryForSemas);
-    expect(semas.filter((code) => code !== null).every(isIndustryCode)).toBe(true);
-  });
-
-  it('목록 밖 업종은 받지 않는다', () => {
-    // CS100002(중식음식점)는 서울시 외식업 상위 업종이지만 아직 열지 않았다(ADR 0010 §3).
-    expect(isIndustryCode('CS100002')).toBe(false);
-    expect(businessProfileInputSchema.shape.marketIndustryCode.safeParse('CS100002').success).toBe(false);
-    expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100002').success).toBe(false);
-    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100002' }).marketIndustryCode).toBe('');
-    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100010' }).marketIndustryCode).toBe('CS100010');
+    expect(semas).toEqual(['CS100001', 'CS100010', null]);
   });
 
   it('업종 코드를 목록과 원천 대응표 밖에 따로 적지 않는다', () => {

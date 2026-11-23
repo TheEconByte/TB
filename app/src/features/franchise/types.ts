@@ -1,4 +1,4 @@
-import type { IndustryCode } from '../industries.ts';
+import type { IndustryCode, OpenIndustryCode } from '../industries.ts';
 
 // 공정거래위원회 가맹정보(공공데이터포털 Open API). 운영자 적재 명령에서만 호출하고,
 // 웹 요청 중에는 적재된 스냅샷만 읽는다.
@@ -72,7 +72,7 @@ export const FTC_SERVICES: Readonly<Record<FtcService['key'], FtcService>> = {
 };
 
 // 공정위 업종 중분류 → 서울시 상위 업종. 이 표에 있는 중분류만 적재한다.
-export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, IndustryCode>> = {
+export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, OpenIndustryCode>> = {
   한식: 'CS100001',
   커피: 'CS100010',
   '음료 (커피 외)': 'CS100010',
