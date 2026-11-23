@@ -1,3 +1,5 @@
+import type { IndustryCode } from '../industries.ts';
+
 // 공정거래위원회 가맹정보(공공데이터포털 Open API). 운영자 적재 명령에서만 호출하고,
 // 웹 요청 중에는 적재된 스냅샷만 읽는다.
 export const FRANCHISE_SCHEMA_VERSION = 'ftc-franchise-v1.0.0';
@@ -69,15 +71,13 @@ export const FTC_SERVICES: Readonly<Record<FtcService['key'], FtcService>> = {
   },
 };
 
-// 공정위 업종 중분류 → 서울시 상위 업종. 제품 범위(한식, 커피·음료)만 적재한다.
-export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, 'CS100001' | 'CS100010'>> = {
+// 공정위 업종 중분류 → 서울시 상위 업종. 이 표에 있는 중분류만 적재한다.
+export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, IndustryCode>> = {
   한식: 'CS100001',
   커피: 'CS100010',
   '음료 (커피 외)': 'CS100010',
 };
 export const FRANCHISE_INDUSTRY_LARGE = '외식';
-
-export type MarketIndustryCode = 'CS100001' | 'CS100010';
 
 export type FranchiseBrandRecord = {
   disclosureYear: number;
@@ -85,7 +85,7 @@ export type FranchiseBrandRecord = {
   brandName: string;
   industryLarge: string;
   industryMiddle: string;
-  marketIndustryCode: MarketIndustryCode;
+  marketIndustryCode: IndustryCode;
   storeCount: number;
   newStoreCount: number;
   contractEndCount: number;
@@ -152,7 +152,7 @@ export type FranchisePayload = {
     latestPerformanceYear: number;
     startupCostsIncluded: boolean;
   };
-  industry: { code: MarketIndustryCode; label: string; ftcMiddleNames: string[] };
+  industry: { code: IndustryCode; label: string; ftcMiddleNames: string[] };
   summary: { brandCount: number; brandsWithStores: number; brandsWithSales: number };
   query: string;
   brands: FranchiseBrand[];

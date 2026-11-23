@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import { z } from 'zod';
+import { INDUSTRY_CODES } from '../industries.ts';
 
 const AREA_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 
@@ -17,7 +18,7 @@ const positiveDecimalString = z
 
 export const businessProfileInputSchema = z.object({
   districtCode: z.string().regex(/^\d{5}$/, '서울 자치구 코드를 선택해 주세요.'),
-  marketIndustryCode: z.enum(['CS100001', 'CS100010']),
+  marketIndustryCode: z.enum(INDUSTRY_CODES),
   detailedIndustryCode: z.string().trim().min(2).max(20).nullable(),
   area: z.object({ value: positiveDecimalString, unit: z.enum(['PYEONG', 'SQUARE_METERS']) }),
   floor: z.enum(['BASEMENT_1', 'GROUND_1', 'UPPER_2_PLUS']),

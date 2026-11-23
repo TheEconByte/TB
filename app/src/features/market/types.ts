@@ -1,3 +1,5 @@
+import { INDUSTRIES } from '../industries.ts';
+
 export const MARKET_SCHEMA_VERSION = 'market-schema-v1.1.0';
 export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v2';
 export const INDUSTRY_CATEGORY_VERSION = 'seoul-service-industry-2024-2025';
@@ -11,10 +13,9 @@ export type DisplayNameSource = 'PRODUCT_DOCUMENT' | 'AREA_FILE' | 'OBSERVED_FIL
 // Product-document display names for the industries this release exposes.
 // Priority for an industry display name is PRODUCT_DOCUMENT first, then the
 // name recorded in the source files.
-export const SUPPORTED_INDUSTRIES: readonly { code: string; displayName: string }[] = [
-  { code: 'CS100001', displayName: '한식' },
-  { code: 'CS100010', displayName: '커피·음료' },
-];
+export const SUPPORTED_INDUSTRIES: readonly { code: string; displayName: string }[] = INDUSTRIES.map(
+  ({ code, shortName }) => ({ code, displayName: shortName }),
+);
 
 export const SUPPORTED_INDUSTRY_CODES: readonly string[] = SUPPORTED_INDUSTRIES.map((item) => item.code);
 

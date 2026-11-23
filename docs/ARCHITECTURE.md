@@ -42,6 +42,7 @@ Operator load commands (*:load)
 | 책임 | 위치 |
 |---|---|
 | 페이지·Route Handler | `app/src/app` |
+| 다루는 외식 업종 목록(도메인 공통, [ADR 0010](decisions/0010-food-service-industry-scope.md)) | `app/src/features/industries.ts` |
 | DB schema·migration | `app/prisma` |
 | 운영 적재·검증·하네스 명령 | `app/scripts` |
 | 학습된 계수 파일·학습 리포트 | `app/models/market-score` |

@@ -1,9 +1,10 @@
+import { isIndustryCode, type IndustryCode } from '../industries.ts';
 import { businessProfileInputSchema, type BusinessProfileInput } from './schema.ts';
 
 // 계획 화면의 사업 조건 입력 상태. 서버에 보내기 전 판정은 서버와 같은 스키마로 한다.
 export type BusinessProfileForm = {
   districtCode: string;
-  marketIndustryCode: '' | 'CS100001' | 'CS100010';
+  marketIndustryCode: '' | IndustryCode;
   detailedIndustryCode: string;
   areaValue: string;
   areaUnit: 'PYEONG' | 'SQUARE_METERS';
@@ -27,10 +28,7 @@ export function businessProfileFormFromStored(value: unknown): BusinessProfileFo
   const area = stored.area && typeof stored.area === 'object' ? (stored.area as Record<string, unknown>) : {};
   return {
     districtCode: typeof stored.districtCode === 'string' ? stored.districtCode : '',
-    marketIndustryCode:
-      stored.marketIndustryCode === 'CS100001' || stored.marketIndustryCode === 'CS100010'
-        ? stored.marketIndustryCode
-        : '',
+    marketIndustryCode: isIndustryCode(stored.marketIndustryCode) ? stored.marketIndustryCode : '',
     detailedIndustryCode: typeof stored.detailedIndustryCode === 'string' ? stored.detailedIndustryCode : '',
     areaValue: typeof area.value === 'string' ? area.value : '',
     areaUnit: area.unit === 'SQUARE_METERS' ? 'SQUARE_METERS' : 'PYEONG',
@@ -47,12 +45,10 @@ export function businessProfileFormFromStored(value: unknown): BusinessProfileFo
   };
 }
 
-const marketIndustryCodes: readonly string[] = businessProfileInputSchema.shape.marketIndustryCode.options;
-
 // 업종 드롭다운의 값을 폼에 넣는다. 빈 값이나 서버가 받지 않는 코드는 해제로 다룬다.
 // 상위 업종이 바뀌거나 해제되면 그 업종에 속한 세부 업종도 지운다.
 export function selectMarketIndustry(form: BusinessProfileForm, value: string): BusinessProfileForm {
-  const code = marketIndustryCodes.includes(value) ? (value as BusinessProfileForm['marketIndustryCode']) : '';
+  const code = isIndustryCode(value) ? value : '';
   if (code === form.marketIndustryCode) return form;
   return { ...form, marketIndustryCode: code, detailedIndustryCode: '' };
 }

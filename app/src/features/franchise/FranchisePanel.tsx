@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { IndustryCode } from '@/features/industries';
 import type { FranchiseBrand, FranchisePayload, FranchiseYearStats } from './types';
 
 const numberFormat = new Intl.NumberFormat('ko-KR');
@@ -34,7 +35,7 @@ function storeChange(brand: FranchiseBrand): string {
 export default function FranchisePanel({
   industryCode,
   savedMonthlyRevenue,
-}: Readonly<{ industryCode: '' | 'CS100001' | 'CS100010'; savedMonthlyRevenue: string | null }>) {
+}: Readonly<{ industryCode: '' | IndustryCode; savedMonthlyRevenue: string | null }>) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState<LoadState>({ kind: 'idle' });
   const [selectedId, setSelectedId] = useState('');

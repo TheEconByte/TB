@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
+import { INDUSTRIES, industryByCode } from '@/features/industries';
 import { BUILDING_TYPE_CRITERIA, BUILDING_TYPE_LABELS, BUILDING_TYPES } from '@/features/rent-benchmark/types';
 import {
   EMPTY_BUSINESS_PROFILE_FORM,
@@ -14,11 +15,6 @@ import {
 import { AreaIcon, BuildingTypeIcon, FloorIcon, SearchIcon, TipIcon } from './icons';
 
 const STEPS = ['위치·업종', '매장 크기', '매장 층', '상가 유형', '입력 확인'] as const;
-
-const INDUSTRIES = [
-  { code: 'CS100001', label: '한식음식점' },
-  { code: 'CS100010', label: '커피·음료' },
-] as const;
 
 const AREA_PRESETS = [
   { value: '12', label: '소형', size: 'small' },
@@ -77,12 +73,7 @@ export default function BusinessProfileWizard({
   const complete = saveState.kind === 'COMPLETE';
   const missing = businessProfileMissingFields(form);
   const district = SEOUL_DISTRICTS.find((item) => item.code === form.districtCode)?.name ?? '미선택';
-  const broadName =
-    form.marketIndustryCode === 'CS100001'
-      ? '한식음식점'
-      : form.marketIndustryCode === 'CS100010'
-        ? '커피·음료'
-        : '미선택';
+  const broadName = industryByCode(form.marketIndustryCode)?.name ?? '미선택';
 
   return (
     <section className="business-wizard" aria-labelledby="business-wizard-title">
@@ -149,9 +140,9 @@ export default function BusinessProfileWizard({
                 onChange={(event) => onChange(selectMarketIndustry(form, event.target.value))}
               >
                 <option value="">업종을 선택하세요</option>
-                {INDUSTRIES.map(({ code, label }) => (
+                {INDUSTRIES.map(({ code, name }) => (
                   <option key={code} value={code}>
-                    {label}
+                    {name}
                   </option>
                 ))}
               </select>
