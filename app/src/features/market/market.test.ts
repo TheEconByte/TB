@@ -622,7 +622,7 @@ describe('source pipeline', () => {
       storeCount: 4,
     });
     expect(parsed.industries.find((industry) => industry.code === 'CS100002')).toMatchObject({
-      displayName: '중식음식점',
+      displayName: '중식',
       displayNameSource: 'PRODUCT_DOCUMENT',
       isSupported: true,
     });
@@ -928,7 +928,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
   it('serves a newly opened industry with its own observed values', async () => {
     // ADR 0010 7단계: 5단계에서 적재해 둔 중식 관측값을 다시 적재하지 않고 그대로 낸다(픽스처의 555원·4개).
     const chinese = await prismaSummary('3110001', 'CS100002');
-    expect(chinese.industry.displayName).toBe('중식음식점');
+    expect(chinese.industry.displayName).toBe('중식');
     expect(chinese.quarters.map((quarter) => [quarter.quarter, quarter.salesAmount, quarter.storeCount])).toEqual([
       ['20241', '555', 4],
     ]);

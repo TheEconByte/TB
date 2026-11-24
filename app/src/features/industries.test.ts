@@ -12,7 +12,7 @@ import { businessProfileInputSchema } from './business-profile/schema.ts';
 import { franchiseQuerySchema } from './franchise/schema.ts';
 import { INDUSTRY_MIDDLE_TO_MARKET } from './franchise/types.ts';
 import { INDUSTRIES, INDUSTRY_CODES, OPEN_INDUSTRY_CODES, isIndustryCode } from './industries.ts';
-import { MARKET_INDUSTRIES, isServedMarketIndustry } from './market/types.ts';
+import { MARKET_DEFINITION_VERSION, MARKET_INDUSTRIES, isServedMarketIndustry } from './market/types.ts';
 
 // ADR 0010: 업종 목록은 한 파일에서 정하고 모든 도메인이 그 목록을 쓴다.
 describe('업종 목록', () => {
@@ -33,23 +33,32 @@ describe('업종 목록', () => {
     ]);
   });
 
-  it('요식업 업종 열 개를 모두 열고, 표시명은 적재한 상권 릴리스의 이름 그대로다', () => {
+  it('요식업 업종 열 개를 모두 열고, 상권·프랜차이즈 화면에는 짧은 표시명을 쓴다', () => {
     // 근거: ADR 0010 7단계. 상권·경쟁 점포·프랜차이즈 자료를 열 개 업종 모두 적재했고, 열 개를 한 번에 열기로
-    // 정했다(사용자 결정 2026-11-24). 상권 화면은 적재 때 릴리스에 저장한 표시명을 쓰므로, shortName을 바꾸면
-    // 다시 적재하기 전까지 상권 화면과 프랜차이즈 화면의 이름이 갈린다. 그래서 한식 외에는 원자료 이름을 그대로 둔다
-    // (ACTIVE 상권 릴리스 seoul-market-2021q1-2026q2-ea78b0888796의 displayName, 사용자 결정 2026-11-24).
+    // 정했다(사용자 결정 2026-11-24). 표시명은 한식처럼 "음식점"·"전문점"·"점"을 뗀 이름으로 줄인다. 제과점은 떼면
+    // 업종이 흐려지고, 호프·간이주점과 커피·음료는 붙은 말이 없어 원자료 이름 그대로다(ADR 0010 §4, 사용자 결정 2026-11-24).
     expect(OPEN_INDUSTRY_CODES).toEqual(INDUSTRY_CODES);
     expect(INDUSTRIES.map(({ code, shortName }) => [code, shortName])).toEqual([
       ['CS100001', '한식'],
-      ['CS100002', '중식음식점'],
-      ['CS100003', '일식음식점'],
-      ['CS100004', '양식음식점'],
+      ['CS100002', '중식'],
+      ['CS100003', '일식'],
+      ['CS100004', '양식'],
       ['CS100005', '제과점'],
-      ['CS100006', '패스트푸드점'],
-      ['CS100007', '치킨전문점'],
-      ['CS100008', '분식전문점'],
+      ['CS100006', '패스트푸드'],
+      ['CS100007', '치킨'],
+      ['CS100008', '분식'],
       ['CS100009', '호프·간이주점'],
       ['CS100010', '커피·음료'],
+    ]);
+  });
+
+  it('표시명을 바꾸면 상권 정의 버전도 바뀐다', () => {
+    // 상권 릴리스는 적재 때 shortName을 표시명으로 저장하지만, 릴리스 키는 스키마·정의 버전과 원본 내용으로만 만든다
+    // (source-files.ts의 releaseKeyFor). 원본이 같으면 다시 적재해도 ALREADY_ACTIVE로 끝나 이름이 바뀌지 않는다.
+    // 그래서 위 표시명을 바꿀 때는 정의 버전을 올리고 이 짝도 함께 고친다. v4는 새 업종의 표시명을 줄인 정의다.
+    expect([MARKET_DEFINITION_VERSION, INDUSTRIES.map(({ shortName }) => shortName).join(',')]).toEqual([
+      'seoul-market-definition-2024-2025-v4',
+      '한식,중식,일식,양식,제과점,패스트푸드,치킨,분식,호프·간이주점,커피·음료',
     ]);
   });
 

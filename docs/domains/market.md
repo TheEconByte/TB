@@ -19,7 +19,7 @@
 - 관측값을 적재하는 업종은 요식업 업종 목록(`app/src/features/industries.ts`)의 열 개이고, 릴리스의 `industries` 행에 `isSupported`로 남는다. 그 밖의 업종은 원천 분류로만 남긴다([ADR 0010](../decisions/0010-food-service-industry-scope.md)).
 - 사용자에게 내는 업종은 그중 열린 업종이다. 지금은 열 개 모두 열려 있다(ADR 0010 7단계). 업종 목록·summary·report·사업 조건 저장은 `isServedMarketIndustry`(`types.ts`)로, 점수 API와 계획 스냅샷은 열린 업종인지로 거른다. 업종을 열 때 다시 적재하거나 다시 학습하지 않는다.
 - 열린 업종의 분기 자료가 없으면 적재하지 않는다. 열지 않은 업종의 자료가 없으면 경고만 남긴다.
-- 업종 표시명은 적재할 때 `industries.ts`의 `shortName`을 릴리스에 저장한 값이다. `shortName`을 바꾸면 상권을 다시 적재해야 상권 화면에 반영된다.
+- 업종 표시명은 적재할 때 `industries.ts`의 `shortName`을 릴리스에 저장한 값이다. 표시명은 릴리스 키에 들어가지 않아, `shortName`만 바꾸고 적재하면 `ALREADY_ACTIVE`로 끝난다. 그래서 `shortName`을 바꾸면 `MARKET_DEFINITION_VERSION`(`types.ts`)을 올리고 상권을 다시 적재한다(`industries.test.ts`가 둘을 짝으로 검사한다). 그 뒤 `score:build`도 다시 실행한다.
 - 상권 표시명 우선순위: 영역 파일 명칭 → 매출·점포 파일 관측 명칭. 업종 표시명 우선순위: 제품 문서 표시명 → 원천 명칭. 두 명칭은 응답에 함께 담는다.
 - 파일 적재는 manifest에 기록된 파일 크기와 SHA-256이 일치하는 원본만 허용한다. 새 원본은 입수일·기준기간·checksum·예상 행 수를 검증해 새 manifest와 정의 버전으로 추가하며, 명령행 옵션으로 검증을 우회하지 않는다.
 - 업종 메타데이터는 릴리스별로 저장한다. PENDING·FAILED 릴리스의 업종 원본 명칭이 현재 ACTIVE 릴리스 응답을 바꾸지 않는다.

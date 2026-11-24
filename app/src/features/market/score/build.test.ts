@@ -206,8 +206,8 @@ describe('점수 API 응답 조립', () => {
     expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식'])).toBe(
       '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식만 냅니다.',
     );
-    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식', '패스트푸드점'])).toBe(
-      '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·패스트푸드점만 냅니다.',
+    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식', '패스트푸드'])).toBe(
+      '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·패스트푸드만 냅니다.',
     );
     expect(scoreStatusMessage('NO_DATA', null, ['한식'])).toBe('이 상권은 최근 데이터가 없습니다.');
   });
