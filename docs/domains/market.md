@@ -51,6 +51,6 @@
 
 - 항상: 원본 파싱·헤더 매핑·checksum·거부 규칙, 가짜 서울 API로 API 수신과 적재 원본 구성.
 - 항상: 생존점수 변수·라벨·회귀·점수·등급·기여도·예외 상태·월매출 기본값(`score.test.ts`, `build.test.ts`). 계수 파일은 스키마를 통과해야 한다.
-- 전용 테스트 DB가 있을 때: 합성 릴리스로 `score:build` 활성화·재실행·실패 시 유지, 점수 API 상태, 계획 스냅샷(`score-db.test.ts`). E2E는 `e2e/market-score.spec.ts`.
+- 전용 테스트 DB가 있을 때: 합성 릴리스로 `score:build` 활성화·재실행·실패 시 유지, 점수 API 상태, 계획 스냅샷(`score-db.test.ts`). E2E는 한식·커피 경로가 `e2e/market-score.spec.ts`, 점수 없이 연 업종(중식)과 점수를 내는 새 업종(패스트푸드) 경로가 `e2e/food-industries.spec.ts`다.
 - `data/raw/`에 검증본 파일이 있을 때: 기록된 행 수·결합·표본 대조.
 - 전용 테스트 DB가 있을 때: 합성 릴리스 적재. 끝나면 지우고 실행 전 ACTIVE 상태를 복원한다.
