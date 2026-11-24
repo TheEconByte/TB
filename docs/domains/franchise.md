@@ -13,7 +13,7 @@
   - 공공데이터포털에서 [브랜드별 가맹점 현황](https://www.data.go.kr/data/15110241/openapi.do)과 [브랜드별 창업 금액 현황](https://www.data.go.kr/data/15110265/openapi.do)을 활용신청해야 한다.
 - 기본으로 최근 3개 정보공개서 기준년도를 받는다. 최신 연도는 한국 시간 기준 올해의 전년도이고, `--latest-year 2025`로 바꿀 수 있다. 기준년도 N의 수치는 N−1년 실적이며, 가맹점 수는 N−1년 말 기준이다.
 - 창업 금액 활용신청이 승인되기 전에는 `-- --without-startup-costs`로 창업 금액 없이 적재할 수 있다. 이때 릴리스 키에 `nocost`가 붙는다.
-- 범위: 대분류 외식 중 `types.ts`의 `INDUSTRY_MIDDLE_TO_MARKET`이 요식업 업종으로 대응한 중분류다(대응과 근거는 [ADR 0010](../decisions/0010-food-service-industry-scope.md) §2). 열지 않은 업종의 브랜드도 적재하고, 조회 입력(`schema.ts`)이 열린 업종만 받는다. 키는 기준년도·법인명·브랜드명·업종 중분류다.
+- 범위: 대분류 외식 중 `types.ts`의 `INDUSTRY_MIDDLE_TO_MARKET`이 요식업 업종으로 대응한 중분류다(대응과 근거는 [ADR 0010](../decisions/0010-food-service-industry-scope.md) §2). 열지 않은 업종의 브랜드도 적재하고, 조회 입력(`schema.ts`)이 열린 업종만 받는다. 지금은 열 개 업종이 모두 열려 있다(ADR 0010 7단계). 키는 기준년도·법인명·브랜드명·업종 중분류다.
 - 값:
   - 금액은 천원 단위 원본 그대로 저장한다.
   - 평균매출·3.3㎡당 평균매출의 0은 미기재(NULL)로 저장한다.
@@ -29,7 +29,7 @@
 
 ## 조회
 
-`GET /api/franchises?industryCode=CS100001|CS100010&q=메가&limit=10`
+`GET /api/franchises?industryCode=<열린 상위 업종 코드>&q=메가&limit=10`
 
 - 최신 기준년도의 해당 업종 브랜드를 가맹점 수가 많은 순서로 돌려준다.
   - `q`는 브랜드명·가맹본부명의 부분 일치이며, 대소문자를 구분하지 않고 40자까지 받는다.

@@ -16,12 +16,16 @@ import { interpretationPhrase, recordedInterpretation, type MonthlyRevenueInterp
 
 export const MAX_CONTRIBUTIONS = 4;
 
-// 마지막 문장의 매출 해석은 응답하는 점수 릴리스의 해석을 따른다.
-export function scoreLimitations(interpretation: MonthlyRevenueInterpretation): readonly string[] {
+// 학습한 업종 수, 기준 AUC, 매출 해석은 응답하는 점수 릴리스의 모델·기록을 따른다.
+export function scoreLimitations(
+  interpretation: MonthlyRevenueInterpretation,
+  trainedIndustryCount: number,
+  minTestAuc: number,
+): readonly string[] {
   return [
     '서울시 상권분석서비스의 공공 추정 데이터로 계산했습니다.',
     '개별 점포의 생존 확률이나 예상매출이 아닙니다. 같은 업종 점포들의 향후 1년 폐업률이 서울 중간 수준보다 낮을 가능성입니다.',
-    '서울의 한식·커피 상권만 학습했고, 테스트 정확도가 기준에 못 미친 업종은 점수를 내지 않습니다.',
+    `서울 요식업 ${trainedIndustryCount}개 업종의 상권을 학습했고, 테스트 정확도(AUC)가 ${minTestAuc} 미만인 업종은 점수를 내지 않습니다.`,
     `점포당 월매출은 매출 원값을 ${interpretationPhrase(interpretation)} 잠정 해석입니다.`,
   ];
 }
@@ -115,7 +119,7 @@ export function scoreStatusMessage(
         ? '이 상권에는 이 업종 점포가 없어 점수를 내지 않습니다.'
         : `점포가 ${storeCount}개뿐이라 점수를 내지 않습니다.`;
     case 'UNSUPPORTED_INDUSTRY':
-      return `현재 ${servedNames.join('·')}만 지원합니다.`;
+      return `이 업종은 생존점수를 내지 않습니다. 점수는 현재 ${servedNames.join('·')}만 냅니다.`;
     case 'NO_DATA':
       return '이 상권은 최근 데이터가 없습니다.';
   }
@@ -214,7 +218,7 @@ export async function getMarketScore(
     distribution: null,
     financeDefault: null,
     model: null,
-    limitations: scoreLimitations(interpretation),
+    limitations: scoreLimitations(interpretation, model.industries.length, summary.minTestAuc),
   };
   const servedNames = servedIndustries.map((item) => item.displayName);
   if (!served || !industrySummary || !industryModel) {

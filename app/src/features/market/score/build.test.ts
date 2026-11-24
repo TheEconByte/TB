@@ -202,9 +202,12 @@ describe('점수 API 응답 조립', () => {
     expect(scoreStatusMessage('INSUFFICIENT_STORES', 0, ['한식'])).toBe(
       '이 상권에는 이 업종 점포가 없어 점수를 내지 않습니다.',
     );
-    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식'])).toBe('현재 한식만 지원합니다.');
-    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식', '커피·음료'])).toBe(
-      '현재 한식·커피·음료만 지원합니다.',
+    // 업종은 열려 있어 상권 지표는 보이므로, 업종 전체가 아니라 점수만 없다고 적는다(ADR 0010 7단계).
+    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식'])).toBe(
+      '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식만 냅니다.',
+    );
+    expect(scoreStatusMessage('UNSUPPORTED_INDUSTRY', null, ['한식', '패스트푸드점'])).toBe(
+      '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·패스트푸드점만 냅니다.',
     );
     expect(scoreStatusMessage('NO_DATA', null, ['한식'])).toBe('이 상권은 최근 데이터가 없습니다.');
   });

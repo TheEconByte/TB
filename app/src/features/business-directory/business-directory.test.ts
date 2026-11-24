@@ -196,12 +196,25 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('소진공 점포 스냅샷 적�
     await db().$disconnect();
   });
 
-  it('요식업 업종으로 대응한 점포를 모두 적재하고, 조회는 열린 업종의 점포만 내보인다', async () => {
+  it('요식업 업종 열 개의 점포를 적재하고 모두 조회한다', async () => {
+    // 업종마다 대응표(ADR 0010 §2의 경쟁 점포)에 있는 소분류 하나씩. 업종 코드는 대응표에서 나온다.
+    const perIndustry = [
+      ['B01', 'I201', '한식', 'I20107', '돼지고기 구이/찜', 'CS100001'],
+      ['B02', 'I202', '중식', 'I20201', '중국집', 'CS100002'],
+      ['B03', 'I203', '일식', 'I20301', '일식 회/초밥', 'CS100003'],
+      ['B04', 'I204', '서양식', 'I20401', '경양식', 'CS100004'],
+      ['B05', 'I210', '기타 간이', 'I21001', '빵/도넛', 'CS100005'],
+      ['B06', 'I210', '기타 간이', 'I21004', '버거', 'CS100006'],
+      ['B07', 'I210', '기타 간이', 'I21006', '치킨', 'CS100007'],
+      ['B08', 'I210', '기타 간이', 'I21007', '김밥/만두/분식', 'CS100008'],
+      ['B09', 'I211', '주점', 'I21103', '생맥주 전문', 'CS100009'],
+      ['B10', 'I212', '비알코올', 'I21201', '카페', 'CS100010'],
+    ] as const;
     const items = [
-      semasItem('B1', 'I201', '한식', 'I20107', '돼지고기 구이/찜'),
-      semasItem('B2', 'I212', '비알코올', 'I21201', '카페'),
-      semasItem('B3', 'I202', '중식', 'I20201', '중국집'),
-      semasItem('B4', 'I205', '동남아시아', 'I20501', '베트남식 전문'),
+      ...perIndustry.map(([id, middleCode, middleName, smallCode, smallName]) =>
+        semasItem(id, middleCode, middleName, smallCode, smallName),
+      ),
+      semasItem('B11', 'I205', '동남아시아', 'I20501', '베트남식 전문'),
     ];
     const result = await loadBusinessDirectory({
       prisma: db(),
@@ -210,25 +223,19 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('소진공 점포 스냅샷 적�
       retrievedAt: new Date('2026-11-24T00:00:00.000Z'),
     });
     expect(result.outcome).toBe('ACTIVATED');
-    // 대응하지 못한 베트남식(B4)만 빠진다.
-    expect(result.businessCount).toBe(3);
-    // 열지 않은 중식 점포도 남겨 업종을 열 때(7단계) 다시 적재하지 않는다.
-    const chinese = await db().businessLocation.findFirst({
-      where: { releaseId: result.releaseId, sourceBusinessId: 'B3' },
-    });
-    expect(chinese?.marketIndustryCode).toBe('CS100002');
+    // 대응하지 못한 베트남식(B11)만 빠진다.
+    expect(result.businessCount).toBe(10);
 
+    // 열 개 업종을 모두 열었으므로(ADR 0010 7단계) 업종마다 소분류가 하나씩 보인다.
     const categories = await listBusinessCategories(db());
-    expect(categories.categories.map((category) => [category.code, category.marketIndustryCode])).toEqual([
-      ['I20107', 'CS100001'],
-      ['I21201', 'CS100010'],
-    ]);
-    expect((await getBusinessSummary(db(), { districtCode: '11440', detailedIndustryCode: 'I20201' })).kind).toBe(
-      'CATEGORY_NOT_FOUND',
+    expect(categories.categories.map((category) => [category.code, category.marketIndustryCode])).toEqual(
+      perIndustry.map(([, , , smallCode, , industryCode]) => [smallCode, industryCode]),
     );
-    const korean = await getBusinessSummary(db(), { districtCode: '11440', detailedIndustryCode: 'I20107' });
-    expect(korean.kind === 'OK' ? korean.payload.businessCount : korean.kind).toBe(1);
+    const chinese = await getBusinessSummary(db(), { districtCode: '11440', detailedIndustryCode: 'I20201' });
+    expect(chinese.kind === 'OK' ? chinese.payload.businessCount : chinese.kind).toBe(1);
+    // 세부 업종은 자기 상위 업종에서만 고를 수 있다. 중국집은 한식의 세부 업종이 아니다.
     expect(await resolveDetailedCategory(db(), 'I20201', 'CS100001')).toBeNull();
+    expect(await resolveDetailedCategory(db(), 'I20201', 'CS100002')).not.toBeNull();
   }, 60000);
 
   it('열린 업종의 점포가 하나도 없으면 활성화하지 않고 기존 ACTIVE를 유지한다', async () => {

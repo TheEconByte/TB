@@ -11,7 +11,7 @@ import {
 import { businessProfileInputSchema } from './business-profile/schema.ts';
 import { franchiseQuerySchema } from './franchise/schema.ts';
 import { INDUSTRY_MIDDLE_TO_MARKET } from './franchise/types.ts';
-import { INDUSTRIES, INDUSTRY_CODES, OPEN_INDUSTRIES, OPEN_INDUSTRY_CODES, isIndustryCode } from './industries.ts';
+import { INDUSTRIES, INDUSTRY_CODES, OPEN_INDUSTRY_CODES, isIndustryCode } from './industries.ts';
 import { MARKET_INDUSTRIES, isServedMarketIndustry } from './market/types.ts';
 
 // ADR 0010: 업종 목록은 한 파일에서 정하고 모든 도메인이 그 목록을 쓴다.
@@ -33,12 +33,23 @@ describe('업종 목록', () => {
     ]);
   });
 
-  it('열린 업종은 아직 한식과 커피·음료뿐이고 이름은 지금 화면 그대로다', () => {
-    // 근거: PRODUCT.md "상위 업종은 한식(CS100001)과 커피·음료(CS100010)만 노출한다". 업종은 7단계에서 연다.
-    // 업종을 고르는 화면은 "한식음식점", 상권·프랜차이즈 화면은 "한식"으로 보여 왔다.
-    expect(OPEN_INDUSTRIES.map(({ code, name, shortName }) => ({ code, name, shortName }))).toEqual([
-      { code: 'CS100001', name: '한식음식점', shortName: '한식' },
-      { code: 'CS100010', name: '커피·음료', shortName: '커피·음료' },
+  it('요식업 업종 열 개를 모두 열고, 표시명은 적재한 상권 릴리스의 이름 그대로다', () => {
+    // 근거: ADR 0010 7단계. 상권·경쟁 점포·프랜차이즈 자료를 열 개 업종 모두 적재했고, 열 개를 한 번에 열기로
+    // 정했다(사용자 결정 2026-11-24). 상권 화면은 적재 때 릴리스에 저장한 표시명을 쓰므로, shortName을 바꾸면
+    // 다시 적재하기 전까지 상권 화면과 프랜차이즈 화면의 이름이 갈린다. 그래서 한식 외에는 원자료 이름을 그대로 둔다
+    // (ACTIVE 상권 릴리스 seoul-market-2021q1-2026q2-ea78b0888796의 displayName, 사용자 결정 2026-11-24).
+    expect(OPEN_INDUSTRY_CODES).toEqual(INDUSTRY_CODES);
+    expect(INDUSTRIES.map(({ code, shortName }) => [code, shortName])).toEqual([
+      ['CS100001', '한식'],
+      ['CS100002', '중식음식점'],
+      ['CS100003', '일식음식점'],
+      ['CS100004', '양식음식점'],
+      ['CS100005', '제과점'],
+      ['CS100006', '패스트푸드점'],
+      ['CS100007', '치킨전문점'],
+      ['CS100008', '분식전문점'],
+      ['CS100009', '호프·간이주점'],
+      ['CS100010', '커피·음료'],
     ]);
   });
 
@@ -47,22 +58,25 @@ describe('업종 목록', () => {
     expect(businessProfileInputSchema.shape.marketIndustryCode.options).toEqual(INDUSTRY_CODES);
   });
 
-  it('조회와 업종 선택은 열린 업종만 받는다', () => {
+  it('조회와 업종 선택은 열린 업종을 받고 목록 밖 코드는 받지 않는다', () => {
     // 열지 않은 업종을 받으면 적재되지 않은 업종의 빈 결과를 성공처럼 보인다(ADR 0010 Validation).
+    // 7단계에서 새로 연 업종(중식 CS100002)을 고를 수 있어야 한다.
     expect(franchiseQuerySchema.shape.industryCode.options).toEqual(OPEN_INDUSTRY_CODES);
-    expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100002').success).toBe(false);
-    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100002').marketIndustryCode).toBe('');
-    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100010').marketIndustryCode).toBe('CS100010');
-    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100002' }).marketIndustryCode).toBe('');
-    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100010' }).marketIndustryCode).toBe('CS100010');
+    expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100002').success).toBe(true);
+    expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100011').success).toBe(false);
+    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100002').marketIndustryCode).toBe('CS100002');
+    expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100011').marketIndustryCode).toBe('');
+    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100002' }).marketIndustryCode).toBe('CS100002');
+    expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100011' }).marketIndustryCode).toBe('');
   });
 
   it('상권은 요식업 업종을 모두 적재하고, 그중 열린 업종만 내보인다', () => {
     // ADR 0010 5단계: 업종을 열 때 다시 적재하지 않도록 관측값은 열 개 모두 남긴다.
     expect(MARKET_INDUSTRIES.map((item) => item.code)).toEqual(INDUSTRY_CODES);
     expect(isServedMarketIndustry({ code: 'CS100001', isSupported: true })).toBe(true);
-    // 관측값이 있어도 열지 않은 업종은 내보이지 않는다.
-    expect(isServedMarketIndustry({ code: 'CS100002', isSupported: true })).toBe(false);
+    // 7단계에서 연 업종은 내보이고, 목록 밖 코드는 관측값이 있어도 내보이지 않는다.
+    expect(isServedMarketIndustry({ code: 'CS100002', isSupported: true })).toBe(true);
+    expect(isServedMarketIndustry({ code: 'CS300001', isSupported: true })).toBe(false);
     // 열린 업종이어도 그 릴리스에 관측값이 없으면 내보이지 않는다.
     expect(isServedMarketIndustry({ code: 'CS100001', isSupported: false })).toBe(false);
   });

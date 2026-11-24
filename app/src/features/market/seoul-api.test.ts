@@ -1,6 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
+import { INDUSTRY_CODES } from '../industries.ts';
 import { AREA_API_FIELD_NAMES, SALES_API_FIELDS, STORES_API_FIELDS } from './headers.ts';
 import { loadMarketReleaseFromApi, readMarketApiSources } from './loader.ts';
 import { getMarketSummary, listMarketAreas } from './read.ts';
@@ -65,6 +66,10 @@ function store(quarter: string, code: string, industry: string, storeCount: numb
 
 type ApiData = { areas: Row[]; sales: Row[]; stores: Row[] };
 
+// 한식·커피·음료 밖의 요식업 업종 여덟 개. 열린 업종의 자료가 빠진 릴리스는 활성화하지 않으므로(ADR 0010)
+// 열 개 업종이 모두 있어야 한다. 다른 행과 섞이지 않게 상권 3110003의 2024년 2분기에 하나씩 둔다.
+const OTHER_FOOD_INDUSTRY_CODES = INDUSTRY_CODES.filter((code) => code !== 'CS100001' && code !== 'CS100010');
+
 function defaultData(): ApiData {
   return {
     areas: ['3110001', '3110002', '3110003'].map(areaRow),
@@ -73,6 +78,9 @@ function defaultData(): ApiData {
       salesRow({ STDR_YYQU_CD: '20241', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS300001', THSMON_SELNG_AMT: 5 }),
       salesRow({ STDR_YYQU_CD: '20242', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100001', THSMON_SELNG_AMT: 200 }),
       salesRow({ STDR_YYQU_CD: '20242', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100010', THSMON_SELNG_AMT: 0 }),
+      ...OTHER_FOOD_INDUSTRY_CODES.map((code) =>
+        salesRow({ STDR_YYQU_CD: '20242', TRDAR_CD: '3110003', SVC_INDUTY_CD: code, THSMON_SELNG_AMT: 100 }),
+      ),
     ],
     stores: [
       store('20241', '3110001', 'CS100001', 10, 3),
@@ -80,6 +88,7 @@ function defaultData(): ApiData {
       store('20241', '3110002', 'CS100001', 7),
       store('20242', '3110001', 'CS100001', 11, 3),
       store('20242', '3110001', 'CS100010', 2),
+      ...OTHER_FOOD_INDUSTRY_CODES.map((code) => store('20242', '3110003', code, 3)),
     ],
   };
 }
@@ -219,7 +228,8 @@ describe('서울 Open API 적재 원본', () => {
   it('파일 적재와 같은 규칙으로 분기 지표를 만든다', async () => {
     const parsed = await readMarketApiSources(readOptions());
     expect(parsed.stats.quarters).toEqual(['20241', '20242']);
-    expect(parsed.quarterly).toHaveLength(4);
+    // 결합 키 12개: 한식 3, 커피·음료 1, 나머지 여덟 업종 각 1. 요식업이 아닌 CS300001은 빠진다.
+    expect(parsed.quarterly).toHaveLength(12);
     expect(parsed.checks.every((check) => check.passed)).toBe(true);
 
     const first = parsed.quarterly.find((row) => row.quarter === '20241' && row.areaCode === '3110001');
@@ -240,7 +250,8 @@ describe('서울 Open API 적재 원본', () => {
       'api:VwsmTrdarSelngQq',
       'api:VwsmTrdarStorQq',
     ]);
-    expect(parsed.files.map((file) => file.rowCount)).toEqual([3, 4, 5]);
+    // 상권 3, 매출 4 + 다른 업종 8, 점포 5 + 다른 업종 8(defaultData의 행 수).
+    expect(parsed.files.map((file) => file.rowCount)).toEqual([3, 12, 13]);
     expect(parsed.release).toMatchObject({
       basisStart: '20241',
       basisEnd: '20242',
@@ -324,7 +335,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('서울 Open API 릴리스 적�
     const report = await loadMarketReleaseFromApi({ ...readOptions(), prisma: db(), log: () => {} });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.areaCount).toBe(3);
-    expect(report.quarterlyRowCount).toBe(4);
+    expect(report.quarterlyRowCount).toBe(12);
 
     const areas = await listMarketAreas(db(), '11200');
     if (areas.kind !== 'OK') throw new Error(areas.kind);
