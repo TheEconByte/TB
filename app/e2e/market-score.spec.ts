@@ -307,7 +307,7 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
 
   await page.goto(`/funding?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=CS100001&scoreRelease=${releaseKey}`);
   await expect(page.getByTestId('funding-grade')).toContainText('상권 생존점수 등급 A (72점)');
-  await expect(page.getByTestId('funding-grade')).toContainText('자금 후보 판정 조건에 쓰지 않으며');
+  await expect(page.getByTestId('funding-grade')).toContainText('자금 후보 판정 조건에 쓰지 않습니다');
   await expect(page.getByLabel('2. 사업장·거주 자치구')).toHaveValue('11200');
   await expect(page.getByLabel('3. 업종 코드 (선택)')).toHaveCount(0);
   await expect(page.getByLabel('3. 대표자 나이 (선택)')).toHaveValue('');
@@ -401,7 +401,7 @@ test('저장하지 않고 떠났다 돌아오면 상권 값을 다시 채우지 
 // 그때도 버튼이 넘긴 참조로만 채우고, 다른 화면 주소에 있던 참조로는 채우지 않아야 한다.
 async function openFundingSignedIn(page: Page, path: string): Promise<void> {
   await page.goto(path);
-  await expect(page.getByRole('heading', { name: '이 결과가 무엇이고 무엇이 아닌지' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '내 조건 입력' })).toBeVisible();
 }
 
 test('화면 안에서 이동해 버튼을 눌러도 상권 값을 채운다', async ({ page }, testInfo) => {

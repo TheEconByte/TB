@@ -242,10 +242,6 @@ export default function MarketExplorer() {
           <br />
           상권에서 업종으로.
         </h1>
-        <p>
-          서울시 상권분석서비스의 공개 원값을 그대로 보여줍니다. 로그인 없이 볼 수 있고, 개인 재무계획에는 [이 상권으로
-          재무 계획 시작]을 눌렀을 때만 값을 넘깁니다.
-        </p>
       </section>
 
       {booting && (
@@ -263,24 +259,20 @@ export default function MarketExplorer() {
 
       {!booting && !bootError && !activeRelease && (
         <div className="empty-panel" role="status">
-          <h2>활성 상권 릴리스가 없습니다.</h2>
-          <p>
-            운영자가 <code>npm --prefix app run market:load</code>로 검증된 릴리스를 활성화하기 전까지는 조회할 상권
-            지표가 없습니다. 자료가 없는 상태를 0으로 대신 표시하지 않습니다.
-          </p>
+          <h2>상권 데이터가 아직 준비되지 않았습니다.</h2>
         </div>
       )}
 
       {!booting && activeRelease && (
         <>
-          <section className="notice-box" aria-labelledby="market-limitations">
-            <h2 id="market-limitations">이 화면의 값이 무엇이고 무엇이 아닌지</h2>
+          <details className="notice-box">
+            <summary>이 화면의 값을 읽는 법</summary>
             <ul>
               {MARKET_LIMITATIONS.map((limitation) => (
                 <li key={limitation}>{limitation}</li>
               ))}
             </ul>
-          </section>
+          </details>
 
           <ReleaseCard release={activeRelease} />
 
@@ -338,7 +330,7 @@ export default function MarketExplorer() {
                   <option value="">업종을 선택하세요</option>
                   {industries.map((industry) => (
                     <option key={industry.code} value={industry.code}>
-                      {industry.displayName} ({industry.code})
+                      {industry.displayName}
                     </option>
                   ))}
                 </select>
@@ -362,17 +354,13 @@ export default function MarketExplorer() {
                   </option>
                   {filteredBusinessCategories.map((category) => (
                     <option key={category.code} value={category.code}>
-                      {category.name} ({category.code})
+                      {category.name}
                     </option>
                   ))}
                 </select>
                 <small>{businessCategoryMessage}</small>
               </label>
             </div>
-            <p className="picker-note">
-              업종 표시명은 제품 문서의 이름을 우선하고 원본 명칭을 함께 보존합니다. 상권 표시명은 영역 파일 명칭을
-              우선하며, 매출·점포 파일의 명칭이 다르면 아래에 함께 표시합니다.
-            </p>
           </section>
 
           {(industryCode || detailedIndustryCode) && (
@@ -416,9 +404,7 @@ export default function MarketExplorer() {
               </div>
             )}
             {!summaryLoading && !summaryError && !summary && (
-              <p className="empty-state">
-                자치구 → 상권 → 업종 순으로 선택하면 가용 분기와 분기별 원본 지표를 표시합니다.
-              </p>
+              <p className="empty-state">자치구 → 상권 → 업종을 고르세요.</p>
             )}
             {!summaryLoading && summary && scoreError && (
               <div className="error-box" role="alert">
@@ -443,40 +429,22 @@ export default function MarketExplorer() {
           </section>
         </>
       )}
-
-      <footer>TrendBench · 공개 상권 지표 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
 }
 
 function ReleaseCard({ release }: { readonly release: ReleaseInfo }) {
   return (
-    <section className="release-card" aria-labelledby="market-release">
-      <h2 id="market-release">데이터 출처와 기준</h2>
+    <details className="release-card">
+      <summary>데이터 출처 · {release.basisPeriodLabel}</summary>
       <dl className="release-grid">
         <div>
-          <dt>활성 릴리스</dt>
+          <dt>릴리스</dt>
           <dd>{release.releaseKey}</dd>
-        </div>
-        <div>
-          <dt>기준기간</dt>
-          <dd>{release.basisPeriodLabel}</dd>
         </div>
         <div>
           <dt>원본 입수일</dt>
           <dd>{formatDate(release.retrievedAt)}</dd>
-        </div>
-        <div>
-          <dt>활성화 시각</dt>
-          <dd>{release.activatedAt ? new Date(release.activatedAt).toLocaleString('ko-KR') : '기록 없음'}</dd>
-        </div>
-        <div>
-          <dt>적재 스키마 버전</dt>
-          <dd>{release.schemaVersion}</dd>
-        </div>
-        <div>
-          <dt>공간·지표 정의 버전</dt>
-          <dd>{release.definitionVersion}</dd>
         </div>
         <div>
           <dt>적재 범위</dt>
@@ -493,7 +461,7 @@ function ReleaseCard({ release }: { readonly release: ReleaseInfo }) {
               {source.datasetId} {source.datasetName}
             </a>
             <span>
-              {source.fileName} · {source.basisPeriod} · SHA-256 {source.sha256.slice(0, 16)}…
+              {source.fileName} · {source.basisPeriod}
             </span>
           </li>
         ))}
@@ -503,7 +471,7 @@ function ReleaseCard({ release }: { readonly release: ReleaseInfo }) {
           서울시 상권분석서비스 원본 안내 열기
         </a>
       </p>
-    </section>
+    </details>
   );
 }
 
@@ -533,21 +501,13 @@ function SummaryPanel({
       <div className="summary-head">
         <h2>{summary.area.displayName}</h2>
         <p>
-          {summary.area.districtName} · {summary.area.areaTypeName} · 상권 코드 {summary.area.areaCode} · 업종{' '}
-          {summary.industry.displayName} ({summary.industry.code})
+          {summary.area.districtName} · {summary.area.areaTypeName} · {summary.industry.displayName}
         </p>
-        <p>
-          업종 원본 명칭 <strong>{summary.industry.sourceName}</strong> · 원천 분류{' '}
-          {summary.industry.sourceCategoryVersion} · 상권 원본 명칭 <strong>{summary.area.sourceName}</strong>
-        </p>
-        {summary.area.nameMismatch && (
+        {(summary.area.nameMismatch ? summary.area.observedName : selectedArea?.observedName) && (
           <p className="name-mismatch">
-            원본 명칭이 다릅니다: 영역 파일 <strong>{summary.area.sourceName}</strong>, 매출·점포 파일{' '}
-            <strong>{summary.area.observedName}</strong>. 영역 파일 명칭을 표시명으로 사용합니다.
+            매출·점포 자료의 상권 이름:{' '}
+            {summary.area.nameMismatch ? summary.area.observedName : selectedArea?.observedName}
           </p>
-        )}
-        {!summary.area.nameMismatch && selectedArea?.observedName && (
-          <p className="name-mismatch">매출·점포 파일의 관측 명칭: {selectedArea.observedName}</p>
         )}
       </div>
 
@@ -556,18 +516,12 @@ function SummaryPanel({
         {summary.dataStatusMessage && <span>{summary.dataStatusMessage}</span>}
       </div>
 
-      <div className="scope-card">
-        <span>관측 데이터 범위</span>
-        <strong>{summary.observedScope.label} 전체 기준</strong>
-        <p>{summary.observedScope.statement}</p>
-      </div>
-
       {summary.quarters.length === 0 ? (
         <div className="empty-panel" role="status">
           <h2>자료 부족</h2>
           <p>
-            {summary.area.displayName} · {summary.industry.displayName} 조합에는 적재된 분기 지표가 없습니다. 값을 0으로
-            만들지 않고 자료 부족으로 표시합니다. 다른 상권이나 업종을 선택해 주세요.
+            {summary.area.displayName} · {summary.industry.displayName} 조합에는 분기 지표가 없습니다. 다른 상권이나
+            업종을 선택해 주세요.
           </p>
         </div>
       ) : (
@@ -575,15 +529,13 @@ function SummaryPanel({
           <div className="table-card">
             <h3>분기별 매출 원값 추이 (단위 미확정)</h3>
             <QuarterTrendChart points={points} />
-            <p className="table-note">
-              세로 막대는 매출 원값을, 빗금 칸은 자료가 없는 분기를 나타냅니다. 정확한 값은 아래 표에 있습니다.
-            </p>
+            <p className="table-note">빗금 칸은 자료가 없는 분기입니다.</p>
           </div>
 
           {summary.quarters.at(-1)?.salesBreakdown && <SalesBreakdownPanel quarter={summary.quarters.at(-1)!} />}
 
           <div className="table-card">
-            <h3>분기별 원본 지표 · 가장 오래된 분기부터</h3>
+            <h3>분기별 지표</h3>
             <div className="table-scroll">
               <table className="market-table">
                 <caption>
@@ -608,21 +560,16 @@ function SummaryPanel({
                 </tbody>
               </table>
             </div>
-            <p className="table-note">
-              매출 원값은 API에서 원 단위 정수 문자열로 전달되며, 표에서는 읽기 쉽도록 천 단위 구분만 넣었습니다. 점포
-              수는 제공된 값만 그대로 표시하고, 없는 값은 0이 아니라 자료 부족으로 표시합니다.
-            </p>
           </div>
 
-          <div className="table-card">
-            <h3>지표 정의와 원본 열</h3>
+          <details className="table-card reference-source">
+            <summary>지표 정의</summary>
             <div className="table-scroll">
               <table className="market-table indicator-table">
                 <thead>
                   <tr>
                     <th scope="col">지표</th>
                     <th scope="col">단위</th>
-                    <th scope="col">원본 열 (2024 / 2025)</th>
                     <th scope="col">해석 제한</th>
                   </tr>
                 </thead>
@@ -631,16 +578,13 @@ function SummaryPanel({
                     <tr key={indicator.key}>
                       <th scope="row">{indicator.label}</th>
                       <td>{indicator.unitConfirmed ? indicator.unit : '단위 미확정'}</td>
-                      <td className="column-cell">
-                        {indicator.sourceColumn[2024]} / {indicator.sourceColumn[2025]}
-                      </td>
                       <td className="note-cell">{indicator.note}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </details>
         </>
       )}
     </>
@@ -653,9 +597,6 @@ function SalesBreakdownPanel({ quarter }: { readonly quarter: QuarterIndicatorRo
   return (
     <div className="table-card">
       <h3>{quarter.label} 매출 구성 · 상위 업종 기준</h3>
-      <p className="table-note">
-        금액 비중은 각 분류 안에서만 계산합니다. 개인 고객 구성이나 세부 업종 구성으로 해석하지 않습니다.
-      </p>
       <div className="breakdown-grid">
         <MetricBars title="요일별" points={breakdown.dayOfWeek} />
         <MetricBars title="시간대별" points={breakdown.timeOfDay} />
@@ -707,7 +648,7 @@ function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
         <p>{summary.competitionScope.statement}</p>
       </div>
       {summary.businesses.length === 0 ? (
-        <p className="empty-state">해당 자치구에서 관측된 점포가 없습니다. 0건은 활성 스냅샷 조회 결과입니다.</p>
+        <p className="empty-state">해당 자치구에서 관측된 점포가 없습니다.</p>
       ) : (
         <ul className="competition-list">
           {summary.businesses.map((business) => (
@@ -721,12 +662,8 @@ function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
           ))}
         </ul>
       )}
-      {summary.truncated && (
-        <p className="table-note">목록은 50개까지만 표시하며 총 개수는 전체 스냅샷을 기준으로 합니다.</p>
-      )}
-      <p className="table-note">
-        기준일 {formatDate(summary.asOf)} · 릴리스 {summary.sourceRelease}
-      </p>
+      {summary.truncated && <p className="table-note">목록은 50개까지만 보여 줍니다.</p>}
+      <p className="table-note">기준일 {formatDate(summary.asOf)}</p>
     </div>
   );
 }

@@ -96,7 +96,7 @@ export default function RentBenchmarkPanel({
         </p>
       ) : state.kind === 'unavailable' ? (
         <p className="picker-note" role="status">
-          한국부동산원 임대료 자료가 아직 준비되지 않았습니다. 자료가 적재되면 이곳에 표시됩니다.
+          임대료 자료가 아직 준비되지 않았습니다.
         </p>
       ) : state.kind === 'error' ? (
         <p className="inline-error" role="alert">
@@ -157,8 +157,7 @@ function RentBenchmarkBody({
   return (
     <>
       <p className="picker-note reference-lead">
-        {payload.source.statName}의 {payload.buildingType.label} {payload.source.latestQuarterLabel} 조사값입니다. 지역
-        평균이며, 재무계획의 월 임대료에 자동으로 넣지 않습니다.
+        {payload.source.statName} {payload.buildingType.label} {payload.source.latestQuarterLabel} 지역 평균입니다.
       </p>
       <div className="select-row reference-select-row">
         <label className="field">
@@ -231,8 +230,7 @@ function RentBenchmarkBody({
 
       {savedMonthlyRent !== null && (
         <p className="funding-position">
-          이 계획에 저장된 월 임대료: {formatWon(savedMonthlyRent)}. 부동산원 값은 보증금을 월세로 환산해 더한 금액이라
-          월세만 적은 값보다 클 수 있습니다.
+          이 계획의 월 임대료 {formatWon(savedMonthlyRent)} · 부동산원 값은 보증금 환산분이 더해져 더 클 수 있습니다.
         </p>
       )}
 
