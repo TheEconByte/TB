@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.ts';
+import { isOpenIndustryCode } from '../industries.ts';
 import { sha256Hex } from './checksum.ts';
 import { decodeCp949, iterateCsvRows, normalizeHeaderRow } from './csv.ts';
 import { parseDbf } from './dbf.ts';
@@ -47,8 +48,8 @@ import {
   INDUSTRY_CATEGORY_VERSION,
   MARKET_DEFINITION_VERSION,
   MARKET_SCHEMA_VERSION,
-  SUPPORTED_INDUSTRIES,
-  supportedIndustry,
+  MARKET_INDUSTRIES,
+  marketIndustry,
   type SalesBreakdown,
   type DisplayNameSource,
 } from './types.ts';
@@ -634,7 +635,7 @@ function createMarketBuilder(areas: MarketAreaRecord[], areaSource: string, issu
     quarters.add(parts.quarter);
     rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
     rememberIndustry(parts.industryCode, get('industryName').trim(), year);
-    if (supportedIndustry(parts.industryCode)) salesObservations.set(key, observation);
+    if (marketIndustry(parts.industryCode)) salesObservations.set(key, observation);
   }
 
   function addStores(get: RowGetter, file: string, line: number, year: number | null) {
@@ -662,7 +663,7 @@ function createMarketBuilder(areas: MarketAreaRecord[], areaSource: string, issu
     quarters.add(parts.quarter);
     rememberAreaName(parts.areaType, parts.areaCode, get('areaName').trim());
     rememberIndustry(parts.industryCode, get('industryName').trim(), year);
-    if (supportedIndustry(parts.industryCode)) storeCounts.set(key, counts);
+    if (marketIndustry(parts.industryCode)) storeCounts.set(key, counts);
   }
 
   function finish(basisStart: string, basisEnd: string): BuiltMarket {
@@ -702,14 +703,14 @@ function createMarketBuilder(areas: MarketAreaRecord[], areaSource: string, issu
       }
       const newest = industryNewest.get(code);
       const sourceName = newest?.name ?? [...names.keys()][0] ?? code;
-      const supported = supportedIndustry(code);
+      const loaded = marketIndustry(code);
       industries.push({
         code,
         sourceName,
-        displayName: supported ? supported.displayName : sourceName,
-        displayNameSource: supported ? 'PRODUCT_DOCUMENT' : 'SOURCE_FILE',
+        displayName: loaded ? loaded.displayName : sourceName,
+        displayNameSource: loaded ? 'PRODUCT_DOCUMENT' : 'SOURCE_FILE',
         sourceCategoryVersion: INDUSTRY_CATEGORY_VERSION,
-        isSupported: supported !== null,
+        isSupported: loaded !== null,
       });
     }
     industries.sort((left, right) => left.code.localeCompare(right.code));
@@ -752,11 +753,13 @@ function createMarketBuilder(areas: MarketAreaRecord[], areaSource: string, issu
       return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
     });
 
-    for (const industry of SUPPORTED_INDUSTRIES) {
+    // 열린 업종의 자료가 없으면 사용자 화면이 비므로 적재하지 않는다. 열지 않은 업종은 경고로 남긴다.
+    for (const industry of MARKET_INDUSTRIES) {
       const count = quarterly.filter((row) => row.industryCode === industry.code).length;
-      if (count === 0) {
-        issues.add('MISSING_SUPPORTED_INDUSTRY', 'industry', `지원 업종 ${industry.code}의 분기 자료가 없습니다.`);
-      }
+      if (count > 0) continue;
+      const message = `업종 ${industry.code}의 분기 자료가 없습니다.`;
+      if (isOpenIndustryCode(industry.code)) issues.add('MISSING_SUPPORTED_INDUSTRY', 'industry', message);
+      else issues.warn('MISSING_SUPPORTED_INDUSTRY', 'industry', message);
     }
 
     const quarterList = [...quarters].sort();

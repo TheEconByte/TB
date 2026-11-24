@@ -6,6 +6,7 @@ import { crc32 } from 'node:zlib';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
+import { INDUSTRY_CODES, isOpenIndustryCode } from '../industries.ts';
 import { contentHash, sha256Hex } from './checksum.ts';
 import { decodeCp949, iterateCsvRows, normalizeHeaderRow } from './csv.ts';
 import { parseDbf } from './dbf.ts';
@@ -270,12 +271,21 @@ const DEFAULT_SALES_2024: RowValues[] = [
     industryName: 'CoffeeDrinks',
     salesAmount: '0',
   }),
+  // 열지 않은 요식업 업종: 관측값은 적재하고 조회에는 내지 않는다(ADR 0010 5단계).
   salesRow({
     quarter: '20241',
     areaCode: '3110001',
     industryCode: 'CS100002',
     industryName: 'ChineseFood',
     salesAmount: '555',
+  }),
+  // 요식업이 아닌 업종: 적재하지 않는다.
+  salesRow({
+    quarter: '20241',
+    areaCode: '3110001',
+    industryCode: 'CS300001',
+    industryName: 'Supermarket',
+    salesAmount: '777',
   }),
 ];
 
@@ -313,6 +323,15 @@ const DEFAULT_STORES_2024: RowValues[] = [
     storeCount: '4',
     similarIndustryStoreCount: '5',
     franchiseStoreCount: '1',
+  }),
+  storeRow({
+    quarter: '20241',
+    areaCode: '3110001',
+    industryCode: 'CS300001',
+    industryName: 'Supermarket',
+    storeCount: '2',
+    similarIndustryStoreCount: '2',
+    franchiseStoreCount: '0',
   }),
 ];
 
@@ -550,7 +569,8 @@ describe('source pipeline', () => {
   it('builds quarterly rows, keeping store-only sales null and explicit zero', () => {
     const parsed = readMarketSources({ sourceDir: writeSources(), acceptChangedSource: true });
     expect(parsed.stats.quarters).toEqual(['20241', '20242', '20251']);
-    expect(parsed.quarterly).toHaveLength(4);
+    // 요식업 업종의 결합 키 5개(한식 3, 커피·음료 1, 중식 1). 요식업이 아닌 CS300001은 빠진다.
+    expect(parsed.quarterly).toHaveLength(5);
     expect(parsed.stats.duplicateKeys).toBe(0);
     expect(parsed.stats.salesRowsMissingStores).toBe(0);
     expect(parsed.stats.storeOnlyQuarterlyRows).toBe(1);
@@ -562,15 +582,31 @@ describe('source pipeline', () => {
     expect(storeOnly?.salesAmount).toBeNull();
     expect(storeOnly?.storeCount).toBe(7);
 
-    expect(parsed.quarterly.find((row) => row.industryCode === 'CS100002')).toBeUndefined();
-    expect(parsed.industries.find((industry) => industry.code === 'CS100002')?.isSupported).toBe(false);
     expect(parsed.industries.find((industry) => industry.code === 'CS100010')).toMatchObject({
       displayName: '커피·음료',
       displayNameSource: 'PRODUCT_DOCUMENT',
+      isSupported: true,
+    });
+  });
+
+  it('keeps every food service industry, open or not, and drops the rest', () => {
+    // ADR 0010 5단계: 업종을 열 때 다시 적재하지 않도록 요식업 업종 열 개의 관측값을 모두 남긴다.
+    // 요식업이 아닌 업종은 지금처럼 원천 분류로만 남긴다.
+    const parsed = readMarketSources({ sourceDir: writeSources(), acceptChangedSource: true });
+    expect(parsed.quarterly.find((row) => row.industryCode === 'CS100002')).toMatchObject({
+      salesAmount: '555',
+      storeCount: 4,
     });
     expect(parsed.industries.find((industry) => industry.code === 'CS100002')).toMatchObject({
-      displayName: 'ChineseFood',
+      displayName: '중식음식점',
+      displayNameSource: 'PRODUCT_DOCUMENT',
+      isSupported: true,
+    });
+    expect(parsed.quarterly.find((row) => row.industryCode === 'CS300001')).toBeUndefined();
+    expect(parsed.industries.find((industry) => industry.code === 'CS300001')).toMatchObject({
+      displayName: 'Supermarket',
       displayNameSource: 'SOURCE_FILE',
+      isSupported: false,
     });
   });
 
@@ -665,16 +701,17 @@ describe.skipIf(!hasRawFiles)('recorded 2024-2025 source files', () => {
     expect(parsed.stats.storeCountIdentityMismatches).toBe(0);
     expect(parsed.stats.quarters).toEqual(['20241', '20242', '20243', '20244', '20251', '20252', '20253', '20254']);
     expect(parsed.areas).toHaveLength(1650);
-    expect(parsed.industries.filter((industry) => industry.isSupported).map((industry) => industry.code)).toEqual([
-      'CS100001',
-      'CS100010',
-    ]);
+    // ADR 0010 "확인한 사실": 원자료에 외식업 상위 업종 열 개가 모두 있다.
+    expect(parsed.industries.filter((industry) => industry.isSupported).map((industry) => industry.code)).toEqual(
+      INDUSTRY_CODES,
+    );
   }, 120000);
 
   it('keeps store-only combinations as 자료 부족 instead of 0', () => {
     const parsed = readMarketSources({ sourceDir: RAW_DIR });
     const storeOnly = parsed.quarterly.filter((row) => row.salesAmount === null);
-    expect(storeOnly).toHaveLength(4870);
+    // 4870은 한식·커피·음료만 적재하던 때 기록한 값이다. 다른 요식업 업종의 건수는 아직 기록하지 않았다.
+    expect(storeOnly.filter((row) => isOpenIndustryCode(row.industryCode))).toHaveLength(4870);
     expect(storeOnly.every((row) => row.storeCount !== null)).toBe(true);
     expect(parsed.quarterly.some((row) => row.salesAmount === '0')).toBe(false);
   }, 120000);
@@ -781,7 +818,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.areaCount).toBe(3);
-    expect(report.quarterlyRowCount).toBe(4);
+    // 요식업 업종의 결합 키 5개(source pipeline 테스트와 같다).
+    expect(report.quarterlyRowCount).toBe(5);
     expect(report.checks).toHaveLength(7);
     expect(report.checks.every((check) => check.passed)).toBe(false);
     firstReleaseKey = report.releaseKey;
@@ -791,7 +829,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     expect(payload.areas).toHaveLength(3);
     expect(payload.areas.map((area) => area.areaCode)).toEqual(['3110001', '3110002', '3110003']);
     expect(payload.release.releaseKey).toBe(firstReleaseKey);
-    expect(payload.release.quarterlyRowCount).toBe(4);
+    expect(payload.release.quarterlyRowCount).toBe(5);
     expect(payload.release.sources.map((source) => source.fileName)).toEqual([
       'areas.zip',
       'sales-2024.zip',
@@ -808,6 +846,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     const unknownDistrict = await listMarketAreas(db(), '99999');
     expect(unknownDistrict.kind).toBe('INVALID_DISTRICT_CODE');
 
+    // 중식(CS100002)은 관측값이 적재돼 있어도 열지 않은 업종이라 목록에 없다(ADR 0010).
     const industries = await listSupportedIndustries(db());
     expect(industries.industries.map((industry) => industry.code)).toEqual(['CS100001', 'CS100010']);
     expect(industries.activeRelease?.releaseKey).toBe(firstReleaseKey);
@@ -856,6 +895,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     expect((await getMarketSummary(db(), { areaCode: '3110001', industryCode: 'CS999999' })).kind).toBe(
       'INVALID_INDUSTRY_CODE',
     );
+    // 관측값이 적재된 업종이어도 열지 않았으면 조회를 거부한다. 빈 성공 응답을 내지 않는다(ADR 0010 Validation).
     expect((await getMarketSummary(db(), { areaCode: '3110001', industryCode: 'CS100002' })).kind).toBe(
       'UNSUPPORTED_INDUSTRY',
     );

@@ -2,7 +2,8 @@ import Decimal from 'decimal.js';
 import { z } from 'zod';
 import type { PrismaClient } from '../../../generated/prisma/client.ts';
 import { quarterLabel, basisPeriodLabel } from '../quarter.ts';
-import { supportedIndustry } from '../types.ts';
+import { isOpenIndustryCode } from '../../industries.ts';
+import { marketIndustry } from '../types.ts';
 import { isAreaCode, isIndustryCode } from '../validation.ts';
 import type { ScoreDetail, ScoreSummary } from './build.ts';
 import type { FeatureKey, Grade } from './config.ts';
@@ -177,13 +178,15 @@ export async function getMarketScore(
   const summary = release.summaryJson as unknown as ScoreSummary;
   const interpretation = recordedInterpretation(summary.monthlyRevenueInterpretation);
   const model = marketScoreModelSchema.parse(release.modelJson);
-  const servedIndustries = summary.servedIndustryCodes.map((code) => ({
+  // 점수 릴리스는 AUC 기준을 넘은 요식업 업종 모두의 점수를 담는다. 그중 열린 업종만 낸다(ADR 0010).
+  const servedIndustries = summary.servedIndustryCodes.filter(isOpenIndustryCode).map((code) => ({
     code,
-    displayName: supportedIndustry(code)?.displayName ?? code,
+    displayName: marketIndustry(code)?.displayName ?? code,
   }));
   const industrySummary = summary.industries.find((item) => item.industryCode === params.industryCode);
   const industryModel = model.industries.find((item) => item.industryCode === params.industryCode);
-  const served = industrySummary?.served === true && industryModel !== undefined;
+  const served =
+    isOpenIndustryCode(params.industryCode) && industrySummary?.served === true && industryModel !== undefined;
 
   const base: Omit<MarketScoreResponse, 'status' | 'message' | 'storeCount'> = {
     area: {
@@ -195,7 +198,7 @@ export async function getMarketScore(
     },
     industry: {
       code: params.industryCode,
-      displayName: supportedIndustry(params.industryCode)?.displayName ?? params.industryCode,
+      displayName: marketIndustry(params.industryCode)?.displayName ?? params.industryCode,
     },
     servedIndustries,
     baseQuarter: summary.baseQuarter,

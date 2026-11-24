@@ -9,7 +9,7 @@
 - `Plan.businessProfileJson`은 자치구·서울시 상위 업종·소진공 세부 업종·면적·층·상가 유형과 사용한 릴리스 키를 저장한다.
 - 재무 `inputJson`, `INPUT_SCHEMA_VERSION`, 과거 `plan_results`는 바꾸거나 재계산하지 않는다.
 - `PUT /api/plans/{planId}/business-profile`은 소유권과 revision을 검사한다. 계획 생성·일반 수정에서도 같은 스키마와 활성 릴리스 검증을 재사용한다.
-- 상위 업종은 스키마에서 요식업 업종 목록(`app/src/features/industries.ts`)의 코드를 모두 받는다. 그중 저장할 수 있는 업종은 활성 상권 릴리스가 지원하는 업종뿐이고, 그 밖은 400 `INDUSTRY_NOT_FOUND`다. 입력 화면은 열린 업종만 보여 준다([ADR 0010](../decisions/0010-food-service-industry-scope.md)).
+- 상위 업종은 스키마에서 요식업 업종 목록(`app/src/features/industries.ts`)의 코드를 모두 받는다. 그중 저장할 수 있는 업종은 활성 상권 릴리스에 관측값이 있는 열린 업종뿐이고(`isServedMarketIndustry`), 그 밖은 400 `INDUSTRY_NOT_FOUND`다. 입력 화면은 열린 업종만 보여 준다([ADR 0010](../decisions/0010-food-service-industry-scope.md)).
 - 필수값(자치구·상위 업종·면적·층·상가 유형)이 모두 있어야 저장된다. 면적은 0보다 크고 10,000 이하, 소수 둘째 자리까지다. 형식이 틀린 면적은 500이 아니라 400 `INVALID_INPUT`이다.
 - 계획 화면은 저장 전에 `app/src/features/business-profile/form.ts`의 `businessProfileSaveState`로 판정한다.
   - 모두 비어 있으면 `businessProfile: null`로 저장한다(사업 조건 없는 계획). 서버는 `null`을 받으면 저장된 조건을 비운다.
