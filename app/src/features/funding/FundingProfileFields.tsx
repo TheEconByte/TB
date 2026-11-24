@@ -2,7 +2,6 @@
 
 import { SEOUL_DISTRICTS } from './districts.ts';
 import { USER_TARGET_GROUP_LABELS } from './match-text.ts';
-import { MAX_AGE } from './match-profile.ts';
 import { USER_TARGET_GROUPS } from './matching.ts';
 import { toggleNoTargetGroup, toggleTargetGroup, type FundingProfileForm } from './profile-form.ts';
 
@@ -37,7 +36,6 @@ export default function FundingProfileFields({
             <option value="PRE_STARTUP">예비 창업자(사업자등록 전)</option>
             <option value="BUSINESS">사업자(사업자등록 후)</option>
           </select>
-          <small>예비 창업자만·사업자만 받는 공고를 가려 봅니다.</small>
         </label>
         {form.businessStatus === 'BUSINESS' && (
           <label className="field">
@@ -56,10 +54,7 @@ export default function FundingProfileFields({
                 onChange={(event) => onChange({ ...form, openedYearMonth: event.target.value })}
               />
             </span>
-            <small>
-              업력 조건을 맞춰 봅니다. 202403처럼 붙여 써도 됩니다. 달까지만 받아, 기준에 걸치는 달이면 확인 필요로
-              남습니다.
-            </small>
+            <small>202403처럼 붙여 써도 됩니다.</small>
           </label>
         )}
         <label className="field">
@@ -75,7 +70,7 @@ export default function FundingProfileFields({
               </option>
             ))}
           </select>
-          <small>{districtHint ?? '지역을 한정한 공고를 서울 자치구로 맞춰 봅니다.'}</small>
+          {districtHint && <small>{districtHint}</small>}
         </label>
         <label className="field">
           <span>3. 대표자 나이 (선택)</span>
@@ -91,7 +86,7 @@ export default function FundingProfileFields({
               onChange={(event) => onChange({ ...form, age: event.target.value })}
             />
           </span>
-          <small>만 나이(0~{MAX_AGE})입니다. 청년 한정 공고도 나이로 맞춰 봅니다.</small>
+          <small>만 나이</small>
         </label>
       </div>
       <fieldset className="field target-groups">
@@ -120,11 +115,7 @@ export default function FundingProfileFields({
             해당 없음
           </label>
         </div>
-        <small>
-          아무것도 고르지 않으면 답하지 않음으로 두고, 대상을 한정한 공고는 확인 필요로 보여 줍니다. 대상을 고르면
-          고르지 않은 대상에는 해당하지 않는 것으로 봅니다. 장애 여부는 민감한 정보라 맞춰 보기에만 쓰고 AI에 보내지
-          않으며, 계획을 지우면 함께 지워집니다.
-        </small>
+        <small>고른 대상에만 해당하는 것으로 봅니다. 장애 여부는 AI에 보내지 않습니다.</small>
       </fieldset>
     </div>
   );

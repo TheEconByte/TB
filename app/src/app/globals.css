@@ -93,12 +93,6 @@ header {
   color: var(--muted);
   font-size: 13px;
 }
-.badge {
-  border: 1px solid #d1d6db;
-  border-radius: 30px;
-  padding: 5px 13px;
-  font-size: 12px;
-}
 .hero {
   padding: 56px 0 36px;
   max-width: 760px;
@@ -125,8 +119,7 @@ h1 {
   letter-spacing: -1.2px;
   margin: 12px 0 16px;
 }
-.hero > p:last-child,
-.results-head > p:last-child {
+.hero > p:last-child {
   color: var(--muted);
   font-size: 16px;
 }
@@ -254,7 +247,7 @@ a:focus-visible {
 .calculate-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 20px;
   background: #ffffff;
   color: var(--ink);
@@ -265,14 +258,6 @@ a:focus-visible {
   bottom: 12px;
   z-index: 2;
   box-shadow: 0 8px 28px #191f281f;
-}
-.calculate-bar div {
-  display: flex;
-  flex-direction: column;
-}
-.calculate-bar span {
-  color: var(--muted);
-  font-size: 12px;
 }
 .calculate-bar .secondary-button {
   border-color: #d1d6db;
@@ -665,16 +650,6 @@ th {
 .scope-note li {
   font-size: 13px;
 }
-.scope-note small {
-  color: var(--muted);
-}
-footer {
-  margin-top: 64px;
-  padding: 24px 0 32px;
-  border-top: 1px solid var(--line);
-  color: #8b95a1;
-  font-size: 12px;
-}
 @media (max-width: 850px) {
   .brand span,
   .account-actions > span {
@@ -783,6 +758,20 @@ footer {
 .notice-box h2 {
   margin: 0 0 12px;
   font-size: 19px;
+}
+.notice-box > summary,
+.release-card > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15px;
+}
+details.notice-box,
+details.release-card {
+  padding: 16px 22px;
+}
+details.notice-box[open] > summary,
+details.release-card[open] > summary {
+  margin-bottom: 14px;
 }
 .notice-box ul {
   margin: 0;
@@ -981,14 +970,11 @@ footer {
   font-weight: 600;
 }
 .indicator-table {
-  min-width: 780px;
+  min-width: 560px;
 }
 .indicator-table th:nth-child(n + 2),
 .indicator-table td:nth-child(n + 2) {
   text-align: left;
-}
-.indicator-table .column-cell {
-  font-size: 12px;
 }
 .indicator-table .note-cell {
   white-space: normal;
@@ -1314,20 +1300,6 @@ footer {
 .funding-tab:hover:not(.active) {
   background: var(--surface);
 }
-.match-limit-note {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #fff8ec;
-  color: #8a4b08;
-  font-size: 13px;
-}
-.match-limit-note p {
-  margin: 0;
-}
-.match-limit-note p + p {
-  margin-top: 4px;
-}
 .status-count.count-remaining {
   border-left: 4px solid var(--primary);
 }
@@ -1444,11 +1416,6 @@ footer {
   font-size: 12px;
   font-weight: 700;
   color: #4e5968;
-}
-.match-version {
-  margin-left: 10px;
-  color: var(--muted);
-  word-break: break-all;
 }
 @media (max-width: 850px) {
   .match-conditions {

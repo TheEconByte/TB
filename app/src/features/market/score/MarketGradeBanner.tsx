@@ -53,7 +53,7 @@ export default function MarketGradeBanner({ onLoaded }: { readonly onLoaded?: (s
           {score.area.displayName} {score.industry.displayName}: {score.message}
         </strong>
       )}
-      <p>등급은 참고용입니다. 자금 후보 판정 조건에 쓰지 않으며, 대출 승인 가능성을 뜻하지 않습니다.</p>
+      <p>등급은 참고용이며 자금 후보 판정 조건에 쓰지 않습니다.</p>
     </div>
   );
 }
