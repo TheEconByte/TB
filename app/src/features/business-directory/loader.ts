@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.ts';
 import { sha256Hex } from '../market/checksum.ts';
 import { SEOUL_DISTRICTS } from '../funding/districts.ts';
+import { OPEN_INDUSTRIES } from '../industries.ts';
 import { marketIndustryForSemas } from './mapping.ts';
 import {
   BUSINESS_DIRECTORY_API_BASE,
@@ -89,11 +90,7 @@ export function parseBusinessDirectoryPage(payload: unknown): {
       middleCategoryName,
       smallCategoryCode,
       smallCategoryName,
-      marketIndustryCode: marketIndustryForSemas({
-        middleName: middleCategoryName,
-        smallCode: smallCategoryCode,
-        smallName: smallCategoryName,
-      }),
+      marketIndustryCode: marketIndustryForSemas({ middleCode: middleCategoryCode, smallCode: smallCategoryCode }),
       standardIndustryCode: nullableText(item.ksicCd),
       standardIndustryName: nullableText(item.ksicNm),
       districtCode,
@@ -196,11 +193,15 @@ export async function loadBusinessDirectory(
       throw new BusinessDirectoryError('DUPLICATE_BUSINESS', `중복 상가업소번호: ${record.sourceBusinessId}`);
     seen.add(record.sourceBusinessId);
   }
+  // 요식업 업종으로 대응한 업소는 열지 않은 업종도 남겨, 업종을 열 때 다시 적재하지 않는다(ADR 0010).
   const mappedRecords = records.filter((record) => record.marketIndustryCode !== null);
-  if (mappedRecords.length === 0)
+  const missingOpen = OPEN_INDUSTRIES.filter(
+    (industry) => !mappedRecords.some((record) => record.marketIndustryCode === industry.code),
+  );
+  if (missingOpen.length > 0)
     throw new BusinessDirectoryError(
       'NO_SUPPORTED_BUSINESS',
-      '한식·커피 업종으로 매핑된 업소가 없어 릴리스를 활성화하지 않습니다.',
+      `열린 업종 ${missingOpen.map((industry) => industry.shortName).join('·')}으로 대응한 업소가 없어 릴리스를 활성화하지 않습니다.`,
     );
   const retrievedAt = options.retrievedAt ?? new Date();
   const sourceChecksum = canonicalChecksum(mappedRecords);

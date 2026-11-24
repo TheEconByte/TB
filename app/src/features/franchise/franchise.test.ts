@@ -5,7 +5,7 @@ import { FranchiseError, type FetchLike } from './ftc-api.ts';
 import { defaultLatestYear, loadFranchises, parseFtcRows, readFranchiseSources } from './loader.ts';
 import { getFranchises } from './read.ts';
 import { franchiseQuerySchema } from './schema.ts';
-import { FTC_SERVICES } from './types.ts';
+import { FTC_SERVICES, INDUSTRY_MIDDLE_TO_MARKET } from './types.ts';
 
 const KEY = 'FTCTESTKEY%2Bxyz';
 type Row = Record<string, unknown>;
@@ -155,16 +155,44 @@ describe('공정위 가맹정보 해석', () => {
     expect(defaultLatestYear(new Date('2026-12-31T16:00:00.000Z'))).toBe(2026);
   });
 
-  it('외식 한식·커피·음료만 남기고, 같은 브랜드도 업종이 다르면 따로 둔다', () => {
+  it('외식 중 요식업 업종으로 대응한 중분류만 남기고, 같은 브랜드도 업종이 다르면 따로 둔다', () => {
     const rows = parseFtcRows(FTC_SERVICES.stores, 2025, defaultData().stores[2025]);
+    // 도소매 대분류의 '커피'(원두상점)는 외식이 아니라 빠진다.
     expect(rows.map((row) => `${row.brandName}:${row.industryMiddle}`)).toEqual([
       '빽커피:커피',
       'MEGA 커피:커피',
       '새싹음료:음료 (커피 외)',
       '한상차림:한식',
+      '한상차림:주점',
+      '빵집:제과제빵',
     ]);
     const numeric = parseFtcRows(FTC_SERVICES.stores, 2025, [storeRow(2025, { frcsCnt: '12' })]);
     expect(numeric[0].amounts.frcsCnt).toBe(12);
+  });
+
+  it('2025년 외식 중분류 15개를 사람이 정한 대로 서울시 상위 업종에 대응시킨다', () => {
+    // 2026-11-24 공정위 브랜드별 가맹점 현황 2025년에서 나온 외식 중분류 전부(ADR 0010 6단계).
+    // 피자는 소진공 대응과 같이 패스트푸드점으로 묶는다. 아이스크림/빙수·기타 외국식·기타 외식은 열 개 업종에 맞지 않는다.
+    const expected: Record<string, string | undefined> = {
+      한식: 'CS100001',
+      중식: 'CS100002',
+      일식: 'CS100003',
+      서양식: 'CS100004',
+      제과제빵: 'CS100005',
+      패스트푸드: 'CS100006',
+      피자: 'CS100006',
+      치킨: 'CS100007',
+      분식: 'CS100008',
+      주점: 'CS100009',
+      커피: 'CS100010',
+      '음료 (커피 외)': 'CS100010',
+      '아이스크림/빙수': undefined,
+      '기타 외국식': undefined,
+      '기타 외식': undefined,
+    };
+    expect(
+      Object.fromEntries(Object.keys(expected).map((middle) => [middle, INDUSTRY_MIDDLE_TO_MARKET[middle]])),
+    ).toEqual(expected);
   });
 
   it('필드 구성·연도·숫자·이름·중복이 어긋나면 멈춘다', async () => {
@@ -203,7 +231,8 @@ describe('공정위 가맹정보 적재 원본', () => {
     const parsed = await readFranchiseSources({ ...readOptions(), fetchImpl: api.fetchImpl });
     expect(parsed.years).toEqual([2023, 2024, 2025]);
     expect(parsed.releaseKey).toMatch(/^ftc-franchise-2023-2025-[0-9a-f]{12}$/);
-    expect(parsed.records).toHaveLength(12);
+    // 연도마다 외식 요식업 브랜드 행 6개(커피 2, 음료 1, 한식 1, 주점 1, 제과제빵 1) × 3개 연도.
+    expect(parsed.records).toHaveLength(18);
     const paik = parsed.records.find((record) => record.disclosureYear === 2025 && record.brandName === '빽커피');
     expect(paik).toMatchObject({
       marketIndustryCode: 'CS100010',
@@ -235,6 +264,15 @@ describe('공정위 가맹정보 적재 원본', () => {
     const reversed = defaultData();
     for (const year of [2023, 2024, 2025]) reversed.stores[year].reverse();
     expect((await readFranchiseSources(readOptions(reversed))).releaseKey).toBe(parsed.releaseKey);
+  });
+
+  it('어느 해에 열린 업종의 브랜드가 없으면 멈춘다', async () => {
+    // 그대로 활성화하면 그 업종의 프랜차이즈가 하나도 없는 것처럼 보인다(AGENTS.md §3의 2번).
+    const data = defaultData();
+    data.stores[2024] = data.stores[2024].filter((row) => row.indutyMlsfcNm !== '한식');
+    const error = await expectFranchiseError(() => readFranchiseSources(readOptions(data)));
+    expect(error.code).toBe('EMPTY_SOURCE');
+    expect(error.message).toContain('2024년 한식');
   });
 
   it('창업 금액을 빼고 적재하면 키와 기록에 드러난다', async () => {
@@ -309,7 +347,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('공정위 가맹정보 릴리�
   it('릴리스를 활성화해 업종별 브랜드를 원 단위로 돌려주고, 같은 내용은 다시 적재하지 않는다', async () => {
     const report = await loadFranchises({ ...readOptions(), prisma: db() });
     expect(report.outcome).toBe('ACTIVATED');
-    expect(report.brandCount).toBe(12);
+    expect(report.brandCount).toBe(18);
 
     const top = await getFranchises(db(), { industryCode: 'CS100010', query: '', limit: 10 });
     if (top.kind !== 'OK') throw new Error(top.kind);
@@ -352,6 +390,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('공정위 가맹정보 릴리�
     const byCorp = await getFranchises(db(), { industryCode: 'CS100001', query: '한상', limit: 10 });
     if (byCorp.kind !== 'OK') throw new Error(byCorp.kind);
     expect(byCorp.payload.brands.map((brand) => brand.industryMiddle)).toEqual(['한식']);
+    // 열지 않은 업종의 브랜드도 적재해 둔다. 조회 입력(franchiseQuerySchema)이 열린 업종만 받는다.
+    const pub = await getFranchises(db(), { industryCode: 'CS100009', query: '', limit: 10 });
+    if (pub.kind !== 'OK') throw new Error(pub.kind);
+    expect(pub.payload.brands.map((brand) => `${brand.brandName}:${brand.industryMiddle}`)).toEqual(['한상차림:주점']);
 
     const again = await loadFranchises({ ...readOptions(), prisma: db() });
     expect(again.outcome).toBe('ALREADY_ACTIVE');

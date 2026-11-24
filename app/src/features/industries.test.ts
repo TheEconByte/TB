@@ -11,14 +11,7 @@ import {
 import { businessProfileInputSchema } from './business-profile/schema.ts';
 import { franchiseQuerySchema } from './franchise/schema.ts';
 import { INDUSTRY_MIDDLE_TO_MARKET } from './franchise/types.ts';
-import {
-  INDUSTRIES,
-  INDUSTRY_CODES,
-  OPEN_INDUSTRIES,
-  OPEN_INDUSTRY_CODES,
-  isIndustryCode,
-  isOpenIndustryCode,
-} from './industries.ts';
+import { INDUSTRIES, INDUSTRY_CODES, OPEN_INDUSTRIES, OPEN_INDUSTRY_CODES, isIndustryCode } from './industries.ts';
 import { MARKET_INDUSTRIES, isServedMarketIndustry } from './market/types.ts';
 
 // ADR 0010: 업종 목록은 한 파일에서 정하고 모든 도메인이 그 목록을 쓴다.
@@ -80,15 +73,22 @@ describe('업종 목록', () => {
     expect(businessProfileInputSchema.shape.marketIndustryCode.safeParse('CS100011').success).toBe(false);
   });
 
-  it('대응표는 열린 업종으로만 보낸다', () => {
-    // 대응표를 넓히는 일은 6단계이고, 그 전에는 열지 않은 업종의 점포를 적재하지 않는다.
-    for (const code of Object.values(INDUSTRY_MIDDLE_TO_MARKET)) expect(isOpenIndustryCode(code)).toBe(true);
+  it('경쟁 점포와 프랜차이즈 대응표가 요식업 업종 열 개에 모두 닿는다', () => {
+    // ADR 0010 §1: 한 업종은 경쟁 점포·프랜차이즈가 준비됐을 때 연다. 대응표에 없는 업종은 열 수 없다.
     const semas = [
-      { middleName: '한식', smallCode: 'I20107', smallName: '돼지고기 구이/찜' },
-      { middleName: '비알코올 음료점업', smallCode: 'I21201', smallName: '카페' },
-      { middleName: '일식', smallCode: 'I20301', smallName: '일식 회/초밥' },
-    ].map(marketIndustryForSemas);
-    expect(semas).toEqual(['CS100001', 'CS100010', null]);
+      ['I201', 'I20101'],
+      ['I202', 'I20201'],
+      ['I203', 'I20301'],
+      ['I204', 'I20401'],
+      ['I210', 'I21001'],
+      ['I210', 'I21004'],
+      ['I210', 'I21006'],
+      ['I210', 'I21007'],
+      ['I211', 'I21103'],
+      ['I212', 'I21201'],
+    ].map(([middleCode, smallCode]) => marketIndustryForSemas({ middleCode, smallCode }));
+    expect(semas).toEqual(INDUSTRY_CODES);
+    expect([...new Set(Object.values(INDUSTRY_MIDDLE_TO_MARKET))].sort()).toEqual(INDUSTRY_CODES);
   });
 
   it('업종 코드를 목록과 원천 대응표 밖에 따로 적지 않는다', () => {

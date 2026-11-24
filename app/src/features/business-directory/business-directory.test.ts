@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { BusinessDirectoryError, parseBusinessDirectoryPage } from './loader.ts';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PrismaClient } from '../../generated/prisma/client.ts';
+import { BusinessDirectoryError, loadBusinessDirectory, parseBusinessDirectoryPage } from './loader.ts';
 import { isMeatCategory, marketIndustryForSemas } from './mapping.ts';
+import { getBusinessSummary, listBusinessCategories, resolveDetailedCategory } from './read.ts';
 
 const ITEM = {
   bizesId: 'MA010120220800001234',
@@ -59,15 +62,185 @@ describe('소진공 상가(상권)정보 응답', () => {
   });
 });
 
+// 2026-11-24 서울 25개 자치구 음식(I2) 업소 137,172곳에서 나온 분류 43개 전부와 사람이 정한 대응(ADR 0010 6단계).
+// null은 대응하지 않아 적재하지 않는 분류다.
+const SURVEYED_CATEGORIES: readonly (readonly [
+  middleCode: string,
+  smallCode: string,
+  smallName: string,
+  expected: string | null,
+])[] = [
+  ...(
+    [
+      ['I20101', '백반/한정식'],
+      ['I20102', '국/탕/찌개류'],
+      ['I20103', '족발/보쌈'],
+      ['I20104', '전/부침개'],
+      ['I20105', '국수/칼국수'],
+      ['I20106', '냉면/밀면'],
+      ['I20107', '돼지고기 구이/찜'],
+      ['I20108', '소고기 구이/찜'],
+      ['I20109', '곱창 전골/구이'],
+      ['I20110', '닭/오리고기 구이/찜'],
+      ['I20111', '횟집'],
+      ['I20112', '해산물 구이/찜'],
+      ['I20113', '복 요리 전문'],
+      ['I20199', '기타 한식 음식점'],
+    ] as const
+  ).map(([code, name]) => ['I201', code, name, 'CS100001'] as const), // 중분류 한식 전체 → 한식(지금과 같다)
+  ['I202', 'I20201', '중국집', 'CS100002'],
+  ['I202', 'I20202', '마라탕/훠궈', 'CS100002'],
+  ['I203', 'I20301', '일식 회/초밥', 'CS100003'],
+  ['I203', 'I20302', '일식 카레/돈가스/덮밥', 'CS100003'],
+  ['I203', 'I20303', '일식 면 요리', 'CS100003'],
+  ['I203', 'I20399', '기타 일식 음식점', 'CS100003'],
+  ['I204', 'I20401', '경양식', 'CS100004'],
+  ['I204', 'I20402', '파스타/스테이크', 'CS100004'],
+  ['I204', 'I20403', '패밀리레스토랑', 'CS100004'],
+  ['I204', 'I20499', '기타 서양식 음식점', 'CS100004'],
+  // 서울시 상위 업종 열 개에 동남아·기타 외국식·구내식당·뷔페는 없다.
+  ['I205', 'I20501', '베트남식 전문', null],
+  ['I205', 'I20599', '기타 동남아식 전문', null],
+  ['I206', 'I20601', '분류 안된 외국식 음식점', null],
+  ['I207', 'I20701', '구내식당', null],
+  ['I207', 'I20702', '뷔페', null],
+  ['I210', 'I21001', '빵/도넛', 'CS100005'],
+  // 사용자 결정: 떡집은 제조·소매 성격이 강해 제과점에 넣지 않는다.
+  ['I210', 'I21002', '떡/한과', null],
+  // 사용자 결정: 피자·버거·토스트/샌드위치/샐러드는 패스트푸드점으로 묶는다.
+  ['I210', 'I21003', '피자', 'CS100006'],
+  ['I210', 'I21004', '버거', 'CS100006'],
+  ['I210', 'I21005', '토스트/샌드위치/샐러드', 'CS100006'],
+  ['I210', 'I21006', '치킨', 'CS100007'],
+  ['I210', 'I21007', '김밥/만두/분식', 'CS100008'],
+  // 사용자 결정: 아이스크림/빙수는 열 개 업종 어디에도 맞지 않는다.
+  ['I210', 'I21008', '아이스크림/빙수', null],
+  ['I210', 'I21099', '그 외 기타 간이 음식점', null],
+  // 사용자 결정: 유흥 주점은 창업 대상 간이주점과 달라 넣지 않는다.
+  ['I211', 'I21101', '일반 유흥 주점', null],
+  ['I211', 'I21102', '무도 유흥 주점', null],
+  ['I211', 'I21103', '생맥주 전문', 'CS100009'],
+  ['I211', 'I21104', '요리 주점', 'CS100009'],
+  ['I212', 'I21201', '카페', 'CS100010'], // 지금과 같다
+];
+
 describe('소진공 업종 매핑', () => {
-  it('한식·커피만 서울시 상위 업종에 연결하고 고깃집 여부를 별도로 표시한다', () => {
-    expect(marketIndustryForSemas({ middleName: '한식', smallCode: 'I20107', smallName: '돼지고기 구이/찜' })).toBe(
-      'CS100001',
-    );
-    expect(marketIndustryForSemas({ middleName: '비알코올 음료점업', smallCode: 'I21201', smallName: '카페' })).toBe(
-      'CS100010',
-    );
-    expect(marketIndustryForSemas({ middleName: '일식', smallCode: 'I20301', smallName: '일식 회/초밥' })).toBeNull();
-    expect(isMeatCategory('소고기 구이/찜')).toBe(true);
+  it('조사한 분류 43개를 사람이 정한 대로 서울시 상위 업종에 대응시킨다', () => {
+    expect(SURVEYED_CATEGORIES).toHaveLength(43);
+    expect(
+      SURVEYED_CATEGORIES.map(([middleCode, smallCode, smallName]) => [
+        smallCode,
+        smallName,
+        marketIndustryForSemas({ middleCode, smallCode }),
+      ]),
+    ).toEqual(SURVEYED_CATEGORIES.map(([, smallCode, smallName, expected]) => [smallCode, smallName, expected]));
   });
+
+  it('업종 하나로 묶인 중분류에 새 소분류가 생기면 그 업종으로, 나뉘는 중분류의 새 소분류는 대응하지 않는다', () => {
+    // 한식 중분류 전체를 한식으로 보던 지금 규칙을 유지한다. 기타 간이·주점은 소분류마다 사람이 정했다.
+    expect(marketIndustryForSemas({ middleCode: 'I201', smallCode: 'I20114' })).toBe('CS100001');
+    expect(marketIndustryForSemas({ middleCode: 'I210', smallCode: 'I21009' })).toBeNull();
+    expect(marketIndustryForSemas({ middleCode: 'I211', smallCode: 'I21105' })).toBeNull();
+  });
+
+  it('고깃집 여부를 별도로 표시한다', () => {
+    expect(isMeatCategory('소고기 구이/찜')).toBe(true);
+    expect(isMeatCategory('중국집')).toBe(false);
+  });
+});
+
+function semasItem(id: string, middleCode: string, middleName: string, smallCode: string, smallName: string) {
+  return {
+    ...ITEM,
+    bizesId: id,
+    bizesNm: `${smallName} 업소 ${id}`,
+    indsMclsCd: middleCode,
+    indsMclsNm: middleName,
+    indsSclsCd: smallCode,
+    indsSclsNm: smallName,
+  };
+}
+
+// 마포구에만 업소가 있는 가짜 소진공 API. 다른 자치구는 0건이다.
+function semasFetcher(items: readonly ReturnType<typeof semasItem>[]): typeof fetch {
+  return (async (input: string | URL | Request) => {
+    const url = new URL(String(input));
+    const rows = url.searchParams.get('key') === '11440' && url.searchParams.get('pageNo') === '1' ? items : [];
+    const total = url.searchParams.get('key') === '11440' ? items.length : 0;
+    return new Response(JSON.stringify({ header: { resultCode: '00' }, body: { totalCount: total, items: rows } }));
+  }) as typeof fetch;
+}
+
+// 합성 스냅샷을 전용 테스트 DB에 적재하고, 끝나면 지우고 이전 ACTIVE를 되돌린다.
+describe.skipIf(!process.env.TEST_DATABASE_URL)('소진공 점포 스냅샷 적재·조회(PostgreSQL)', () => {
+  let client: PrismaClient | null = null;
+  let previousActiveId: string | null = null;
+  let startedAt = new Date(0);
+  const db = (): PrismaClient => {
+    if (!client) throw new Error('PrismaClient가 초기화되지 않았습니다.');
+    return client;
+  };
+
+  beforeAll(async () => {
+    client = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.TEST_DATABASE_URL }) });
+    startedAt = new Date();
+    previousActiveId = (await db().businessDirectoryRelease.findFirst({ where: { status: 'ACTIVE' } }))?.id ?? null;
+  });
+
+  afterAll(async () => {
+    await db().businessDirectoryRelease.deleteMany({ where: { createdAt: { gte: startedAt } } });
+    if (previousActiveId) {
+      await db().businessDirectoryRelease.updateMany({ where: { status: 'ACTIVE' }, data: { status: 'SUPERSEDED' } });
+      await db().businessDirectoryRelease.update({ where: { id: previousActiveId }, data: { status: 'ACTIVE' } });
+    }
+    await db().$disconnect();
+  });
+
+  it('요식업 업종으로 대응한 점포를 모두 적재하고, 조회는 열린 업종의 점포만 내보인다', async () => {
+    const items = [
+      semasItem('B1', 'I201', '한식', 'I20107', '돼지고기 구이/찜'),
+      semasItem('B2', 'I212', '비알코올', 'I21201', '카페'),
+      semasItem('B3', 'I202', '중식', 'I20201', '중국집'),
+      semasItem('B4', 'I205', '동남아시아', 'I20501', '베트남식 전문'),
+    ];
+    const result = await loadBusinessDirectory({
+      prisma: db(),
+      serviceKey: 'TESTKEY',
+      fetcher: semasFetcher(items),
+      retrievedAt: new Date('2026-11-24T00:00:00.000Z'),
+    });
+    expect(result.outcome).toBe('ACTIVATED');
+    // 대응하지 못한 베트남식(B4)만 빠진다.
+    expect(result.businessCount).toBe(3);
+    // 열지 않은 중식 점포도 남겨 업종을 열 때(7단계) 다시 적재하지 않는다.
+    const chinese = await db().businessLocation.findFirst({
+      where: { releaseId: result.releaseId, sourceBusinessId: 'B3' },
+    });
+    expect(chinese?.marketIndustryCode).toBe('CS100002');
+
+    const categories = await listBusinessCategories(db());
+    expect(categories.categories.map((category) => [category.code, category.marketIndustryCode])).toEqual([
+      ['I20107', 'CS100001'],
+      ['I21201', 'CS100010'],
+    ]);
+    expect((await getBusinessSummary(db(), { districtCode: '11440', detailedIndustryCode: 'I20201' })).kind).toBe(
+      'CATEGORY_NOT_FOUND',
+    );
+    const korean = await getBusinessSummary(db(), { districtCode: '11440', detailedIndustryCode: 'I20107' });
+    expect(korean.kind === 'OK' ? korean.payload.businessCount : korean.kind).toBe(1);
+    expect(await resolveDetailedCategory(db(), 'I20201', 'CS100001')).toBeNull();
+  }, 60000);
+
+  it('열린 업종의 점포가 하나도 없으면 활성화하지 않고 기존 ACTIVE를 유지한다', async () => {
+    const before = await db().businessDirectoryRelease.findFirst({ where: { status: 'ACTIVE' } });
+    // 커피·음료 점포가 없다. 그대로 활성화하면 커피·음료 경쟁 점포가 0곳인 것처럼 보인다(AGENTS.md §3의 2번).
+    const items = [
+      semasItem('C1', 'I201', '한식', 'I20101', '백반/한정식'),
+      semasItem('C2', 'I202', '중식', 'I20201', '중국집'),
+    ];
+    await expect(
+      loadBusinessDirectory({ prisma: db(), serviceKey: 'TESTKEY', fetcher: semasFetcher(items) }),
+    ).rejects.toMatchObject({ code: 'NO_SUPPORTED_BUSINESS' });
+    expect((await db().businessDirectoryRelease.findFirst({ where: { status: 'ACTIVE' } }))?.id).toBe(before?.id);
+  }, 60000);
 });

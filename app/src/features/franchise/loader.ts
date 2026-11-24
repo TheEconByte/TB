@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.ts';
+import { OPEN_INDUSTRIES } from '../industries.ts';
 import { sha256Hex } from '../market/checksum.ts';
 import { canonicalRowsHash } from '../market/seoul-api.ts';
 import { createFtcApiClient, FranchiseError, type FetchLike, type FtcRow } from './ftc-api.ts';
@@ -69,7 +70,7 @@ function invalidRow(label: string, index: number, reason: string): never {
   throw new FranchiseError('INVALID_ROW', `${label} ${index + 1}번째 행: ${reason}`);
 }
 
-// 필드 구성·연도·이름·숫자를 검사하고 제품 범위(외식 한식·커피·음료) 행만 돌려준다.
+// 필드 구성·연도·이름·숫자를 검사하고 제품 범위(외식 중 요식업 업종으로 대응한 중분류) 행만 돌려준다.
 export function parseFtcRows(service: FtcService, year: number, rows: readonly FtcRow[]): ParsedRow[] {
   const label = `${service.name} ${year}`;
   const expected = new Set(service.fields);
@@ -175,7 +176,15 @@ export async function readFranchiseSources(options: ReadFranchiseOptions): Promi
       });
     }
     const stores = byService.get('stores') ?? [];
-    if (stores.length === 0) throw new FranchiseError('EMPTY_SOURCE', `${year}년 한식·커피·음료 브랜드가 없습니다.`);
+    // 열지 않은 업종은 비어도 되지만, 열린 업종이 비면 브랜드가 없는 것처럼 보이므로 멈춘다.
+    const missingOpen = OPEN_INDUSTRIES.filter(
+      (industry) => !stores.some((row) => INDUSTRY_MIDDLE_TO_MARKET[row.industryMiddle] === industry.code),
+    );
+    if (missingOpen.length > 0)
+      throw new FranchiseError(
+        'EMPTY_SOURCE',
+        `${year}년 ${missingOpen.map((industry) => industry.shortName).join('·')} 브랜드가 없습니다.`,
+      );
     const costs = new Map((byService.get('startupCosts') ?? []).map((row) => [row.key, row]));
     for (const row of stores) {
       const cost = costs.get(row.key);
@@ -214,7 +223,10 @@ export async function readFranchiseSources(options: ReadFranchiseOptions): Promi
   lines.sort();
   const contentHash = sha256Hex(lines.join('\n'));
   const checks: FranchiseCheck[] = [
-    { name: '연도별 자료', detail: `${years.join('·')}년 모두 한식·커피·음료 브랜드가 있습니다.` },
+    {
+      name: '연도별 자료',
+      detail: `${years.join('·')}년 모두 열린 업종(${OPEN_INDUSTRIES.map((industry) => industry.shortName).join('·')})의 브랜드가 있습니다.`,
+    },
     { name: '중복 키 0', detail: `브랜드 ${records.length}건의 연도·법인·브랜드·업종 키가 모두 다릅니다.` },
     {
       name: '평균매출 미기재',
