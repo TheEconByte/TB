@@ -1,7 +1,11 @@
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { districtName } from '../funding/districts.ts';
+import { OPEN_INDUSTRY_CODES } from '../industries.ts';
 import { isMeatCategory } from './mapping.ts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo, BusinessSummary } from './types.ts';
+
+// 스냅샷은 요식업 업종 열 개의 점포를 담지만, 조회는 열린 업종의 점포만 내보인다(ADR 0010).
+const SERVED_INDUSTRY = { in: [...OPEN_INDUSTRY_CODES] };
 
 async function activeRelease(prisma: PrismaClient) {
   return prisma.businessDirectoryRelease.findFirst({ where: { status: 'ACTIVE' }, orderBy: { activatedAt: 'desc' } });
@@ -34,7 +38,7 @@ export async function listBusinessCategories(prisma: PrismaClient): Promise<{
   }
   const grouped = await prisma.businessLocation.groupBy({
     by: ['smallCategoryCode', 'smallCategoryName', 'middleCategoryCode', 'middleCategoryName', 'marketIndustryCode'],
-    where: { releaseId: release.id, marketIndustryCode: { not: null } },
+    where: { releaseId: release.id, marketIndustryCode: SERVED_INDUSTRY },
     _count: { _all: true },
     orderBy: [{ marketIndustryCode: 'asc' }, { smallCategoryName: 'asc' }],
   });
@@ -70,7 +74,11 @@ export async function getBusinessSummary(
   if (!release) return { kind: 'RELEASE_UNAVAILABLE' };
   const categoryGroup = await prisma.businessLocation.groupBy({
     by: ['smallCategoryCode', 'smallCategoryName', 'middleCategoryCode', 'middleCategoryName', 'marketIndustryCode'],
-    where: { releaseId: release.id, smallCategoryCode: input.detailedIndustryCode, marketIndustryCode: { not: null } },
+    where: {
+      releaseId: release.id,
+      smallCategoryCode: input.detailedIndustryCode,
+      marketIndustryCode: SERVED_INDUSTRY,
+    },
     _count: { _all: true },
   });
   const categoryRow = categoryGroup[0];

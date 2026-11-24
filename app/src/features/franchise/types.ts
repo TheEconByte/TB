@@ -1,4 +1,4 @@
-import type { IndustryCode, OpenIndustryCode } from '../industries.ts';
+import type { IndustryCode } from '../industries.ts';
 
 // 공정거래위원회 가맹정보(공공데이터포털 Open API). 운영자 적재 명령에서만 호출하고,
 // 웹 요청 중에는 적재된 스냅샷만 읽는다.
@@ -71,9 +71,20 @@ export const FTC_SERVICES: Readonly<Record<FtcService['key'], FtcService>> = {
   },
 };
 
-// 공정위 업종 중분류 → 서울시 상위 업종. 이 표에 있는 중분류만 적재한다.
-export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, OpenIndustryCode>> = {
+// 공정위 외식 업종 중분류 → 서울시 상위 업종(ADR 0010 6단계). 이 표에 있는 중분류만 적재한다.
+// 피자는 소진공 대응과 같이 패스트푸드점으로 묶는다. 아이스크림/빙수·기타 외국식·기타 외식은 열 개 업종에
+// 맞지 않아 넣지 않는다. 열지 않은 업종의 브랜드도 적재하고, 조회 입력(schema.ts)이 열린 업종만 받는다.
+export const INDUSTRY_MIDDLE_TO_MARKET: Readonly<Record<string, IndustryCode>> = {
   한식: 'CS100001',
+  중식: 'CS100002',
+  일식: 'CS100003',
+  서양식: 'CS100004',
+  제과제빵: 'CS100005',
+  패스트푸드: 'CS100006',
+  피자: 'CS100006',
+  치킨: 'CS100007',
+  분식: 'CS100008',
+  주점: 'CS100009',
   커피: 'CS100010',
   '음료 (커피 외)': 'CS100010',
 };

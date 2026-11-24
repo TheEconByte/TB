@@ -3,7 +3,7 @@ import { PrismaClient } from '../src/generated/prisma/client.ts';
 import { FranchiseError, loadFranchises } from '../src/features/franchise/loader.ts';
 import { secretMasker } from '../src/features/market/seoul-api.ts';
 
-const USAGE = `공정거래위원회 가맹정보(공공데이터포털)의 한식·커피·음료 브랜드 현황과 창업 금액을 적재합니다.
+const USAGE = `공정거래위원회 가맹정보(공공데이터포털)의 외식 요식업 브랜드 현황과 창업 금액을 적재합니다.
 
 환경변수:
   DATABASE_URL       PostgreSQL 연결 문자열
