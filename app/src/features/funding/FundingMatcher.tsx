@@ -101,11 +101,7 @@ export default function FundingMatcher() {
           공고문의 조건을,
           <br />내 조건과 나란히.
         </h1>
-        <p>
-          사업자등록 여부·개업 연월·자치구·나이·대상 한정을 입력하면, AI가 공고문에서 읽어 둔 조건과 항목마다 맞춰 보고
-          정책자금·지원사업으로 나눠 보여 줍니다. 항목마다 공고문 인용을 함께 보여 주며, 신청 전에는 원 공고를 확인해야
-          합니다.
-        </p>
+        <p>AI가 공고문에서 읽은 조건과 내 조건을 항목마다 맞춰 봅니다.</p>
       </section>
 
       {isPending && (
@@ -118,29 +114,21 @@ export default function FundingMatcher() {
         <div className="empty-panel" role="status">
           <h2>로그인이 필요합니다.</h2>
           <p>
-            자금 공고 맞춰 보기는 로그인한 사용자만 쓸 수 있습니다. <Link href="/">내 창업 계획</Link>에서 로그인한 뒤
-            다시 열어 주세요.
+            <Link href="/">내 창업 계획</Link>에서 로그인한 뒤 다시 열어 주세요.
           </p>
         </div>
       )}
 
       {!isPending && session && (
         <>
-          <section className="notice-box" aria-labelledby="funding-limits">
-            <h2 id="funding-limits">이 결과가 무엇이고 무엇이 아닌지</h2>
+          <details className="notice-box">
+            <summary>결과를 읽는 법</summary>
             <ul>
-              <li>
-                남은 공고는 AI가 공고문에서 읽은 조건 중 안 맞는 것이 없다는 뜻이며 선정이나 지원 결정이 아닙니다. 접수
-                중인지는 조건과 따로 카드마다 보여 줍니다.
-              </li>
-              <li>
-                조건에 안 맞는 공고는 목록에서 뺍니다. 음식점·카페를 제외하는 공고는 입력이 없어도 빠집니다. AI가 잘못
-                읽을 수 있어 뺀 건수를 밝히고, 펼쳐서 다시 볼 수 있게 둡니다. 마감은 출처·운영자 기록으로만 정합니다.
-              </li>
-              <li>지원금·보증·공간·프로그램 지원은 대출 원금이나 월 상환액으로 바꾸지 않습니다.</li>
-              <li>입력하지 않은 항목은 해당 없음으로 채우지 않고 확인 필요로 남깁니다. 입력은 AI에 보내지 않습니다.</li>
+              <li>남은 공고는 AI가 읽은 조건 중 안 맞는 것이 없다는 뜻이며, 선정을 뜻하지 않습니다.</li>
+              <li>조건에 안 맞는 공고는 빼고 건수를 밝힙니다. 펼쳐서 다시 볼 수 있습니다.</li>
+              <li>입력하지 않은 항목은 확인 필요로 남깁니다. 입력은 AI에 보내지 않습니다.</li>
             </ul>
-          </section>
+          </details>
 
           <section className="picker" aria-labelledby="funding-picker">
             <h2 id="funding-picker">내 조건 입력</h2>
@@ -156,31 +144,21 @@ export default function FundingMatcher() {
                   {loading ? '맞춰 보는 중…' : '공고 맞춰 보기'}
                 </button>
               </div>
-              <p className="picker-note">
-                판정 기준일은 서버의 한국 시간 오늘이며 요청에서 바꿀 수 없습니다. 입력은 저장하지 않습니다. 계획에
-                저장하려면 내 창업 계획 화면의 자금 조건을 쓰세요.
-              </p>
+              <p className="picker-note">입력은 저장되지 않습니다.</p>
             </form>
           </section>
 
           <section className="market-results" aria-live="polite" aria-busy={loading}>
             {loading && (
               <p className="loading-state" role="status">
-                활성 카탈로그의 공고를 맞춰 보는 중…
+                공고를 맞춰 보는 중…
               </p>
             )}
             {!loading && error && <FundingMatchesErrorPanel error={error} />}
-            {!loading && !error && !result && (
-              <p className="empty-state">
-                조건을 입력하고 공고 맞춰 보기를 누르면 갈래마다 남은 공고와 공고가 밝힌 조건을 보여 줍니다.
-              </p>
-            )}
             {!loading && !error && result && <FundingMatchesPanel result={result} />}
           </section>
         </>
       )}
-
-      <footer>TrendBench · 공식 출처 기반 자금 공고 · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
 }

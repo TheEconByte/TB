@@ -114,7 +114,6 @@ export default function BusinessProfileWizard({
                   창업하시는지 알려주세요.
                 </>
               }
-              note="세부 업종 경쟁과 서울시 상위 업종 매출은 서로 다른 범위로 표시합니다."
             />
             <label className="field search-field">
               <span>지역구</span>
@@ -178,7 +177,6 @@ export default function BusinessProfileWizard({
                   생각하시는지 알려주세요.
                 </>
               }
-              note="카드는 빠른 입력입니다. 지역 평균값을 만들지 않고, 아래에 입력한 정확한 면적을 저장합니다."
             />
             <div className="choice-grid three">
               {AREA_PRESETS.map(({ value, label, size }) => (
@@ -236,7 +234,6 @@ export default function BusinessProfileWizard({
                   생각하시는지 알려주세요.
                 </>
               }
-              note="층에 맞는 부동산원 층별 임대료를 참고로 보여 드립니다. 재무계획에는 자동으로 넣지 않습니다."
             />
             <div className="choice-grid three">
               {(Object.entries(FLOOR_LABELS) as Array<[keyof typeof FLOOR_LABELS, string]>).map(([value, label]) => (
@@ -264,7 +261,6 @@ export default function BusinessProfileWizard({
                   생각하시는지 알려주세요.
                 </>
               }
-              note="한국부동산원 임대동향조사의 상가 구분입니다. 고른 유형의 조사 임대료를 참고로 보여 드립니다."
             />
             <div className="choice-grid three">
               {BUILDING_TYPES.map((value) => (
@@ -295,10 +291,10 @@ export default function BusinessProfileWizard({
               }
               note={
                 complete
-                  ? '화면 아래 "초안 저장"을 누르면 계획과 함께 저장됩니다. 재무 계산 입력과는 분리해 저장합니다.'
+                  ? '"초안 저장"을 누르면 계획과 함께 저장됩니다.'
                   : saveState.kind === 'EMPTY'
-                    ? '사업 조건 없이 재무 계획만 저장할 수 있습니다. 조건을 입력하면 임대료·프랜차이즈 참고 자료를 볼 수 있습니다.'
-                    : '일부만 입력한 상태에서는 초안을 저장할 수 없습니다. 빠진 항목을 입력하거나 사업 조건을 모두 비워 주세요.'
+                    ? '비워 두고 재무 계획만 저장할 수도 있습니다.'
+                    : '일부만 입력하면 저장할 수 없습니다. 마저 입력하거나 모두 비워 주세요.'
               }
             />
             <div className="profile-summary-grid">
@@ -372,11 +368,11 @@ export default function BusinessProfileWizard({
   );
 }
 
-function WizardHeading({ title, note }: Readonly<{ title: ReactNode; note: string }>) {
+function WizardHeading({ title, note }: Readonly<{ title: ReactNode; note?: string }>) {
   return (
     <div className="wizard-heading">
       <h2 id="business-profile-title">{title}</h2>
-      <p>{note}</p>
+      {note && <p>{note}</p>}
     </div>
   );
 }

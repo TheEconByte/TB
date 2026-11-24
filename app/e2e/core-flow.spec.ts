@@ -38,7 +38,7 @@ test('가입부터 불변 결과 재조회와 다른 사용자 접근 차단까�
 
   await page.getByLabel('계획 제목').fill(title);
   await page.getByRole('button', { name: '저장하고 서버 계산' }).click();
-  await expect(page.getByRole('heading', { name: /revision 1의 불변 결과/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /revision 1 계산 결과/ })).toBeVisible();
   await expect(page.getByText('새 계산 결과를 저장했습니다.')).toBeVisible();
 
   const planId = await page.evaluate(async () => {
@@ -50,7 +50,7 @@ test('가입부터 불변 결과 재조회와 다른 사용자 접근 차단까�
 
   await page.reload();
   await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.getByRole('heading', { name: /revision 1의 불변 결과/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /revision 1 계산 결과/ })).toBeVisible();
 
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
@@ -77,7 +77,7 @@ test('없앤 적용 기능이 저장한 대출 가정 출처를 계획과 결과
   await signUp(page, `loan-assumption-${suffix}@example.test`, '대출 가정 확인');
   await page.getByLabel('계획 제목').fill(title);
   await page.getByRole('button', { name: '저장하고 서버 계산' }).click();
-  await expect(page.getByRole('heading', { name: /revision 1의 불변 결과/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /revision 1 계산 결과/ })).toBeVisible();
   const planId = await page.evaluate(async () => {
     const body = (await (await fetch('/api/plans')).json()) as { plans: Array<{ id: string }> };
     return body.plans[0]?.id;
@@ -115,7 +115,7 @@ test('없앤 적용 기능이 저장한 대출 가정 출처를 계획과 결과
 
   await page.reload();
   await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.getByRole('heading', { name: /revision 1의 불변 결과/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /revision 1 계산 결과/ })).toBeVisible();
   const planSource = page.getByText(/^저장된 대출 가정 출처:/);
   await expect(planSource).toContainText('e2e-loan@1.0.0');
   await expect(planSource).toContainText('승인 확정이 아니며');

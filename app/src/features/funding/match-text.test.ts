@@ -417,8 +417,6 @@ describe('한도와 부족자금 문장', () => {
     expect(
       fundingGapText({ revision: 2, value: { status: 'INSUFFICIENT_INPUT', value: null, missingFields: ['equity'] } }),
     ).toContain('계산하지 못했습니다');
-    // 저장 결과를 보고 있지 않으면 다시 계산해 채우지 않는다(계산 결과는 저장된 것만 쓴다).
-    expect(fundingGapText(null)).not.toMatch(/\d원/);
   });
 });
 
@@ -469,7 +467,7 @@ describe('쓰지 않는 문구', () => {
       limitText({ publicLimitKrw: '1', limitText: null }),
       UNREAD_NOTICE,
       titleRegionText('서울'),
-      fundingGapText(null),
+      fundingGapText({ revision: 1, value: { status: 'READY', value: '1' } }),
     ];
     for (const text of texts) for (const word of FORBIDDEN) expect(text, text).not.toContain(word);
   });

@@ -142,7 +142,6 @@ function AuthScreen() {
           <a className="link-button" href="/funding">
             자금 후보
           </a>
-          <span className="badge">인증 필요</span>
         </div>
       </header>
       <section className="auth-shell">
@@ -153,7 +152,7 @@ function AuthScreen() {
             <br />
             로그인해 주세요.
           </h1>
-          <p>이메일은 로그인 식별에만 사용합니다. 실제 이메일 발송과 비밀번호 복구는 아직 제공하지 않습니다.</p>
+          <p>비밀번호 찾기는 아직 지원하지 않습니다.</p>
         </div>
         <form className="auth-card" onSubmit={submit}>
           <h2>{mode === 'signin' ? '로그인' : '회원가입'}</h2>
@@ -322,7 +321,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     // 사업 조건을 일부만 입력한 채 저장하면 null이 가서 저장된 조건까지 지워진다. 저장 전에 막는다.
     const profileState = businessProfileSaveState(businessForm);
     if (profileState.kind === 'INCOMPLETE') {
-      const profileIssue = `사업 조건에 빠진 항목이 있어 저장하지 않았습니다: ${profileState.missing.join(', ')}. 사업 조건을 마저 입력하거나, 입력 확인 단계에서 모두 비운 뒤 다시 저장해 주세요.`;
+      const profileIssue = `사업 조건에 빠진 항목이 있어 저장하지 않았습니다: ${profileState.missing.join(', ')}. 마저 입력하거나 모두 비워 주세요.`;
       setMessage(profileIssue);
       requestAnimationFrame(() => document.querySelector('.status-message')?.scrollIntoView({ block: 'start' }));
       throw new Error(profileIssue);
@@ -374,7 +373,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   async function calculate(title: string, input: FinanceInput) {
     const saved = await saveDraft(title, input);
     setBusy(true);
-    setMessage('서버에서 저장된 입력을 계산하고 있습니다.');
+    setMessage('계산하고 있습니다.');
     try {
       const data = await api<{ result: StoredResult; reused: boolean }>(`/api/plans/${saved.id}/calculations`, {
         method: 'POST',
@@ -382,7 +381,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
       setStoredResult(data.result);
       await openPlan(saved.id);
       setStoredResult(data.result);
-      setMessage(data.reused ? '동일 revision의 기존 계산 결과를 불러왔습니다.' : '새 계산 결과를 저장했습니다.');
+      setMessage(data.reused ? '이미 계산한 결과를 불러왔습니다.' : '새 계산 결과를 저장했습니다.');
       return data.result.resultJson;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '계산 결과를 저장하지 못했습니다.');
@@ -606,7 +605,6 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           />
         </div>
       </div>
-      <footer>TrendBench · 내부 MVP · 공개 출시 준비 완료 상태가 아닙니다.</footer>
     </main>
   );
 }
@@ -629,12 +627,11 @@ function MarketSourceNotice({
           {score.area.displayName} {score.industry.displayName} 점포당 평균 기준 · 등급 {score.score!.grade}
         </strong>
         <p>
-          월매출 기본값 {formatWon(score.financeDefault!.monthlyRevenue)}은 {score.baseQuarterLabel}까지 최근 4분기
-          서울시 매출 원값을 {interpretationPhrase(score.financeDefault!.interpretation)} 점포당 월평균
-          잠정값입니다(원값 합 {formatWon(score.financeDefault!.salesSum)} ÷ 점포 수 합{' '}
+          월매출 기본값 {formatWon(score.financeDefault!.monthlyRevenue)}(잠정)은 {score.baseQuarterLabel}까지 최근
+          4분기 매출 원값을 {interpretationPhrase(score.financeDefault!.interpretation)} 점포당 월평균입니다(원값 합{' '}
+          {formatWon(score.financeDefault!.salesSum)} ÷ 점포 수 합{' '}
           {wonFormat.format(score.financeDefault!.storeCountSum)}
-          {interpretationDivisor(score.financeDefault!.interpretation)}). 개인 예상매출이 아니며 고쳐서 쓸 수 있습니다.
-          저장하면 상권 코드·등급·모델 버전을 함께 보존합니다.
+          {interpretationDivisor(score.financeDefault!.interpretation)}). 개인 예상매출이 아니니 고쳐 쓰세요.
         </p>
         {score.financeDefault!.unusual && <UnusualRevenueWarning score={score} />}
         <button type="button" onClick={onDisconnect}>
@@ -650,20 +647,19 @@ function MarketSourceNotice({
           {stored.areaName} {stored.industryName} 점포당 평균 기준 · 등급 {stored.grade}
         </strong>
         <p>
-          계획을 만들 때 저장한 값입니다. 다시 계산하지 않습니다. 기준분기 {quarterLabel(stored.baseQuarter)} · 점수{' '}
-          {stored.score}점 · 모델 {stored.modelVersion} · 월매출 기본값 {formatWon(stored.monthlyRevenueDefault)}(잠정)
+          계획을 만들 때 저장한 값입니다. 기준분기 {quarterLabel(stored.baseQuarter)} · 점수 {stored.score}점 · 월매출
+          기본값 {formatWon(stored.monthlyRevenueDefault)}(잠정)
         </p>
         {stored.monthlyRevenueUnusual && (
           <p className="inline-error" role="note">
-            저장 당시 기본값이 같은 업종 상권의 하위·상위 1% 범위를 벗어났습니다. 개인 점포 매출과 크게 다를 수
-            있습니다.
+            저장 당시 기본값이 같은 업종 상권의 상·하위 1% 범위를 벗어나 실제와 크게 다를 수 있습니다.
           </p>
         )}
         {stored.monthlyRevenueInterpretation !== CURRENT_MONTHLY_REVENUE_INTERPRETATION && (
           <p className="inline-error" role="note" data-testid="legacy-revenue-interpretation">
-            이 기본값은 서울시 매출 원값을 {interpretationPhrase(stored.monthlyRevenueInterpretation)} 이전 해석으로
-            채웠습니다. 지금은 원값을 {interpretationPhrase(CURRENT_MONTHLY_REVENUE_INTERPRETATION)} 값을 쓰며, 이전
-            값은 약 3배 클 수 있습니다. 월매출을 그대로 두었다면 직접 확인해 고쳐 주세요.
+            이 기본값은 매출 원값을 {interpretationPhrase(stored.monthlyRevenueInterpretation)} 이전 해석으로 채워 지금
+            해석({interpretationPhrase(CURRENT_MONTHLY_REVENUE_INTERPRETATION)} 값)보다 약 3배 클 수 있습니다. 월매출을
+            확인해 주세요.
           </p>
         )}
       </div>
@@ -725,30 +721,24 @@ function PlanFundingPanel({
   // 자치구만 입력했다가 비우면 조건이 하나도 없어 저장된 조건이 비워진다(조회 불가). 그래서 다른 조건과 함께일 때로 쓴다.
   const districtHint =
     savedBusinessDistrict === null
-      ? '자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구로 맞춰 봅니다. 그것도 없으면 지역은 확인 필요로 남습니다.'
-      : `자치구를 비워 두고 다른 조건을 저장하면, 계획에 저장된 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
+      ? '비워 두면 사업 조건의 자치구로 맞춰 봅니다.'
+      : `비워 두면 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
   return (
     <section className="picker" aria-labelledby="plan-funding">
       <h2 id="plan-funding">계획 기준 자금 공고 맞춰 보기</h2>
       <p className="picker-note">
-        이 계획에 저장한 자금 조건으로, AI가 공고문에서 읽어 둔 조건과 항목마다 맞춰 봅니다. 재무 계산 입력과 분리해
-        저장하며, 조건을 바꾼 뒤에는 초안을 저장해야 조회에 반영됩니다.
+        AI가 공고문에서 읽은 조건과 이 계획의 자금 조건을 맞춰 봅니다. 조건을 바꾸면 초안을 저장해야 반영됩니다.
       </p>
       <FundingProfileFields form={form} onChange={onChange} idPrefix="plan-funding" districtHint={districtHint} />
 
-      {plan === null && (
-        <p className="empty-state">새 계획은 먼저 초안을 저장해야 저장된 조건으로 공고를 맞춰 볼 수 있습니다.</p>
-      )}
+      {plan === null && <p className="empty-state">초안을 저장하면 공고를 맞춰 볼 수 있습니다.</p>}
 
       {plan !== null && appliedSummary && <p className="funding-position">저장된 대출 가정 출처: {appliedSummary}</p>}
 
       {plan !== null && !hasStoredProfile && (
         <div className="empty-panel" role="status">
           <h2>저장된 자금 조건이 없습니다.</h2>
-          <p>
-            위에서 조건을 하나 이상 입력하고 초안을 저장하면 저장된 조건으로 공고를 맞춰 볼 수 있습니다. 조건 없이
-            조회하면 0건이 아니라 400으로 거부됩니다.
-          </p>
+          <p>조건을 하나 이상 입력하고 초안을 저장해 주세요.</p>
         </div>
       )}
 
@@ -757,24 +747,22 @@ function PlanFundingPanel({
           {stored?.kind === 'OK' && <p className="funding-position">저장된 조건: {stored.summary}</p>}
           {stored?.kind === 'OK' && stored.legacy && (
             <p className="picker-note" role="note">
-              예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 업종·용도는 더 쓰지 않으며, 다음에 초안을 저장하면
-              지금 모양으로 저장합니다(옮길 값이 없으면 저장된 조건을 비웁니다).
+              예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 다음에 저장하면 지금 형식으로 바뀝니다.
             </p>
           )}
           {stored?.kind === 'INVALID' && (
             <p className="inline-error" role="status">
-              저장된 자금 조건을 읽지 못해 빈 입력란으로 보여 줍니다. 조건을 다시 입력해 저장해 주세요.
+              저장된 자금 조건을 읽지 못했습니다. 다시 입력해 저장해 주세요.
             </p>
           )}
           {dirty && (
             <p className="inline-error" role="status">
-              아직 저장하지 않은 조건 변경이 있습니다. 초안을 저장한 뒤 조회해 주세요.
+              바꾼 조건을 저장한 뒤 조회해 주세요.
             </p>
           )}
           {!dirty && businessDistrictDirty && (
             <p className="inline-error" role="status">
-              사업 조건의 자치구를 바꾼 뒤 저장하지 않았습니다. 자금 조건의 자치구가 비어 있어 그 값으로 맞춰 보므로,
-              초안을 저장한 뒤 조회해 주세요.
+              바꾼 사업 조건의 자치구를 저장한 뒤 조회해 주세요.
             </p>
           )}
           <div className="button-row">
@@ -785,7 +773,7 @@ function PlanFundingPanel({
           <div className="market-results" aria-live="polite" aria-busy={loading}>
             {loading && (
               <p className="loading-state" role="status">
-                저장된 계획 조건으로 공고를 맞춰 보는 중…
+                공고를 맞춰 보는 중…
               </p>
             )}
             {!loading && error && <FundingMatchesErrorPanel error={error} />}
@@ -793,14 +781,9 @@ function PlanFundingPanel({
               <FundingMatchesPanel
                 result={matches}
                 districtSource={matches.districtSource}
-                planLabel={`계획 revision ${matches.plan.revision}에 저장된 조건으로 맞춰 봤습니다.`}
+                planLabel={`계획 revision ${matches.plan.revision}의 조건으로 맞춰 봤습니다.`}
                 fundingGap={fundingGap}
               />
-            )}
-            {!loading && !error && !matches && (
-              <p className="empty-state">
-                계획 조건으로 공고 맞춰 보기를 누르면 갈래마다 남은 공고와 공고가 밝힌 조건을 보여 줍니다.
-              </p>
             )}
           </div>
         </>

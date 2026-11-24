@@ -91,8 +91,7 @@ export default function FranchisePanel({
           {payload.source.latestDisclosureYear}년 정보공개서({payload.source.latestPerformanceYear}년 실적) 기준{' '}
           {payload.industry.label} 브랜드 {numberFormat.format(payload.summary.brandCount)}개 중 가맹점이 있는 곳{' '}
           {numberFormat.format(payload.summary.brandsWithStores)}개, 평균매출을 공개한 곳{' '}
-          {numberFormat.format(payload.summary.brandsWithSales)}개입니다. 전국 평균이며 재무계획에 자동으로 넣지
-          않습니다.
+          {numberFormat.format(payload.summary.brandsWithSales)}개입니다.
         </p>
       )}
       <div className="select-row reference-select-row">
@@ -108,7 +107,6 @@ export default function FranchisePanel({
               onChange={(event) => setQuery(event.target.value)}
             />
           </span>
-          <small>검색하지 않으면 가맹점이 많은 순서로 10개를 보여 드립니다.</small>
         </label>
       </div>
       {state.kind === 'loading' || state.kind === 'idle' ? (
@@ -117,7 +115,7 @@ export default function FranchisePanel({
         </p>
       ) : state.kind === 'unavailable' ? (
         <p className="picker-note" role="status">
-          공정위 가맹정보가 아직 준비되지 않았습니다. 자료가 적재되면 이곳에 표시됩니다.
+          프랜차이즈 자료가 아직 준비되지 않았습니다.
         </p>
       ) : state.kind === 'error' ? (
         <p className="inline-error" role="alert">
@@ -226,8 +224,8 @@ function FranchiseDetail({
 
       {savedMonthlyRevenue !== null && latest.averageMonthlySalesWon !== null && (
         <p className="funding-position">
-          이 계획에 저장된 월매출 가정: {formatWon(savedMonthlyRevenue)}. 이 브랜드 가맹점의 전국 월 평균은 약{' '}
-          {formatWon(latest.averageMonthlySalesWon)}입니다. 입지·면적에 따라 크게 다르므로 참고로만 보세요.
+          이 계획의 월매출 가정 {formatWon(savedMonthlyRevenue)} · 이 브랜드 전국 월 평균 약{' '}
+          {formatWon(latest.averageMonthlySalesWon)}
         </p>
       )}
 
