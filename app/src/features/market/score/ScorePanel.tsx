@@ -58,8 +58,7 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
                 {score.score.topPercent}%
               </strong>
               <span>
-                전체 {numberFormat.format(score.score.total)}곳 중 {numberFormat.format(score.score.rank)}위 · 기준분기{' '}
-                {score.baseQuarterLabel}
+                전체 {numberFormat.format(score.score.total)}곳 중 {numberFormat.format(score.score.rank)}위
               </span>
             </div>
           </div>
@@ -78,8 +77,8 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
           </div>
           {score.financeDefault && (
             <p className="table-note">
-              재무 계획에는 월매출 기본값 {formatWon(score.financeDefault.monthlyRevenue)}(잠정, 점포당 월평균)을 채워
-              넘기며, 계획 화면에서 고칠 수 있습니다.
+              재무 계획은 월매출 {formatWon(score.financeDefault.monthlyRevenue)}(잠정, 점포당 월평균)을 채워 시작하며,
+              고칠 수 있습니다.
             </p>
           )}
           {score.financeDefault?.unusual && <UnusualRevenueWarning score={score} />}
@@ -87,7 +86,6 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
       ) : (
         <div className="score-unavailable" role="status">
           <strong>{score.message}</strong>
-          <p>{SCORE_EXPLANATION}</p>
         </div>
       )}
 
@@ -101,11 +99,11 @@ export function UnusualRevenueWarning({ score }: { readonly score: MarketScoreRe
   if (!finance?.unusual || !finance.warningRange) return null;
   return (
     <p className="inline-error" role="note">
-      이 상권의 점포당 월매출(잠정)은 서울 {score.industry.displayName} 상권{' '}
+      이 상권의 점포당 월매출(잠정)이 서울 {score.industry.displayName} 상권{' '}
       {finance.unusual === 'HIGH'
-        ? `상위 1% 경계(${formatWon(finance.warningRange.high)})보다 높습니다. 법인·단체 수요 등으로`
-        : `하위 1% 경계(${formatWon(finance.warningRange.low)})보다 낮습니다. 추정 자료의 한계 등으로`}{' '}
-      개인 점포의 매출과 크게 다를 수 있으니 그대로 쓰지 말고 확인해 주세요.
+        ? `상위 1%(${formatWon(finance.warningRange.high)})보다 높아`
+        : `하위 1%(${formatWon(finance.warningRange.low)})보다 낮아`}{' '}
+      실제 점포 매출과 크게 다를 수 있습니다. 확인 후 쓰세요.
     </p>
   );
 }
@@ -143,10 +141,7 @@ function ContributionBars({ items }: { readonly items: readonly ScoreContributio
           );
         })}
       </ul>
-      <p className="table-note">
-        막대는 가운데(0)를 기준으로 오른쪽이 점수를 올린 요인, 왼쪽이 내린 요인입니다. 높음·낮음은 실제 값으로,
-        올림·내림은 모델 기여도 부호로 정합니다.
-      </p>
+      <p className="table-note">막대는 가운데(0)를 기준으로 오른쪽이 점수를 올린 요인, 왼쪽이 내린 요인입니다.</p>
     </div>
   );
 }
@@ -254,7 +249,6 @@ function ScoreBasis({ score }: { readonly score: MarketScoreResponse }) {
           <li key={item}>{item}</li>
         ))}
       </ul>
-      <p className="table-note">상권 릴리스 {score.release.marketReleaseKey}</p>
     </details>
   );
 }

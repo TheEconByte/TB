@@ -291,13 +291,11 @@ export default function FinancePlanner({
   return (
     <>
       <section className="hero">
-        <p className="eyebrow">로그인 계정에 보존하는 재무계획</p>
         <h1>
           내 가정으로 확인하는
           <br />
           창업 재무계획
         </h1>
-        <p>초안을 저장한 뒤 서버에서 계산합니다. 과거 결과는 입력을 바꿔도 그대로 남습니다.</p>
       </section>
       <form onSubmit={submit} noValidate>
         <section className="form-section">
@@ -305,7 +303,6 @@ export default function FinancePlanner({
             <span>00</span>
             <div>
               <h2>계획 이름</h2>
-              <p>내 계획 목록에서 다시 찾을 이름입니다.</p>
             </div>
           </div>
           <label className="field" htmlFor="plan-title">
@@ -329,7 +326,6 @@ export default function FinancePlanner({
             <span>01</span>
             <div>
               <h2>개업 전 자금</h2>
-              <p>실제 지출과 남겨 둘 예비금을 구분합니다.</p>
             </div>
           </div>
           <div className="field-grid">
@@ -346,7 +342,6 @@ export default function FinancePlanner({
             <span>02</span>
             <div>
               <h2>월 운영 가정</h2>
-              <p>공공 상권 매출이 아닌 사용자 가정입니다.</p>
             </div>
           </div>
           {revenueNotice}
@@ -381,7 +376,6 @@ export default function FinancePlanner({
             <span>03</span>
             <div>
               <h2>신규 대출 가정</h2>
-              <p>부족자금이 자동 입력되지 않습니다.</p>
             </div>
           </div>
           <div className="field-grid">
@@ -460,18 +454,14 @@ export default function FinancePlanner({
         <div className="draft-state" aria-live="polite">
           <strong>
             {revision === null
-              ? '저장되지 않은 새 입력'
+              ? '저장 전'
               : dirty
-                ? `저장 이후 입력 변경 · 초안 revision ${revision}`
-                : `저장된 최신 초안 · revision ${revision}`}
+                ? `저장 후 변경됨 · revision ${revision}`
+                : `저장됨 · revision ${revision}`}
           </strong>
-          {stale && result && <span>결과 생성 후 입력이 변경되었습니다. 다시 계산해 주세요.</span>}
+          {stale && result && <span>입력이 바뀌었습니다. 다시 계산해 주세요.</span>}
         </div>
         <div className="calculate-bar">
-          <div>
-            <strong>{busy ? '서버에서 처리하고 있습니다.' : '초안 저장과 서버 계산을 구분합니다.'}</strong>
-            <span>계산은 저장된 입력을 서버에서 다시 검증합니다.</span>
-          </div>
           <div className="button-row">
             <button className="secondary-button" type="button" disabled={busy} onClick={() => void save()}>
               초안 저장
@@ -486,8 +476,7 @@ export default function FinancePlanner({
         <section id="results" className="results" tabIndex={-1} aria-live="polite">
           <div className="results-head">
             <p className="eyebrow">저장된 계산 결과</p>
-            <h2>revision {resultRevision}의 불변 결과</h2>
-            <p>계산 시점 입력 스냅샷으로 만든 결과입니다.</p>
+            <h2>revision {resultRevision} 계산 결과</h2>
           </div>
           <div className="summary-grid">
             <div>
@@ -542,9 +531,6 @@ export default function FinancePlanner({
           <aside className="scope-note">
             <h3>계산에 포함되지 않은 범위</h3>
             <p>{result.excludedScope.join(' · ')}</p>
-            <small>
-              입력 {result.inputSchemaVersion} · 계산 {result.calculationVersion}
-            </small>
           </aside>
         </section>
       )}

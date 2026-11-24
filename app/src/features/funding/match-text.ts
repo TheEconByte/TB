@@ -346,11 +346,11 @@ export function limitText(limit: ProductMatch['limit']): string {
   return '공고에서 한도를 확인하지 못했습니다.';
 }
 
-// 보고 있는 저장 결과의 계획 부족자금. 다시 계산하지 않고 저장된 결과의 값만 쓴다.
+// 보고 있는 저장 결과의 계획 부족자금. 다시 계산하지 않고 저장된 결과의 값만 쓴다. 저장 결과를 보고 있지 않으면 null이며
+// 화면은 아무것도 쓰지 않는다.
 export type ViewedFundingGap = { revision: number; value: ValueResult<string> } | null;
 
-export function fundingGapText(gap: ViewedFundingGap): string {
-  if (gap === null) return '저장 결과를 열면 그 결과의 계획 부족자금을 한도 옆에 참고로 보여 줍니다.';
+export function fundingGapText(gap: NonNullable<ViewedFundingGap>): string {
   if (gap.value.status === 'READY')
     return `참고: 보고 있는 저장 결과(revision ${gap.revision})의 계획 부족자금 ${formatWon(gap.value.value)}`;
   return `참고: 보고 있는 저장 결과(revision ${gap.revision})에서는 입력이 부족해 계획 부족자금을 계산하지 못했습니다.`;
