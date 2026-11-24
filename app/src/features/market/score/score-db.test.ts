@@ -250,10 +250,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     const coffee = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100010' });
     expect(coffee.kind === 'OK' && coffee.payload).toMatchObject({
       status: 'UNSUPPORTED_INDUSTRY',
-      message: '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·중식음식점만 냅니다.',
+      message: '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·중식만 냅니다.',
       servedIndustries: [
         { code: 'CS100001', displayName: '한식' },
-        { code: 'CS100002', displayName: '중식음식점' },
+        { code: 'CS100002', displayName: '중식' },
       ],
       score: null,
       financeDefault: null,
@@ -262,7 +262,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     const opened = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100002' });
     expect(opened.kind === 'OK' && opened.payload).toMatchObject({
       status: 'OK',
-      industry: { code: 'CS100002', displayName: '중식음식점' },
+      industry: { code: 'CS100002', displayName: '중식' },
       score: { rank: 1, total: 1 },
     });
 

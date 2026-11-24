@@ -1,8 +1,8 @@
 import { INDUSTRIES, isOpenIndustryCode } from '../industries.ts';
 
 export const MARKET_SCHEMA_VERSION = 'market-schema-v1.1.0';
-// 릴리스 키의 일부다. 적재하는 업종 범위(MARKET_INDUSTRIES)나 지표 정의를 바꾸면 올린다.
-export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v3';
+// 릴리스 키의 일부다. 적재하는 업종 범위·표시명(MARKET_INDUSTRIES)이나 지표 정의를 바꾸면 올린다.
+export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v4';
 export const INDUSTRY_CATEGORY_VERSION = 'seoul-service-industry-2024-2025';
 
 // Recorded from the 영역-상권 attribute file: A 골목상권, D 발달상권, R 전통시장, U 관광특구.
