@@ -98,15 +98,17 @@ const SURVEYED_CATEGORIES: readonly (readonly [
   ['I204', 'I20402', '파스타/스테이크', 'CS100004'],
   ['I204', 'I20403', '패밀리레스토랑', 'CS100004'],
   ['I204', 'I20499', '기타 서양식 음식점', 'CS100004'],
-  // 서울시 상위 업종 열 개에 동남아·기타 외국식·구내식당·뷔페는 없다.
-  ['I205', 'I20501', '베트남식 전문', null],
-  ['I205', 'I20599', '기타 동남아식 전문', null],
-  ['I206', 'I20601', '분류 안된 외국식 음식점', null],
+  // 서울시는 기타 외국식 음식점업(KSIC 56129, 베트남·태국 음식점 등)을 양식음식점에 넣는다
+  // (서울시 상권분석서비스 「100대 생활밀접업종 선정현황」).
+  ['I205', 'I20501', '베트남식 전문', 'CS100004'],
+  ['I205', 'I20599', '기타 동남아식 전문', 'CS100004'],
+  ['I206', 'I20601', '분류 안된 외국식 음식점', 'CS100004'],
+  // 구내식당(KSIC 56130)·뷔페는 서울시 외식업 열 개 업종의 정의에 없다.
   ['I207', 'I20701', '구내식당', null],
   ['I207', 'I20702', '뷔페', null],
   ['I210', 'I21001', '빵/도넛', 'CS100005'],
-  // 사용자 결정: 떡집은 제조·소매 성격이 강해 제과점에 넣지 않는다.
-  ['I210', 'I21002', '떡/한과', null],
+  // 서울시 제과점은 제과점업(KSIC 56191)이고 그 예시에 떡 전문점이 있다(「100대 생활밀접업종 선정현황」).
+  ['I210', 'I21002', '떡/한과', 'CS100005'],
   // 사용자 결정: 피자·버거·토스트/샌드위치/샐러드는 패스트푸드점으로 묶는다.
   ['I210', 'I21003', '피자', 'CS100006'],
   ['I210', 'I21004', '버거', 'CS100006'],
@@ -125,7 +127,7 @@ const SURVEYED_CATEGORIES: readonly (readonly [
 ];
 
 describe('소진공 업종 매핑', () => {
-  it('조사한 분류 43개를 사람이 정한 대로 서울시 상위 업종에 대응시킨다', () => {
+  it('조사한 분류 43개를 서울시 업종 정의대로 대응시킨다', () => {
     expect(SURVEYED_CATEGORIES).toHaveLength(43);
     expect(
       SURVEYED_CATEGORIES.map(([middleCode, smallCode, smallName]) => [
@@ -214,7 +216,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('소진공 점포 스냅샷 적�
       ...perIndustry.map(([id, middleCode, middleName, smallCode, smallName]) =>
         semasItem(id, middleCode, middleName, smallCode, smallName),
       ),
-      semasItem('B11', 'I205', '동남아시아', 'I20501', '베트남식 전문'),
+      semasItem('B11', 'I207', '구내식당·뷔페', 'I20701', '구내식당'),
     ];
     const result = await loadBusinessDirectory({
       prisma: db(),
@@ -223,7 +225,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('소진공 점포 스냅샷 적�
       retrievedAt: new Date('2026-11-24T00:00:00.000Z'),
     });
     expect(result.outcome).toBe('ACTIVATED');
-    // 대응하지 못한 베트남식(B11)만 빠진다.
+    // 대응하지 않는 구내식당(B11)만 빠진다.
     expect(result.businessCount).toBe(10);
 
     // 열 개 업종을 모두 열었으므로(ADR 0010 7단계) 업종마다 소분류가 하나씩 보인다.
