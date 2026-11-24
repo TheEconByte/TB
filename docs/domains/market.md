@@ -16,7 +16,9 @@
 - 결합 키는 표시명이 아니라 `quarter + areaType + areaCode + industryCode`다.
 - 새 릴리스는 `PENDING`으로 적재하고 적재 후 검증까지 통과한 뒤 한 트랜잭션으로 활성화한다. 활성화는 상태 전환만 하며 이전 릴리스의 행은 지우거나 고치지 않는다.
 - 실패하면 새 릴리스의 상권·분기 행을 삭제하고 릴리스를 `FAILED`와 실패 사유로 남긴다.
-- 처음 노출하는 업종은 한식(CS100001), 커피·음료(CS100010)다. 다른 업종은 `industries`에 원천 분류로만 남기고 조회를 거부한다.
+- 관측값을 적재하는 업종은 요식업 업종 목록(`app/src/features/industries.ts`)의 열 개이고, 릴리스의 `industries` 행에 `isSupported`로 남는다. 그 밖의 업종은 원천 분류로만 남긴다([ADR 0010](../decisions/0010-food-service-industry-scope.md)).
+- 사용자에게 내는 업종은 그중 열린 업종(지금은 한식 CS100001, 커피·음료 CS100010)뿐이다. 업종 목록·summary·report·사업 조건 저장은 `isServedMarketIndustry`(`types.ts`)로, 점수 API와 계획 스냅샷은 열린 업종인지로 거른다. 업종을 열 때 다시 적재하거나 다시 학습하지 않는다.
+- 열린 업종의 분기 자료가 없으면 적재하지 않는다. 열지 않은 업종의 자료가 없으면 경고만 남긴다.
 - 상권 표시명 우선순위: 영역 파일 명칭 → 매출·점포 파일 관측 명칭. 업종 표시명 우선순위: 제품 문서 표시명 → 원천 명칭. 두 명칭은 응답에 함께 담는다.
 - 파일 적재는 manifest에 기록된 파일 크기와 SHA-256이 일치하는 원본만 허용한다. 새 원본은 입수일·기준기간·checksum·예상 행 수를 검증해 새 manifest와 정의 버전으로 추가하며, 명령행 옵션으로 검증을 우회하지 않는다.
 - 업종 메타데이터는 릴리스별로 저장한다. PENDING·FAILED 릴리스의 업종 원본 명칭이 현재 ACTIVE 릴리스 응답을 바꾸지 않는다.
@@ -36,9 +38,9 @@
 정의와 근거는 [ADR 0008](../decisions/0008-market-survival-score.md)에 있다.
 
 - 코드: `app/src/features/market/score`. 변수·라벨(`dataset.ts`), 로지스틱 회귀(`logistic.ts`), 학습·기준선 비교(`train.ts`), 점수 생성(`build.ts`), 점수 릴리스 적재(`loader.ts`), 공개 API 조립(`api.ts`), 화면(`ScorePanel.tsx`, `MarketGradeBanner.tsx`), `/`로 넘기는 상권 참조(`handoff.ts`). 모델 설정은 `config.ts` 하나에 있다.
-- 학습: `npm --prefix app run score:train [-- --version <버전>]`. ACTIVE 상권 릴리스로 업종별 모델을 학습하고 `app/models/market-score/<버전>.json`(계수)과 `<버전>.report.md`(학습 리포트)를 만든다. 같은 버전 파일은 덮어쓰지 않는다. 계수 파일과 리포트는 Git에 포함한다.
+- 학습: `npm --prefix app run score:train [-- --version <버전>]`. ACTIVE 상권 릴리스로 요식업 업종 열 개의 모델을 모두 학습하고 `app/models/market-score/<버전>.json`(계수)과 `<버전>.report.md`(학습 리포트)를 만든다. 같은 버전 파일은 덮어쓰지 않는다. 계수 파일과 리포트는 Git에 포함한다.
 - 점수 적재: `npm --prefix app run score:build [-- --model <계수 파일>]`. 기본은 `app/models/market-score`의 이름순 마지막 계수 파일이다. 최신 기준분기의 모든 상권 × 제공 업종 행을 `PENDING`으로 저장하고 행 수·점수 범위를 검증한 뒤 한 트랜잭션으로 활성화한다. 실패하면 행을 지우고 `FAILED`로 남기며 기존 ACTIVE를 유지한다. 점수 빌드 버전(`config.ts`의 `SCORE_BUILD_VERSION`)·계수 파일 checksum·상권 릴리스 키·기준분기가 같으면 `ALREADY_ACTIVE`다. 상권을 다시 적재하면 `score:build`를 다시 실행한다.
-- 테스트 AUC가 0.6 미만인 업종은 행을 만들지 않고 요약에 미지원으로 남긴다.
+- 테스트 AUC가 0.6 미만인 업종은 행을 만들지 않고 요약에 미지원으로 남긴다. 기준을 넘은 업종은 열지 않았어도 행을 만들고, 점수 API는 열린 업종에만 점수를 낸다(지원 업종 안내에도 열린 업종만 적는다).
 - `/api/markets/score?areaCode=...&industryCode=...[&areaType=...]`(로그인 불필요): 활성 점수 릴리스가 없으면 503 `SCORE_UNAVAILABLE`, 형식 오류는 400, 점수 릴리스의 상권 영역에 없으면 404 `AREA_NOT_FOUND`다. 그 밖에는 200과 `status`(`OK`·`INSUFFICIENT_STORES`·`UNSUPPORTED_INDUSTRY`·`NO_DATA`), 상태 문구, 점수·등급·순위·상위 %, 기여 변수 최대 4개(이 상권 값·업종 평균·높음/낮음·올림/내림), 10점 구간 분포, 모델 정보(학습 기간·표본·AUC·계수표·등급 구간), 월매출 기본값(원 단위 정수 문자열, 잠정, 근거 원값, 같은 업종 하위·상위 1% 경계 밖인지), 한계 문구를 돌려준다.
 - 상위 %는 ⌈순위 ÷ 점수 낸 상권 수 × 100⌉이고, 점수가 같으면 같은 순위다. 업종 평균은 점수 낸 상권의 화면 표시값 산술 평균이다.
 - 월매출 기본값과 화면의 점포당 월매출(잠정)은 같은 값이며, 최근 4분기 매출 원값 합 ÷ (같은 기간 점포 수 합 × 3)이다([ADR 0011](../decisions/0011-market-sales-quarter-total.md)). 해석은 `revenue.ts` 한 곳에 있고 점수 릴리스 요약의 `monthlyRevenueInterpretation`에 남는다. 이 필드가 없는 이전 릴리스는 ADR 0002 해석(3으로 나누지 않음)이며, API의 `financeDefault.interpretation`과 한계 문구가 릴리스의 해석을 따른다. 점수 변수 `salesPerStore`는 시간 단위를 환산하지 않는 비율이라 해석이 바뀌어도 점수·등급·순위는 같다.

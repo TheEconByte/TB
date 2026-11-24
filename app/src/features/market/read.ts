@@ -2,6 +2,7 @@ import type { PrismaClient } from '../../generated/prisma/client.ts';
 import {
   INDICATOR_DEFINITIONS,
   MARKET_LIMITATIONS,
+  isServedMarketIndustry,
   type AreaInfo,
   type IndustryInfo,
   type MarketAreaList,
@@ -104,7 +105,12 @@ export async function listSupportedIndustries(
 ): Promise<{ activeRelease: ReleaseInfo | null; industries: IndustryInfo[] }> {
   const release = await findActiveRelease(prisma);
   const industries = release
-    ? await prisma.industry.findMany({ where: { releaseId: release.id, isSupported: true }, orderBy: { code: 'asc' } })
+    ? (
+        await prisma.industry.findMany({
+          where: { releaseId: release.id, isSupported: true },
+          orderBy: { code: 'asc' },
+        })
+      ).filter(isServedMarketIndustry)
     : [];
   return {
     activeRelease: release ? toReleaseInfo(release) : null,
@@ -233,7 +239,7 @@ export async function getMarketSummary(
     where: { releaseId_code: { releaseId: release.id, code: params.industryCode } },
   });
   if (!industry) return { kind: 'INVALID_INDUSTRY_CODE', industryCode: params.industryCode };
-  if (!industry.isSupported) return { kind: 'UNSUPPORTED_INDUSTRY', industryCode: params.industryCode };
+  if (!isServedMarketIndustry(industry)) return { kind: 'UNSUPPORTED_INDUSTRY', industryCode: params.industryCode };
 
   const rows = await prisma.marketQuarterly.findMany({
     where: {

@@ -32,9 +32,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     dataPeriod: { start: '20252', end: '20262' },
     minStoreCount: 5,
     gradeBoundaries: [...DEFAULT_GRADE_BOUNDARIES],
-    industries: ['CS100001', 'CS100010'].map((industryCode) => ({
+    // CS100002는 AUC 기준을 넘었지만 열지 않은 업종이다(ADR 0010 5단계). 점수 행은 만들되 사용자에게 내지 않는다.
+    industries: ['CS100001', 'CS100002', 'CS100010'].map((industryCode) => ({
       industryCode,
-      industryName: industryCode === 'CS100001' ? '한식' : '커피·음료',
+      industryName: industryCode,
       intercept: 0,
       features: [
         {
@@ -67,7 +68,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       trainPositiveRate: 0.5,
       testPositiveRate: 0.5,
       trainAuc: 0.7,
-      testAuc: industryCode === 'CS100001' ? 0.65 : 0.55,
+      testAuc: industryCode === 'CS100010' ? 0.55 : 0.65,
       zClip: 3,
     })),
   };
@@ -103,7 +104,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
         activatedAt: new Date(Date.now() + 86_400_000),
       },
     });
-    for (const code of ['CS100001', 'CS100010']) {
+    for (const code of ['CS100001', 'CS100002', 'CS100010']) {
       await db().industry.create({
         data: {
           releaseId: marketReleaseId,
@@ -136,9 +137,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     }
     const quarters = ['20252', '20253', '20254', '20261', '20262'];
     for (const quarter of quarters) {
-      for (const [areaCode, stores] of [
-        ['3119901', 10],
-        ['3119902', 3],
+      for (const [industryCode, areaCode, stores] of [
+        ['CS100001', '3119901', 10],
+        ['CS100001', '3119902', 3],
+        ['CS100002', '3119901', 10],
       ] as const) {
         await db().marketQuarterly.create({
           data: {
@@ -146,7 +148,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
             quarter,
             areaType: 'A',
             areaCode,
-            industryCode: 'CS100001',
+            industryCode,
             salesAmount: '6000',
             similarIndustryStoreCount: stores,
             storeCount: stores,
@@ -179,12 +181,13 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     const report = await buildScoreRelease({ prisma: db(), modelPath: path });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.baseQuarter).toBe('20262');
-    expect(report.rowCount).toBe(3);
-    expect(report.summary.servedIndustryCodes).toEqual(['CS100001']);
-    expect(report.warnings.some((warning) => warning.includes('커피·음료'))).toBe(true);
+    // 상권 3곳 × AUC를 넘은 업종 2개. 업종을 열 때 다시 계산하지 않도록 열지 않은 업종의 행도 만든다.
+    expect(report.rowCount).toBe(6);
+    expect(report.summary.servedIndustryCodes).toEqual(['CS100001', 'CS100002']);
+    expect(report.warnings.some((warning) => warning.includes('CS100010'))).toBe(true);
 
     const rows = await db().marketScore.findMany({
-      where: { releaseId: report.releaseId },
+      where: { releaseId: report.releaseId, industryCode: 'CS100001' },
       orderBy: { areaCode: 'asc' },
     });
     expect(rows.map((row) => row.status)).toEqual(['SCORED', 'INSUFFICIENT_STORES', 'NO_DATA']);
@@ -238,10 +241,19 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       status: 'NO_DATA',
       message: '이 상권은 최근 데이터가 없습니다.',
     });
+    // 지원 업종 안내에는 열린 업종만 적는다. 점수 행이 있는 중식도 열지 않았으므로 적지 않는다.
     const coffee = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100010' });
     expect(coffee.kind === 'OK' && coffee.payload).toMatchObject({
       status: 'UNSUPPORTED_INDUSTRY',
       message: '현재 한식만 지원합니다.',
+      servedIndustries: [{ code: 'CS100001', displayName: '한식' }],
+    });
+    // 점수 행이 있어도 열지 않은 업종이면 점수를 내지 않는다.
+    const closed = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100002' });
+    expect(closed.kind === 'OK' && closed.payload).toMatchObject({
+      status: 'UNSUPPORTED_INDUSTRY',
+      score: null,
+      financeDefault: null,
     });
 
     expect((await getMarketScore(db(), { areaCode: '9999999', industryCode: 'CS100001' })).kind).toBe('AREA_NOT_FOUND');
@@ -263,5 +275,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     });
     expect(await resolvePlanMarketScore(db(), { ...reference, areaCode: '3119902' })).toBeNull();
     expect(await resolvePlanMarketScore(db(), { ...reference, releaseKey: 'missing-release' })).toBeNull();
+    // 열지 않은 업종의 점수는 재무 계획 기본값으로 넘기지 않는다(AGENTS.md §3의 3번 예외는 열린 업종의 화면에서만 시작한다).
+    expect(await resolvePlanMarketScore(db(), { ...reference, industryCode: 'CS100002' })).toBeNull();
   });
 });

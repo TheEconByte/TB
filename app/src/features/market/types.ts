@@ -1,7 +1,8 @@
-import { OPEN_INDUSTRIES } from '../industries.ts';
+import { INDUSTRIES, isOpenIndustryCode } from '../industries.ts';
 
 export const MARKET_SCHEMA_VERSION = 'market-schema-v1.1.0';
-export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v2';
+// 릴리스 키의 일부다. 적재하는 업종 범위(MARKET_INDUSTRIES)나 지표 정의를 바꾸면 올린다.
+export const MARKET_DEFINITION_VERSION = 'seoul-market-definition-2024-2025-v3';
 export const INDUSTRY_CATEGORY_VERSION = 'seoul-service-industry-2024-2025';
 
 // Recorded from the 영역-상권 attribute file: A 골목상권, D 발달상권, R 전통시장, U 관광특구.
@@ -10,17 +11,20 @@ export type AreaType = (typeof AREA_TYPES)[number];
 
 export type DisplayNameSource = 'PRODUCT_DOCUMENT' | 'AREA_FILE' | 'OBSERVED_FILE' | 'SOURCE_FILE';
 
-// Product-document display names for the industries this release exposes.
-// Priority for an industry display name is PRODUCT_DOCUMENT first, then the
-// name recorded in the source files.
-export const SUPPORTED_INDUSTRIES: readonly { code: string; displayName: string }[] = OPEN_INDUSTRIES.map(
+// 상권 릴리스가 관측값을 적재하는 업종: 요식업 업종 목록 전부다(ADR 0010). 적재한 업종은 릴리스의 업종 행에
+// isSupported로 남는다. 표시명은 제품 문서 표시명(PRODUCT_DOCUMENT)이 먼저이고, 그 밖의 업종은 원천 명칭이다.
+export const MARKET_INDUSTRIES: readonly { code: string; displayName: string }[] = INDUSTRIES.map(
   ({ code, shortName }) => ({ code, displayName: shortName }),
 );
 
-export const SUPPORTED_INDUSTRY_CODES: readonly string[] = SUPPORTED_INDUSTRIES.map((item) => item.code);
+export function marketIndustry(code: string) {
+  return MARKET_INDUSTRIES.find((item) => item.code === code) ?? null;
+}
 
-export function supportedIndustry(code: string) {
-  return SUPPORTED_INDUSTRIES.find((item) => item.code === code) ?? null;
+// 사용자에게 내보이는 업종: 릴리스에 관측값이 있고(isSupported) 열린 업종이다. 업종 목록·조회·사업 조건이
+// 이 판단을 쓰고, 점수와 계획 스냅샷은 열린 업종인지만 본다(점수 행은 관측값이 있는 업종에만 있다).
+export function isServedMarketIndustry(industry: { code: string; isSupported: boolean }): boolean {
+  return industry.isSupported && isOpenIndustryCode(industry.code);
 }
 
 export type IndicatorKey =

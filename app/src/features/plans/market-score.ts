@@ -7,7 +7,8 @@ import {
   interpretationBasis,
   recordedInterpretation,
 } from '@/features/market/score/revenue';
-import { supportedIndustry } from '@/features/market/types';
+import { isOpenIndustryCode } from '@/features/industries';
+import { marketIndustry } from '@/features/market/types';
 
 // /markets의 [이 상권으로 재무 계획 시작]으로 만든 계획에 붙이는 상권 점수 스냅샷(ADR 0008).
 // 화면은 참조만 보내고, 등급·월매출 기본값은 서버가 점수 릴리스에서 다시 읽어 저장한다.
@@ -62,6 +63,8 @@ export async function resolvePlanMarketScore(
   reference: MarketScoreReference,
   now: Date = new Date(),
 ): Promise<PlanMarketScore | null> {
+  // 점수 행이 있어도 열지 않은 업종은 점수 API가 내지 않으므로 계획에도 붙이지 않는다(ADR 0010).
+  if (!isOpenIndustryCode(reference.industryCode)) return null;
   const release = await prisma.marketScoreRelease.findUnique({ where: { releaseKey: reference.releaseKey } });
   if (!release || (release.status !== 'ACTIVE' && release.status !== 'SUPERSEDED')) return null;
   const row = await prisma.marketScore.findUnique({
@@ -105,7 +108,7 @@ export async function resolvePlanMarketScore(
     districtCode: area.districtCode,
     districtName: area.districtName,
     industryCode: reference.industryCode,
-    industryName: supportedIndustry(reference.industryCode)?.displayName ?? reference.industryCode,
+    industryName: marketIndustry(reference.industryCode)?.displayName ?? reference.industryCode,
     score: row.score,
     grade: row.grade,
     monthlyRevenueDefault: row.monthlyRevenueDefault.toFixed(0),

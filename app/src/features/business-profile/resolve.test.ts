@@ -4,8 +4,8 @@ import { PrismaClient } from '@/generated/prisma/client';
 import { resolveBusinessProfile } from './resolve.ts';
 import type { BusinessProfileInput } from './schema.ts';
 
-// 사업 조건 스키마는 요식업 업종 코드를 모두 받는다. 그중 고를 수 있는 업종은 활성 상권 릴리스가
-// 지원하는 업종뿐이다(ADR 0010 3단계). 열지 않은 업종을 저장하면 상권·경쟁 점포 화면이 빈 결과가 된다.
+// 사업 조건 스키마는 요식업 업종 코드를 모두 받는다. 그중 저장할 수 있는 업종은 활성 상권 릴리스에 관측값이
+// 있고 열린 업종뿐이다(ADR 0010 3·5단계). 열지 않은 업종을 저장하면 경쟁 점포·프랜차이즈 화면이 빈 결과가 된다.
 describe.skipIf(!process.env.TEST_DATABASE_URL)('사업 조건의 업종 확인', () => {
   let client: PrismaClient | null = null;
   const releaseId = `test-business-profile-${Date.now()}`;
@@ -42,16 +42,18 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('사업 조건의 업종 확인'
         activatedAt: new Date(Date.now() + 86_400_000),
       },
     });
+    // CS100002는 관측값을 적재했지만 열지 않은 업종이다. CS100010은 열린 업종이지만 이 릴리스에 관측값이 없다.
     for (const [code, isSupported] of [
       ['CS100001', true],
-      ['CS100002', false],
+      ['CS100002', true],
+      ['CS100010', false],
     ] as const) {
       await db().industry.create({
         data: {
           releaseId,
           code,
           sourceName: code,
-          displayName: code === 'CS100001' ? '한식' : '중식음식점',
+          displayName: code,
           displayNameSource: 'TEST',
           sourceCategoryVersion: 'test',
           isSupported,
@@ -65,19 +67,23 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('사업 조건의 업종 확인'
     await client?.$disconnect();
   });
 
-  it('릴리스가 지원하는 업종은 저장할 사업 조건이 된다', async () => {
+  it('관측값이 있는 열린 업종은 저장할 사업 조건이 된다', async () => {
     const outcome = await resolveBusinessProfile(db(), input('CS100001'));
     expect(outcome).toMatchObject({
       kind: 'OK',
       profile: {
         marketIndustryCode: 'CS100001',
-        marketIndustryName: '한식',
+        marketIndustryName: 'CS100001',
         provenance: { marketReleaseKey: releaseId },
       },
     });
   });
 
-  it('스키마가 받아도 릴리스가 지원하지 않는 업종은 거부한다', async () => {
+  it('관측값이 있어도 열지 않은 업종은 거부한다', async () => {
     expect(await resolveBusinessProfile(db(), input('CS100002'))).toEqual({ kind: 'INDUSTRY_NOT_FOUND' });
+  });
+
+  it('열린 업종이어도 릴리스에 관측값이 없으면 거부한다', async () => {
+    expect(await resolveBusinessProfile(db(), input('CS100010'))).toEqual({ kind: 'INDUSTRY_NOT_FOUND' });
   });
 });

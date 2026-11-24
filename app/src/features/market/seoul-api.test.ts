@@ -70,13 +70,13 @@ function defaultData(): ApiData {
     areas: ['3110001', '3110002', '3110003'].map(areaRow),
     sales: [
       salesRow({ STDR_YYQU_CD: '20241', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100001', THSMON_SELNG_AMT: 123456789 }),
-      salesRow({ STDR_YYQU_CD: '20241', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100002', THSMON_SELNG_AMT: 5 }),
+      salesRow({ STDR_YYQU_CD: '20241', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS300001', THSMON_SELNG_AMT: 5 }),
       salesRow({ STDR_YYQU_CD: '20242', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100001', THSMON_SELNG_AMT: 200 }),
       salesRow({ STDR_YYQU_CD: '20242', TRDAR_CD: '3110001', SVC_INDUTY_CD: 'CS100010', THSMON_SELNG_AMT: 0 }),
     ],
     stores: [
       store('20241', '3110001', 'CS100001', 10, 3),
-      store('20241', '3110001', 'CS100002', 4),
+      store('20241', '3110001', 'CS300001', 4),
       store('20241', '3110002', 'CS100001', 7),
       store('20242', '3110001', 'CS100001', 11, 3),
       store('20242', '3110001', 'CS100010', 2),
@@ -232,8 +232,8 @@ describe('서울 Open API 적재 원본', () => {
     expect(first?.salesBreakdownJson?.timeOfDay).toHaveLength(6);
     expect(parsed.quarterly.find((row) => row.industryCode === 'CS100010')?.salesAmount).toBe('0');
     expect(parsed.quarterly.find((row) => row.areaCode === '3110002')?.salesAmount).toBeNull();
-    expect(parsed.quarterly.find((row) => row.industryCode === 'CS100002')).toBeUndefined();
-    expect(parsed.industries.find((industry) => industry.code === 'CS100002')?.isSupported).toBe(false);
+    expect(parsed.quarterly.find((row) => row.industryCode === 'CS300001')).toBeUndefined();
+    expect(parsed.industries.find((industry) => industry.code === 'CS300001')?.isSupported).toBe(false);
 
     expect(parsed.files.map((file) => file.file)).toEqual([
       'api:TbgisTrdarRelm',

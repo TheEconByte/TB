@@ -19,7 +19,7 @@ import {
   isIndustryCode,
   isOpenIndustryCode,
 } from './industries.ts';
-import { SUPPORTED_INDUSTRIES } from './market/types.ts';
+import { MARKET_INDUSTRIES, isServedMarketIndustry } from './market/types.ts';
 
 // ADR 0010: 업종 목록은 한 파일에서 정하고 모든 도메인이 그 목록을 쓴다.
 describe('업종 목록', () => {
@@ -57,12 +57,21 @@ describe('업종 목록', () => {
   it('조회와 업종 선택은 열린 업종만 받는다', () => {
     // 열지 않은 업종을 받으면 적재되지 않은 업종의 빈 결과를 성공처럼 보인다(ADR 0010 Validation).
     expect(franchiseQuerySchema.shape.industryCode.options).toEqual(OPEN_INDUSTRY_CODES);
-    expect(SUPPORTED_INDUSTRIES.map((item) => item.code)).toEqual(OPEN_INDUSTRY_CODES);
     expect(franchiseQuerySchema.shape.industryCode.safeParse('CS100002').success).toBe(false);
     expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100002').marketIndustryCode).toBe('');
     expect(selectMarketIndustry(EMPTY_BUSINESS_PROFILE_FORM, 'CS100010').marketIndustryCode).toBe('CS100010');
     expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100002' }).marketIndustryCode).toBe('');
     expect(businessProfileFormFromStored({ marketIndustryCode: 'CS100010' }).marketIndustryCode).toBe('CS100010');
+  });
+
+  it('상권은 요식업 업종을 모두 적재하고, 그중 열린 업종만 내보인다', () => {
+    // ADR 0010 5단계: 업종을 열 때 다시 적재하지 않도록 관측값은 열 개 모두 남긴다.
+    expect(MARKET_INDUSTRIES.map((item) => item.code)).toEqual(INDUSTRY_CODES);
+    expect(isServedMarketIndustry({ code: 'CS100001', isSupported: true })).toBe(true);
+    // 관측값이 있어도 열지 않은 업종은 내보이지 않는다.
+    expect(isServedMarketIndustry({ code: 'CS100002', isSupported: true })).toBe(false);
+    // 열린 업종이어도 그 릴리스에 관측값이 없으면 내보이지 않는다.
+    expect(isServedMarketIndustry({ code: 'CS100001', isSupported: false })).toBe(false);
   });
 
   it('목록 밖 코드는 업종이 아니다', () => {

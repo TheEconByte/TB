@@ -2,6 +2,7 @@ import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { resolveDetailedCategory } from '../business-directory/read.ts';
 import { districtName } from '../funding/districts.ts';
 import { findActiveRelease } from '../market/read.ts';
+import { isServedMarketIndustry } from '../market/types.ts';
 import type { BusinessProfileInput, StoredBusinessProfile } from './schema.ts';
 
 export type ResolveBusinessProfileOutcome =
@@ -19,7 +20,7 @@ export async function resolveBusinessProfile(
   const industry = await prisma.industry.findUnique({
     where: { releaseId_code: { releaseId: release.id, code: input.marketIndustryCode } },
   });
-  if (!industry?.isSupported) return { kind: 'INDUSTRY_NOT_FOUND' };
+  if (!industry || !isServedMarketIndustry(industry)) return { kind: 'INDUSTRY_NOT_FOUND' };
   const detail =
     input.detailedIndustryCode === null
       ? null
