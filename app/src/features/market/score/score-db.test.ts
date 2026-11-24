@@ -32,7 +32,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     dataPeriod: { start: '20252', end: '20262' },
     minStoreCount: 5,
     gradeBoundaries: [...DEFAULT_GRADE_BOUNDARIES],
-    // CS100002는 AUC 기준을 넘었지만 열지 않은 업종이다(ADR 0010 5단계). 점수 행은 만들되 사용자에게 내지 않는다.
+    // CS100002는 7단계에서 연 업종이고 AUC 기준을 넘는다. CS100010은 기준(0.6)에 못 미친다(ADR 0008).
     industries: ['CS100001', 'CS100002', 'CS100010'].map((industryCode) => ({
       industryCode,
       industryName: industryCode,
@@ -181,7 +181,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     const report = await buildScoreRelease({ prisma: db(), modelPath: path });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.baseQuarter).toBe('20262');
-    // 상권 3곳 × AUC를 넘은 업종 2개. 업종을 열 때 다시 계산하지 않도록 열지 않은 업종의 행도 만든다.
+    // 상권 3곳 × AUC를 넘은 업종 2개.
     expect(report.rowCount).toBe(6);
     expect(report.summary.servedIndustryCodes).toEqual(['CS100001', 'CS100002']);
     expect(report.warnings.some((warning) => warning.includes('CS100010'))).toBe(true);
@@ -225,6 +225,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     expect(ok.payload.limitations).toContain(
       '점포당 월매출은 매출 원값을 분기 합계로 보고 3으로 나눈 잠정 해석입니다.',
     );
+    // 학습 범위는 이 릴리스의 모델이 학습한 업종 수(픽스처 3개)와 ADR 0008의 기준 AUC 0.6에서 나온다.
+    expect(ok.payload.limitations).toContain(
+      '서울 요식업 3개 업종의 상권을 학습했고, 테스트 정확도(AUC)가 0.6 미만인 업종은 점수를 내지 않습니다.',
+    );
     expect(ok.payload.contributions.length).toBeLessThanOrEqual(4);
     expect(ok.payload.distribution?.total).toBe(1);
     expect(ok.payload.model?.coefficients).toHaveLength(2);
@@ -241,19 +245,25 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
       status: 'NO_DATA',
       message: '이 상권은 최근 데이터가 없습니다.',
     });
-    // 지원 업종 안내에는 열린 업종만 적는다. 점수 행이 있는 중식도 열지 않았으므로 적지 않는다.
+    // AUC 기준에 못 미친 업종은 열려 있어도 점수를 내지 않고, 점수를 내는 업종을 안내한다(ADR 0008).
+    // 표시명은 상권 화면 표시명(industries.ts의 shortName)이다.
     const coffee = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100010' });
     expect(coffee.kind === 'OK' && coffee.payload).toMatchObject({
       status: 'UNSUPPORTED_INDUSTRY',
-      message: '현재 한식만 지원합니다.',
-      servedIndustries: [{ code: 'CS100001', displayName: '한식' }],
-    });
-    // 점수 행이 있어도 열지 않은 업종이면 점수를 내지 않는다.
-    const closed = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100002' });
-    expect(closed.kind === 'OK' && closed.payload).toMatchObject({
-      status: 'UNSUPPORTED_INDUSTRY',
+      message: '이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식·중식음식점만 냅니다.',
+      servedIndustries: [
+        { code: 'CS100001', displayName: '한식' },
+        { code: 'CS100002', displayName: '중식음식점' },
+      ],
       score: null,
       financeDefault: null,
+    });
+    // 7단계에서 연 업종은 5단계에서 만든 점수 행을 다시 계산하지 않고 낸다.
+    const opened = await getMarketScore(db(), { areaCode: '3119901', industryCode: 'CS100002' });
+    expect(opened.kind === 'OK' && opened.payload).toMatchObject({
+      status: 'OK',
+      industry: { code: 'CS100002', displayName: '중식음식점' },
+      score: { rank: 1, total: 1 },
     });
 
     expect((await getMarketScore(db(), { areaCode: '9999999', industryCode: 'CS100001' })).kind).toBe('AREA_NOT_FOUND');
@@ -275,7 +285,11 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('상권 생존점수 적재와 �
     });
     expect(await resolvePlanMarketScore(db(), { ...reference, areaCode: '3119902' })).toBeNull();
     expect(await resolvePlanMarketScore(db(), { ...reference, releaseKey: 'missing-release' })).toBeNull();
-    // 열지 않은 업종의 점수는 재무 계획 기본값으로 넘기지 않는다(AGENTS.md §3의 3번 예외는 열린 업종의 화면에서만 시작한다).
-    expect(await resolvePlanMarketScore(db(), { ...reference, industryCode: 'CS100002' })).toBeNull();
+    // 점수를 낸 열린 업종은 계획 스냅샷이 되고, AUC 기준에 못 미친 업종은 점수 행이 없어 받지 않는다.
+    expect(await resolvePlanMarketScore(db(), { ...reference, industryCode: 'CS100002' })).toMatchObject({
+      industryCode: 'CS100002',
+      monthlyRevenueDefault: '200',
+    });
+    expect(await resolvePlanMarketScore(db(), { ...reference, industryCode: 'CS100010' })).toBeNull();
   });
 });

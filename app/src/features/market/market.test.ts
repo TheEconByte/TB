@@ -6,7 +6,7 @@ import { crc32 } from 'node:zlib';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../../generated/prisma/client.ts';
-import { INDUSTRY_CODES, isOpenIndustryCode } from '../industries.ts';
+import { INDUSTRY_CODES } from '../industries.ts';
 import { contentHash, sha256Hex } from './checksum.ts';
 import { decodeCp949, iterateCsvRows, normalizeHeaderRow } from './csv.ts';
 import { parseDbf } from './dbf.ts';
@@ -262,6 +262,10 @@ const KOREAN_AREAS = [
   areaRow({ TRDAR_CD: '3110008', TRDAR_CD_N: '혜화동주민센터', SIGNGU_CD_: '종로구', ADSTRD_CD_: '청운효자동' }),
 ];
 
+// 한식·커피·음료·중식 밖의 요식업 업종 일곱 개. 열린 업종의 자료가 빠진 릴리스는 활성화하지 않으므로(ADR 0010)
+// 적재하는 픽스처에는 열 개 업종이 모두 있어야 한다. 상권 3110001의 2024년 1분기에 하나씩 둔다.
+const OTHER_FOOD_INDUSTRY_CODES = INDUSTRY_CODES.filter((code) => !['CS100001', 'CS100002', 'CS100010'].includes(code));
+
 const DEFAULT_SALES_2024: RowValues[] = [
   salesRow({ quarter: '20241', areaCode: '3110001', industryCode: 'CS100001', salesAmount: '123456789' }),
   salesRow({
@@ -271,7 +275,7 @@ const DEFAULT_SALES_2024: RowValues[] = [
     industryName: 'CoffeeDrinks',
     salesAmount: '0',
   }),
-  // 열지 않은 요식업 업종: 관측값은 적재하고 조회에는 내지 않는다(ADR 0010 5단계).
+  // 7단계에서 연 요식업 업종: 관측값을 적재하고 조회에 낸다(ADR 0010).
   salesRow({
     quarter: '20241',
     areaCode: '3110001',
@@ -279,6 +283,15 @@ const DEFAULT_SALES_2024: RowValues[] = [
     industryName: 'ChineseFood',
     salesAmount: '555',
   }),
+  ...OTHER_FOOD_INDUSTRY_CODES.map((industryCode) =>
+    salesRow({
+      quarter: '20241',
+      areaCode: '3110001',
+      industryCode,
+      industryName: `Food${industryCode}`,
+      salesAmount: '100',
+    }),
+  ),
   // 요식업이 아닌 업종: 적재하지 않는다.
   salesRow({
     quarter: '20241',
@@ -324,6 +337,17 @@ const DEFAULT_STORES_2024: RowValues[] = [
     similarIndustryStoreCount: '5',
     franchiseStoreCount: '1',
   }),
+  ...OTHER_FOOD_INDUSTRY_CODES.map((industryCode) =>
+    storeRow({
+      quarter: '20241',
+      areaCode: '3110001',
+      industryCode,
+      industryName: `Food${industryCode}`,
+      storeCount: '3',
+      similarIndustryStoreCount: '3',
+      franchiseStoreCount: '0',
+    }),
+  ),
   storeRow({
     quarter: '20241',
     areaCode: '3110001',
@@ -569,8 +593,8 @@ describe('source pipeline', () => {
   it('builds quarterly rows, keeping store-only sales null and explicit zero', () => {
     const parsed = readMarketSources({ sourceDir: writeSources(), acceptChangedSource: true });
     expect(parsed.stats.quarters).toEqual(['20241', '20242', '20251']);
-    // 요식업 업종의 결합 키 5개(한식 3, 커피·음료 1, 중식 1). 요식업이 아닌 CS300001은 빠진다.
-    expect(parsed.quarterly).toHaveLength(5);
+    // 요식업 업종의 결합 키 12개(한식 3, 커피·음료 1, 중식 1, 나머지 일곱 업종 각 1). 요식업이 아닌 CS300001은 빠진다.
+    expect(parsed.quarterly).toHaveLength(12);
     expect(parsed.stats.duplicateKeys).toBe(0);
     expect(parsed.stats.salesRowsMissingStores).toBe(0);
     expect(parsed.stats.storeOnlyQuarterlyRows).toBe(1);
@@ -589,7 +613,7 @@ describe('source pipeline', () => {
     });
   });
 
-  it('keeps every food service industry, open or not, and drops the rest', () => {
+  it('keeps every food service industry and drops the rest', () => {
     // ADR 0010 5단계: 업종을 열 때 다시 적재하지 않도록 요식업 업종 열 개의 관측값을 모두 남긴다.
     // 요식업이 아닌 업종은 지금처럼 원천 분류로만 남긴다.
     const parsed = readMarketSources({ sourceDir: writeSources(), acceptChangedSource: true });
@@ -711,7 +735,7 @@ describe.skipIf(!hasRawFiles)('recorded 2024-2025 source files', () => {
     const parsed = readMarketSources({ sourceDir: RAW_DIR });
     const storeOnly = parsed.quarterly.filter((row) => row.salesAmount === null);
     // 4870은 한식·커피·음료만 적재하던 때 기록한 값이다. 다른 요식업 업종의 건수는 아직 기록하지 않았다.
-    expect(storeOnly.filter((row) => isOpenIndustryCode(row.industryCode))).toHaveLength(4870);
+    expect(storeOnly.filter((row) => ['CS100001', 'CS100010'].includes(row.industryCode))).toHaveLength(4870);
     expect(storeOnly.every((row) => row.storeCount !== null)).toBe(true);
     expect(parsed.quarterly.some((row) => row.salesAmount === '0')).toBe(false);
   }, 120000);
@@ -818,8 +842,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     });
     expect(report.outcome).toBe('ACTIVATED');
     expect(report.areaCount).toBe(3);
-    // 요식업 업종의 결합 키 5개(source pipeline 테스트와 같다).
-    expect(report.quarterlyRowCount).toBe(5);
+    // 요식업 업종의 결합 키 12개(source pipeline 테스트와 같다).
+    expect(report.quarterlyRowCount).toBe(12);
     expect(report.checks).toHaveLength(7);
     expect(report.checks.every((check) => check.passed)).toBe(false);
     firstReleaseKey = report.releaseKey;
@@ -829,7 +853,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     expect(payload.areas).toHaveLength(3);
     expect(payload.areas.map((area) => area.areaCode)).toEqual(['3110001', '3110002', '3110003']);
     expect(payload.release.releaseKey).toBe(firstReleaseKey);
-    expect(payload.release.quarterlyRowCount).toBe(5);
+    expect(payload.release.quarterlyRowCount).toBe(12);
     expect(payload.release.sources.map((source) => source.fileName)).toEqual([
       'areas.zip',
       'sales-2024.zip',
@@ -846,9 +870,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     const unknownDistrict = await listMarketAreas(db(), '99999');
     expect(unknownDistrict.kind).toBe('INVALID_DISTRICT_CODE');
 
-    // 중식(CS100002)은 관측값이 적재돼 있어도 열지 않은 업종이라 목록에 없다(ADR 0010).
+    // 요식업 업종 열 개를 모두 열었으므로 목록에 열 개가 모두 있다(ADR 0010 7단계).
     const industries = await listSupportedIndustries(db());
-    expect(industries.industries.map((industry) => industry.code)).toEqual(['CS100001', 'CS100010']);
+    expect(industries.industries.map((industry) => industry.code)).toEqual(INDUSTRY_CODES);
     expect(industries.activeRelease?.releaseKey).toBe(firstReleaseKey);
   }, 120000);
 
@@ -895,10 +919,19 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     expect((await getMarketSummary(db(), { areaCode: '3110001', industryCode: 'CS999999' })).kind).toBe(
       'INVALID_INDUSTRY_CODE',
     );
-    // 관측값이 적재된 업종이어도 열지 않았으면 조회를 거부한다. 빈 성공 응답을 내지 않는다(ADR 0010 Validation).
-    expect((await getMarketSummary(db(), { areaCode: '3110001', industryCode: 'CS100002' })).kind).toBe(
+    // 릴리스에 원천 분류로 남은 요식업 밖 업종은 조회를 거부한다. 빈 성공 응답을 내지 않는다(ADR 0010 Validation).
+    expect((await getMarketSummary(db(), { areaCode: '3110001', industryCode: 'CS300001' })).kind).toBe(
       'UNSUPPORTED_INDUSTRY',
     );
+  }, 120000);
+
+  it('serves a newly opened industry with its own observed values', async () => {
+    // ADR 0010 7단계: 5단계에서 적재해 둔 중식 관측값을 다시 적재하지 않고 그대로 낸다(픽스처의 555원·4개).
+    const chinese = await prismaSummary('3110001', 'CS100002');
+    expect(chinese.industry.displayName).toBe('중식음식점');
+    expect(chinese.quarters.map((quarter) => [quarter.quarter, quarter.salesAmount, quarter.storeCount])).toEqual([
+      ['20241', '555', 4],
+    ]);
   }, 120000);
 
   it('reloading the same release is idempotent', async () => {

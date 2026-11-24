@@ -76,6 +76,10 @@ function defaultData(): ApiData {
       storeRow(year, { corpNm: '한상', brandNm: '한상차림', indutyMlsfcNm: '한식', frcsCnt: 50, avrgSlsAmt: 450000 }),
       storeRow(year, { corpNm: '한상', brandNm: '한상차림', indutyMlsfcNm: '주점', frcsCnt: 10, avrgSlsAmt: 400000 }),
       storeRow(year, { corpNm: '빵집', brandNm: '빵집', indutyMlsfcNm: '제과제빵', frcsCnt: 100, avrgSlsAmt: 500000 }),
+      // 나머지 업종의 브랜드 하나씩. 열린 업종의 브랜드가 빠진 해가 있으면 적재하지 않는다(ADR 0010).
+      ...(['중식', '일식', '서양식', '피자', '치킨', '분식'] as const).map((middle) =>
+        storeRow(year, { corpNm: `${middle}본사`, brandNm: `${middle}브랜드`, indutyMlsfcNm: middle, frcsCnt: 20 }),
+      ),
       storeRow(year, {
         indutyLclasNm: '도소매',
         indutyMlsfcNm: '커피',
@@ -165,6 +169,12 @@ describe('공정위 가맹정보 해석', () => {
       '한상차림:한식',
       '한상차림:주점',
       '빵집:제과제빵',
+      '중식브랜드:중식',
+      '일식브랜드:일식',
+      '서양식브랜드:서양식',
+      '피자브랜드:피자',
+      '치킨브랜드:치킨',
+      '분식브랜드:분식',
     ]);
     const numeric = parseFtcRows(FTC_SERVICES.stores, 2025, [storeRow(2025, { frcsCnt: '12' })]);
     expect(numeric[0].amounts.frcsCnt).toBe(12);
@@ -217,7 +227,9 @@ describe('공정위 가맹정보 해석', () => {
       query: '메가',
       limit: 10,
     });
-    expect(franchiseQuerySchema.safeParse({ industryCode: 'CS100002', query: '', limit: 10 }).success).toBe(false);
+    // 요식업 업종 열 개를 모두 열었다(ADR 0010 7단계). 목록 밖 코드는 받지 않는다.
+    expect(franchiseQuerySchema.safeParse({ industryCode: 'CS100002', query: '', limit: 10 }).success).toBe(true);
+    expect(franchiseQuerySchema.safeParse({ industryCode: 'CS100011', query: '', limit: 10 }).success).toBe(false);
     expect(franchiseQuerySchema.safeParse({ industryCode: 'CS100010', query: 'x'.repeat(41), limit: 10 }).success).toBe(
       false,
     );
@@ -231,8 +243,8 @@ describe('공정위 가맹정보 적재 원본', () => {
     const parsed = await readFranchiseSources({ ...readOptions(), fetchImpl: api.fetchImpl });
     expect(parsed.years).toEqual([2023, 2024, 2025]);
     expect(parsed.releaseKey).toMatch(/^ftc-franchise-2023-2025-[0-9a-f]{12}$/);
-    // 연도마다 외식 요식업 브랜드 행 6개(커피 2, 음료 1, 한식 1, 주점 1, 제과제빵 1) × 3개 연도.
-    expect(parsed.records).toHaveLength(18);
+    // 연도마다 외식 요식업 브랜드 행 12개(커피 2, 음료 1, 한식 1, 주점 1, 제과제빵 1, 나머지 중분류 6) × 3개 연도.
+    expect(parsed.records).toHaveLength(36);
     const paik = parsed.records.find((record) => record.disclosureYear === 2025 && record.brandName === '빽커피');
     expect(paik).toMatchObject({
       marketIndustryCode: 'CS100010',
@@ -347,7 +359,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('공정위 가맹정보 릴리�
   it('릴리스를 활성화해 업종별 브랜드를 원 단위로 돌려주고, 같은 내용은 다시 적재하지 않는다', async () => {
     const report = await loadFranchises({ ...readOptions(), prisma: db() });
     expect(report.outcome).toBe('ACTIVATED');
-    expect(report.brandCount).toBe(18);
+    expect(report.brandCount).toBe(36);
 
     const top = await getFranchises(db(), { industryCode: 'CS100010', query: '', limit: 10 });
     if (top.kind !== 'OK') throw new Error(top.kind);
@@ -390,10 +402,15 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('공정위 가맹정보 릴리�
     const byCorp = await getFranchises(db(), { industryCode: 'CS100001', query: '한상', limit: 10 });
     if (byCorp.kind !== 'OK') throw new Error(byCorp.kind);
     expect(byCorp.payload.brands.map((brand) => brand.industryMiddle)).toEqual(['한식']);
-    // 열지 않은 업종의 브랜드도 적재해 둔다. 조회 입력(franchiseQuerySchema)이 열린 업종만 받는다.
+    // 7단계에서 연 업종도 조회된다. 피자는 패스트푸드점으로 묶인다(ADR 0010 §2의 프랜차이즈).
     const pub = await getFranchises(db(), { industryCode: 'CS100009', query: '', limit: 10 });
     if (pub.kind !== 'OK') throw new Error(pub.kind);
     expect(pub.payload.brands.map((brand) => `${brand.brandName}:${brand.industryMiddle}`)).toEqual(['한상차림:주점']);
+    const fastFood = await getFranchises(db(), { industryCode: 'CS100006', query: '', limit: 10 });
+    if (fastFood.kind !== 'OK') throw new Error(fastFood.kind);
+    expect(fastFood.payload.brands.map((brand) => `${brand.brandName}:${brand.industryMiddle}`)).toEqual([
+      '피자브랜드:피자',
+    ]);
 
     const again = await loadFranchises({ ...readOptions(), prisma: db() });
     expect(again.outcome).toBe('ALREADY_ACTIVE');

@@ -257,7 +257,9 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
 
   // 커피는 테스트 AUC 기준 미달이라 미지원 업종이다.
   await page.getByLabel('3. 업종').selectOption('CS100010');
-  await expect(page.locator('.score-panel').getByText('현재 한식만 지원합니다.')).toBeVisible();
+  await expect(
+    page.locator('.score-panel').getByText('이 업종은 생존점수를 내지 않습니다. 점수는 현재 한식만 냅니다.'),
+  ).toBeVisible();
   await page.getByLabel('3. 업종').selectOption('CS100001');
   await expect(panel.getByLabel('점수 72점, 등급 A')).toBeVisible();
 
