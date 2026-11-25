@@ -473,15 +473,9 @@ button:disabled {
   margin-bottom: 0;
 }
 .results {
-  padding-top: 64px;
+  /* [결과 보기]로 옮겨 올 때 위에 붙은 머리말에 가리지 않게 한다. */
+  scroll-margin-top: 84px;
   outline: none;
-}
-.results-head {
-  max-width: 700px;
-  margin-bottom: 20px;
-}
-.results-head h2 {
-  margin-top: 8px;
 }
 .summary-grid {
   display: grid;
@@ -529,71 +523,6 @@ button:disabled {
   font-weight: 700;
   font-size: 14px;
 }
-.scenario-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin: 20px 0;
-}
-.scenario-card {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 22px;
-}
-.scenario-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.scenario-heading h3 {
-  margin: 0;
-  padding: 3px 10px;
-  border-radius: 6px;
-  background: var(--primary-soft);
-  color: var(--primary-strong);
-  font-size: 15px;
-}
-.scenario-card:nth-child(2) .scenario-heading h3 {
-  background: #ffe4e2;
-  color: #c4271b;
-}
-.scenario-card:nth-child(3) .scenario-heading h3 {
-  background: #e6f6ef;
-  color: #0f8a5f;
-}
-.scenario-heading span {
-  color: var(--muted);
-  font-size: 12px;
-}
-.changes {
-  padding-left: 18px;
-  min-height: 68px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.scenario-card dl {
-  margin: 16px 0 0;
-}
-.scenario-card dl > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  border-top: 1px solid var(--line);
-  padding: 11px 0;
-}
-.scenario-card dt {
-  color: var(--muted);
-  font-size: 13px;
-}
-.scenario-card dd {
-  margin: 0;
-  font-weight: 700;
-  font-size: 15px;
-  text-align: right;
-  word-break: keep-all;
-}
 .table-card {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -640,32 +569,6 @@ th {
 }
 .loan-summary p {
   color: var(--muted);
-  font-size: 13px;
-}
-.scope-note {
-  margin-top: 16px;
-  padding: 22px 24px;
-  border-radius: 16px;
-  background: #f9fafb;
-  border: 1px solid var(--line);
-}
-.scope-note h3 {
-  margin-top: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-}
-.scope-note h3::before {
-  content: '';
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none'%3E%3Ccircle cx='10' cy='10' r='9' fill='%23e8f0ff' stroke='%232f6bff' stroke-width='1.4'/%3E%3Cpath d='M10 9v5' stroke='%232f6bff' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='6.2' r='1.1' fill='%232f6bff'/%3E%3C/svg%3E")
-    no-repeat center;
-}
-.scope-note p,
-.scope-note li {
   font-size: 13px;
 }
 @media (max-width: 850px) {
@@ -718,8 +621,8 @@ th {
   .button-row {
     display: grid;
   }
-  /* 화면에 붙어 따라오므로 휴대폰에서는 두 줄로 줄인다. 첫 줄은 저장 상태와 [결과 보기], 다음 줄은 두 버튼이다.
-     입력이 바뀌었다는 안내가 있으면 그 사이에 한 줄을 더 쓴다. */
+  /* 화면에 붙어 따라오므로 휴대폰에서는 버튼을 두 칸씩 놓는다. 첫 줄은 저장 상태, 그 아래가 버튼이고, 버튼이 셋이면
+     기본 버튼([다음])이 한 줄을 다 쓴다. 입력이 바뀌었다는 안내가 있으면 저장 상태 아래에 한 줄을 더 쓴다. */
   .calculate-bar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -734,20 +637,15 @@ th {
   }
   .calculate-bar .draft-state strong {
     grid-row: 1;
-    grid-column: 1;
-    font-size: 13px;
-  }
-  .calculate-bar:not(:has(.button-row a)) .draft-state strong {
     grid-column: 1 / -1;
+    font-size: 13px;
   }
   .calculate-bar .draft-state span {
     grid-row: 2;
     grid-column: 1 / -1;
   }
-  .calculate-bar .button-row a {
-    grid-row: 1;
-    grid-column: 2;
-    justify-self: end;
+  .calculate-bar .button-row > button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
   .calculate-bar button {
     width: 100%;
@@ -755,9 +653,6 @@ th {
   }
   .summary-grid > div {
     min-height: 98px;
-  }
-  .results {
-    padding-top: 60px;
   }
   .table-card {
     padding: 17px;
@@ -1884,13 +1779,10 @@ details.release-card[open] > summary {
   color: var(--muted);
   font-size: 12px;
 }
-.reference-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+.franchise-history {
   margin-top: 22px;
 }
-.reference-detail-grid h3 {
+.franchise-history h3 {
   margin: 0 0 12px;
   font-size: 15px;
 }
@@ -1913,11 +1805,6 @@ details.release-card[open] > summary {
 .reference-source ul {
   margin: 10px 0 0;
   padding-left: 18px;
-}
-@media (max-width: 850px) {
-  .reference-detail-grid {
-    grid-template-columns: 1fr;
-  }
 }
 .franchise-list {
   margin-top: 18px;
@@ -2321,23 +2208,32 @@ details.release-card[open] > summary {
 }
 
 /* 재무 계획 화면(/plans) */
+/* 계획 머리. 이름·제목 입력과 단계 목록을 한 카드에 둬 단계 내용이 첫 화면에 더 많이 보이게 한다. */
 .plan-head {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 22px;
-  padding: 26px 28px;
+  margin-bottom: 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
 }
+.plan-head-row {
+  display: grid;
+  gap: 8px 24px;
+  padding: 16px 24px;
+}
 .plan-head h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
 }
-.plan-head > p {
-  margin: 0 0 6px;
+.plan-head-title p {
+  margin: 2px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+}
+@media (min-width: 1100px) {
+  .plan-head-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
 }
 /* 조건을 고르기 전의 시세 참고는 한 줄로 접는다. */
 .picker.reference-empty {
@@ -2365,20 +2261,330 @@ details.release-card[open] > summary {
   align-items: flex-start;
   gap: 2px;
 }
-.results .result-history {
-  margin-bottom: 16px;
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* 넓은 화면 배치. 재무 계획은 입력과 결과·참고를 두 열로, 자금 공고와 상권은 고르는 칸을 왼쪽에 붙여 둔다.
-   좁은 화면에서는 모두 한 열이다. 열 안의 칸 수는 화면 폭이 아니라 열 폭(@container)으로 정한다. */
-.planner-inputs,
-.planner-side {
-  container-type: inline-size;
-  min-width: 0;
+/* 계산 결과. 묶음마다 판단 문장을 먼저, 근거 금액을 아래에 둔다. */
+.results-head {
+  margin-bottom: 14px;
 }
-.planner-side > :first-child {
+.results-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.results-head p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.result-block {
+  margin-top: 12px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.result-block h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 17px;
+}
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.verdict p {
+  margin: 0;
+}
+.verdict .link-button {
+  padding: 2px 0;
+  color: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+}
+.verdict-positive {
+  background: #e6f6ef;
+  color: #0b6e4b;
+}
+.verdict-caution {
+  background: #fff8e6;
+  color: #8a5a00;
+}
+.verdict-negative {
+  background: #fff1f0;
+  color: #b42318;
+}
+.verdict-missing {
+  background: var(--surface);
+  color: #4e5968;
+}
+.ledger {
+  margin: 12px 0 0;
+}
+.ledger > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.ledger dt {
+  color: var(--ink);
+  font-size: 14px;
+}
+.ledger dt small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ledger dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.ledger .ledger-total {
+  border-top-color: #c9ced4;
+}
+.ledger .ledger-total dt {
+  font-weight: 700;
+}
+.ledger .ledger-total dd {
+  font-size: 18px;
+}
+.ledger dd.negative-value,
+.scenario-table td.negative-value,
+.result-details td.negative-value {
+  color: var(--danger);
+}
+.scenario-legend {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.scenario-legend strong {
+  margin-right: 8px;
+  color: var(--ink);
+}
+.scenario-table th[scope='row'] {
+  position: static;
+  background: none;
+  text-align: left;
+}
+.scenario-table thead th:not(:first-child),
+.scenario-table td {
+  text-align: right;
+}
+.scenario-table td {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.result-details {
+  margin-top: 12px;
+  padding: 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.result-details > summary {
+  min-height: 24px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.result-details[open] > summary {
+  margin-bottom: 12px;
+}
+/* 계획 단계 목록. 번호 모양은 사업 조건 입력 단계(.wizard-steps)와 같게 맞춘다. */
+.plan-steps {
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 76px;
+}
+.plan-steps ol {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  overflow-x: auto;
+  list-style: none;
+}
+.plan-steps li {
+  flex: 1 0 auto;
+}
+/* position: 화면에서 숨긴 "(입력함)" 글자가 가로로 넘치는 목록 밖으로 나가 쪽 전체를 넓히지 않게 버튼 안에 묶는다. */
+.plan-steps .plan-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: #4e5968;
+  font-size: 14px;
+  font-weight: 600;
+}
+.plan-steps .plan-step:hover:not(:disabled) {
+  background: var(--surface);
+}
+.plan-steps .plan-step > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--line);
+  color: #6b7684;
+  font-size: 11px;
+}
+.plan-steps .plan-step[aria-current='step'] {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+/* brand-primary: 지금 단계 번호는 사업 조건 입력 단계와 같은 브랜드 색을 쓴다. */
+.plan-steps .plan-step[aria-current='step'] > span {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* 한 단계 화면. 카드는 같은 간격으로 쌓고 각 카드의 바깥 여백은 쓰지 않는다. */
+.plan-step-panel,
+.step-aside {
+  display: grid;
+  gap: 16px;
+}
+/* display를 정했으므로 브라우저 기본 [hidden]이 이기지 못한다. 지금 단계가 아닌 화면은 여기서 숨긴다. */
+.plan-step-panel[hidden] {
+  display: none;
+}
+.plan-step-panel > *,
+.step-layout > *,
+.step-aside > * {
+  margin: 0;
+}
+/* 입력과 그 값을 정할 때 볼 참고를 나란히 둔다. 좁은 화면에서는 참고가 입력 아래로 간다. */
+.step-layout {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+.step-layout > * {
+  min-width: 0;
+  container-type: inline-size;
+}
+/* 01 매장: 바깥 단계 목록이 진행을 보여 주므로 사업 조건 입력의 진행 막대와 단계 수는 숨기고, 빈 높이를 두지 않는다. */
+.step-note {
+  color: #4e5968;
+  font-size: 14px;
+}
+.plan-step-panel .wizard-progress,
+.plan-step-panel .wizard-title-row > span {
+  display: none;
+}
+.plan-step-panel .wizard-panel {
+  min-height: 0;
+}
+/* 이미 입력한 단계는 번호 대신 체크로 보인다. */
+.plan-steps .plan-step.done > span {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+/* 월 운영 단계의 프랜차이즈 평균매출 비교. 펼친 패널은 바깥 카드 안에 있으므로 패널 자체의 테두리를 뺀다. */
+.reference-details {
+  padding: 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.reference-details > summary {
+  min-height: 24px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.reference-details[open] > summary {
+  margin-bottom: 12px;
+}
+.reference-details > .picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.result-setting {
+  max-width: 260px;
+  margin-top: 12px;
+}
+.results .result-history {
+  margin: 0 0 12px;
+  padding: 0;
+  background: none;
+}
+.result-grid {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+/* 시나리오 표가 넓어도 칸이 화면 밖으로 밀리지 않게 줄어들 수 있게 한다. 표는 자기 안에서 가로로 스크롤한다. */
+.result-grid > .result-block {
+  min-width: 0;
   margin-top: 0;
 }
+.stale-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+.stale-note p {
+  margin: 0;
+}
+@media (min-width: 1100px) {
+  .step-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .result-grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+}
+.result-details > p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* 넓은 화면 배치. 자금 공고와 상권은 고르는 칸을 왼쪽에 붙여 둔다.
+   좁은 화면에서는 모두 한 열이다. 열 안의 칸 수는 화면 폭이 아니라 열 폭(@container)으로 정한다. */
 @container (max-width: 640px) {
   .field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2390,25 +2596,9 @@ details.release-card[open] > summary {
     gap: 16px;
   }
 }
-@container (max-width: 760px) {
-  .scenario-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .changes {
-    min-height: 0;
-  }
-}
 .split-aside,
 .split-main {
   min-width: 0;
-}
-@media (min-width: 1360px) {
-  .planner-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 24px;
-    align-items: start;
-  }
 }
 @media (min-width: 1200px) {
   .split-layout {

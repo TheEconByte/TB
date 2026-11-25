@@ -78,9 +78,28 @@ test('업종에 맞는 공정위 가맹정보를 검색하고 브랜드 현황�
   await page.goto('/plans');
   await signUp(page, `franchise-${suffix}@example.test`);
 
-  const panel = page.getByRole('region', { name: '프랜차이즈 참고' });
-  await expect(panel.getByText('사업 조건에서 업종을 고르면')).toBeVisible();
+  const steps = page.getByRole('navigation', { name: '계획 단계' });
+  // 개업 비용 단계에는 창업 금액을, 월 운영 단계에는 가맹점 수·평균매출을 보여 준다. 업종은 매장 단계에서 고른다.
+  await steps.getByRole('button', { name: /^개업 비용/ }).click();
+  const startup = page.getByRole('region', { name: '프랜차이즈 창업 금액' });
+  await expect(startup.getByText('사업 조건에서 업종을 고르면')).toBeVisible();
+  await steps.getByRole('button', { name: /^매장/ }).click();
   await page.getByLabel('업종 대분류').selectOption({ label: '커피·음료' });
+  await steps.getByRole('button', { name: /^개업 비용/ }).click();
+
+  // 창업 금액은 천원 원본을 원으로 바꿔 보여 주고, 합계를 밝히지 않은 브랜드는 0이 아니라 미기재로 보인다.
+  const startupRows = startup.locator('.franchise-list tbody tr');
+  await expect(startupRows).toHaveCount(4);
+  await expect(startupRows.nth(0)).toContainText('9,700,000원');
+  const startupDetail = startup.locator('.franchise-detail');
+  await expect(startupDetail.getByRole('heading', { name: /MEGA 커피/ })).toBeVisible();
+  await expect(startupDetail).toContainText('9,700,000원');
+  await startupRows.nth(1).getByRole('button', { name: '빽커피' }).click();
+  await expect(startupDetail.locator('.reference-summary > div', { hasText: '창업 금액' })).toContainText('미기재');
+
+  await steps.getByRole('button', { name: /^월 운영/ }).click();
+  await page.getByText('프랜차이즈 평균매출과 비교').click();
+  const panel = page.getByRole('region', { name: '프랜차이즈 참고' });
 
   // 가맹점 수 순서로 목록이 나오고 첫 브랜드가 선택된다. 금액은 천원 원본을 원으로 바꿔 보여 준다.
   await expect(panel.getByText('커피·음료 브랜드 4개 중 가맹점이 있는 곳 3개, 평균매출을 공개한 곳 2개')).toBeVisible();
@@ -93,13 +112,10 @@ test('업종에 맞는 공정위 가맹정보를 검색하고 브랜드 현황�
   await expect(detail).toContainText('전년 대비 +644개');
   await expect(detail).toContainText('360,000,000원');
   await expect(detail).toContainText('월 평균 30,000,000원');
-  await expect(detail).toContainText('9,700,000원');
 
-  // 창업 금액이 없는 브랜드는 0이 아니라 미기재로 보인다.
   await rows.nth(1).getByRole('button', { name: '빽커피' }).click();
   await expect(detail).toContainText('1,712개');
   await expect(detail).toContainText('324,486,000원');
-  await expect(detail.locator('.reference-summary > div', { hasText: '창업 금액' })).toContainText('미기재');
 
   await rows.nth(2).getByRole('button', { name: '새싹음료' }).click();
   await expect(detail.locator('.reference-summary > div', { hasText: '연 평균매출' }).first()).toContainText('미기재');

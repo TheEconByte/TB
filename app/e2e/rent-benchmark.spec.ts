@@ -84,9 +84,15 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await page.goto('/plans');
   await signUp(page, `rent-${suffix}@example.test`);
 
+  // 임대료 참고는 월 임대료를 정하는 월 운영 단계 옆에 있다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^월 운영/ })
+    .click();
   const panel = page.getByRole('region', { name: '임대료 참고' });
   await expect(panel.getByText('사업 조건에서 상가 유형을 고르면')).toBeVisible();
 
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^매장/ }).click();
   // 입력 확인 단계는 빠진 항목을 알려 주고, 그 항목을 입력하는 단계로 보낸다.
   const wizard = page.locator('.business-wizard');
   await wizard.getByRole('button', { name: /입력 확인/ }).click();
@@ -112,20 +118,25 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
 
   await wizard.getByLabel('자치구').selectOption('11200');
   await page.getByLabel('업종 대분류').selectOption({ label: '커피·음료' });
-  await page.getByRole('button', { name: '다음' }).click();
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
   await page.getByLabel('정확한 면적').fill('10');
-  await page.getByRole('button', { name: '다음' }).click();
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
   await page.locator('.choice-card', { has: page.locator('strong', { hasText: /^1층$/ }) }).click();
-  await page.getByRole('button', { name: '다음' }).click();
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
   await page.getByRole('button', { name: /소규모 상가/ }).click();
 
-  // 다 입력하면 입력 확인에 층·상가 유형까지 보이고, 다음 버튼이 아래 참고 자료로 넘어간다.
+  // 다 입력하면 입력 확인에 층·상가 유형까지 보인다.
   await wizard.getByRole('button', { name: '다음', exact: true }).click();
   await expect(missingItems.locator('strong')).toHaveText('없음');
   await expect(wizard.locator('.profile-summary-grid')).toContainText('1층');
   await expect(wizard.locator('.profile-summary-grid')).toContainText('소규모 상가');
-  await wizard.getByRole('button', { name: '다음: 참고 자료', exact: true }).click();
-  await expect(panel.getByRole('heading', { name: '임대료 참고' })).toBeInViewport();
+  // 사업 조건을 마치면 하단 막대의 [다음]으로 다음에 정할 개업 비용으로 넘어간다.
+  await page.getByRole('button', { name: '다음: 개업 비용', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /^개업 비용/ })).toBeInViewport();
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^월 운영/ })
+    .click();
 
   // 성동구와 겹치는 조사 상권(뚝섬)이 먼저 선택되고, 10평(400/121㎡×10) × 1층 60천원/㎡로 계산한다.
   const region = panel.getByLabel('조사 지역');
@@ -142,8 +153,9 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   await region.selectOption('서울>기타>뚝섬');
   await expect(panel.locator('.metric-row', { hasText: '지하 1층' })).toContainText('자료 없음');
 
-  await page.locator('.business-wizard').screenshot({ path: testInfo.outputPath('business-profile.png') });
   await panel.screenshot({ path: testInfo.outputPath('rent-panel.png') });
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^매장/ }).click();
+  await page.locator('.business-wizard').screenshot({ path: testInfo.outputPath('business-profile.png') });
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );

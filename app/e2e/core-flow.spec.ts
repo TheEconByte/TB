@@ -37,8 +37,13 @@ test('가입부터 불변 결과 재조회와 다른 사용자 접근 차단까�
   await signUp(page, ownerEmail, '하네스 소유자');
 
   await page.getByLabel('계획 제목').fill(title);
-  await page.getByRole('button', { name: '저장하고 계산' }).click();
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  // 계산은 마지막 입력 단계(자금 마련)의 [계산하고 결과 보기]로 한다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^자금 마련/ })
+    .click();
+  await page.getByRole('button', { name: '계산하고 결과 보기' }).click();
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
   await expect(page.getByText('계산 결과를 저장했습니다.')).toBeVisible();
   // 계획 목록의 계산 횟수는 새로고침하지 않아도 방금 저장한 결과를 센다(2026-11-25 화면 점검에서 0회로 남았다).
   await expect(page.getByRole('button', { name: new RegExp(title) })).toContainText('계산 1회');
@@ -52,7 +57,7 @@ test('가입부터 불변 결과 재조회와 다른 사용자 접근 차단까�
 
   await page.reload();
   await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
 
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
@@ -79,9 +84,15 @@ test('처음 저장해도 사업 조건 단계가 그대로이고, 다른 계획
   await expect(wizard.getByRole('button', { name: /매장 층/ })).toHaveAttribute('aria-current', 'step');
 
   await page.getByLabel('계획 제목').fill(`첫 계획 ${suffix}`);
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^월 운영/ })
+    .click();
   await page.locator('#monthlyRevenue').fill('15000000');
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
+  // 다른 단계에 있다가 돌아와도 사업 조건 입력 단계는 보던 곳 그대로다.
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^매장/ }).click();
   await expect(wizard.getByRole('button', { name: /매장 층/ })).toHaveAttribute('aria-current', 'step');
   await expect(page.locator('#monthlyRevenue')).toHaveValue('15,000,000');
 
@@ -108,8 +119,13 @@ test('없앤 적용 기능이 저장한 대출 가정 출처를 계획과 결과
   await page.goto('/plans');
   await signUp(page, `loan-assumption-${suffix}@example.test`, '대출 가정 확인');
   await page.getByLabel('계획 제목').fill(title);
-  await page.getByRole('button', { name: '저장하고 계산' }).click();
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  // 계산은 마지막 입력 단계(자금 마련)의 [계산하고 결과 보기]로 한다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^자금 마련/ })
+    .click();
+  await page.getByRole('button', { name: '계산하고 결과 보기' }).click();
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
   const planId = await page.evaluate(async () => {
     const body = (await (await fetch('/api/plans')).json()) as { plans: Array<{ id: string }> };
     return body.plans[0]?.id;
@@ -147,10 +163,16 @@ test('없앤 적용 기능이 저장한 대출 가정 출처를 계획과 결과
 
   await page.reload();
   await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
+  // 계산한 계획은 결과 단계로 열린다. 대출 가정 출처는 자금 공고 단계에 있다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^자금 공고/ })
+    .click();
   const planSource = page.getByText(/^저장된 대출 가정 출처:/);
   await expect(planSource).toContainText('e2e-loan@1.0.0');
   await expect(planSource).toContainText('승인 확정이 아니며');
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^결과/ }).click();
   const resultSource = page.getByText(/^이 결과에 쓴 대출 가정:/);
   await expect(resultSource).toContainText('e2e-catalog@2026-09-20.1');
 });

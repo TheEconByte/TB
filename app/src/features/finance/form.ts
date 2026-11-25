@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { financeInputSchema } from './schema';
 import type { FinanceInput } from './types';
 
 // 재무 입력란의 글자와 저장하는 입력(FinanceInput) 사이의 변환. 빈 칸은 null, 0은 '0'으로 서로 바꾸지 않는다(AGENTS.md 3-2).
@@ -93,4 +94,15 @@ export function fromInput(input?: FinanceInput): FinanceForm {
     repaymentMethod: input.newLoan.repaymentMethod ?? '',
     cashBalanceMonths: input.cashBalanceMonths.toString(),
   };
+}
+
+// 결과를 계산한 입력(결과의 inputSnapshot)과 지금 입력란이 같은지. 계획은 제목·사업 조건·자금 조건만 저장해도 저장 번호가
+// 오르므로 저장 번호로는 결과가 지금 입력의 것인지 알 수 없다. 둘 다 같은 스키마로 읽어 같은 모양으로 견준다.
+// 스냅샷을 읽지 못하면 null을 돌려줘, 부르는 쪽이 다른 방법으로 판단하게 한다.
+export function sameAsCalculatedInput(form: FinanceForm, snapshot: unknown): boolean | null {
+  const calculated = financeInputSchema.safeParse(snapshot);
+  if (!calculated.success) return null;
+  const current = financeInputSchema.safeParse(toInput(form));
+  if (!current.success) return false;
+  return JSON.stringify(current.data) === JSON.stringify(calculated.data);
 }

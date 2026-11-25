@@ -29,7 +29,7 @@
 
 - 초기 비용 합계 = 보증금 + 시설 + 초기 재고 + 기타 준비비
 - 목표 초기 자금 = 초기 비용 합계 + 목표 운영예비금
-- 계획상 부족자금(`plannedFundingGap`) = max(0, 목표 초기 자금 − 자기자금). 신규 대출을 빼기 전의 금액이다.
+- 대출 전 부족액(`plannedFundingGap`) = max(0, 목표 초기 자금 − 자기자금). 신규 대출을 빼기 전의 금액이다.
 - 조달 후 개업 직전 현금(`preOpeningCashAfterFunding`) = 자기자금 + 신규 대출금 − 초기 비용 합계. 음수일 수 있다.
 - 목표 예비금 미달액(`reserveShortfall`) = max(0, 목표 운영예비금 − 조달 후 개업 직전 현금)
 - 자금 상태(`fundingPosition`): 개업 직전 현금이 0 미만이면 `INITIAL_EXPENSE_SHORTFALL`, 목표 운영예비금 미만이면 `RESERVE_SHORTFALL`, 그 외에는 `TARGET_RESERVE_MET`
