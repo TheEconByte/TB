@@ -31,8 +31,7 @@ const FLOOR_LABELS: Readonly<Record<Exclude<BusinessProfileForm['floor'], ''>, s
 export default function BusinessProfileWizard({
   form,
   onChange,
-  onFinish,
-}: Readonly<{ form: BusinessProfileForm; onChange: (form: BusinessProfileForm) => void; onFinish?: () => void }>) {
+}: Readonly<{ form: BusinessProfileForm; onChange: (form: BusinessProfileForm) => void }>) {
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<BusinessCategoryInfo[]>([]);
   const [release, setRelease] = useState<BusinessDirectoryReleaseInfo | null>(null);
@@ -310,7 +309,7 @@ export default function BusinessProfileWizard({
           >
             이전
           </button>
-          {/* 마지막 단계에는 다음 단계가 없으므로, 빠진 항목으로 돌아가거나 아래 참고 자료로 넘어가게 한다. */}
+          {/* 마지막 단계에서는 빠진 항목으로 돌려보낸다. 다 채웠으면 재무 계획의 다음 단계로는 하단 막대의 [다음]이 넘어간다. */}
           {step < STEPS.length - 1 ? (
             <button type="button" onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))}>
               다음
@@ -319,11 +318,7 @@ export default function BusinessProfileWizard({
             <button type="button" onClick={() => setStep(missing[0].step)}>
               빠진 항목 입력
             </button>
-          ) : (
-            <button type="button" disabled={!onFinish} onClick={() => onFinish?.()}>
-              다음: 참고 자료
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

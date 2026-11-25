@@ -388,14 +388,14 @@ export function limitText(limit: ProductMatch['limit']): string {
   return '공고에서 한도를 확인하지 못했습니다.';
 }
 
-// 보고 있는 저장 결과의 계획 부족자금. 다시 계산하지 않고 저장된 결과의 값만 쓴다. 저장 결과를 보고 있지 않으면 null이며
+// 보고 있는 저장 결과의 대출 전 부족액(plannedFundingGap). 다시 계산하지 않고 저장된 결과의 값만 쓴다. 저장 결과를 보고 있지 않으면 null이며
 // 화면은 아무것도 쓰지 않는다.
 export type ViewedFundingGap = { revision: number; value: ValueResult<string> } | null;
 
 export function fundingGapText(gap: NonNullable<ViewedFundingGap>): string {
   if (gap.value.status === 'READY')
-    return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)의 계획 부족자금 ${formatWon(gap.value.value)}`;
-  return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)에서는 입력이 부족해 계획 부족자금을 계산하지 못했습니다.`;
+    return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)의 대출 전 부족액 ${formatWon(gap.value.value)}`;
+  return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)에서는 입력이 부족해 대출 전 부족액을 계산하지 못했습니다.`;
 }
 
 // 맞춰 본 입력 요약. 입력하지 않음과 해당 없음을 구분하고, 사업 조건에서 가져온 자치구는 그렇다고 밝힌다.

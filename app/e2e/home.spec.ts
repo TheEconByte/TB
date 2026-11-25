@@ -71,10 +71,15 @@ test('로그인한 홈은 최근 계획과 마지막 저장 결과를 보여 주
   await signUp(page, `home-${suffix}@example.test`);
 
   await page.getByLabel('계획 제목').fill(calculated);
-  await page.getByRole('button', { name: '저장하고 계산' }).click();
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  // 계산은 마지막 입력 단계(자금 마련)의 [계산하고 결과 보기]로 한다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^자금 마련/ })
+    .click();
+  await page.getByRole('button', { name: '계산하고 결과 보기' }).click();
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
   // 홈 요약은 계획 화면의 저장 결과와 같은 값이어야 한다. 홈이 따로 계산하거나 다른 값을 보이면 안 된다.
-  const gap = await page.locator('.summary-grid > div', { hasText: '계획상 부족자금' }).locator('strong').innerText();
+  const gap = await page.locator('.ledger > div', { hasText: '대출 전 부족액' }).locator('dd').innerText();
 
   await page.getByRole('button', { name: '새 계획' }).click();
   await page.getByLabel('계획 제목').fill(draft);
@@ -95,7 +100,7 @@ test('로그인한 홈은 최근 계획과 마지막 저장 결과를 보여 주
 
   const calculatedItem = recent.getByRole('listitem').nth(1);
   await expect(calculatedItem).toContainText('1번째 저장 기준 계산 결과');
-  await expect(calculatedItem.locator('dl > div', { hasText: '계획상 부족자금' }).locator('dd')).toHaveText(gap);
+  await expect(calculatedItem.locator('dl > div', { hasText: '대출 전 부족액' }).locator('dd')).toHaveText(gap);
 
   await expect(calculatedItem.getByRole('link', { name: '열기', exact: true })).toHaveAttribute(
     'href',
@@ -103,7 +108,8 @@ test('로그인한 홈은 최근 계획과 마지막 저장 결과를 보여 주
   );
   await calculatedItem.getByRole('link', { name: '열기', exact: true }).click();
   await expect(page.getByLabel('계획 제목')).toHaveValue(calculated);
-  await expect(page.getByRole('heading', { name: '계산 결과 · 1번째 저장 기준' })).toBeVisible();
+  // 계산한 계획은 결과 단계로 열린다.
+  await expect(page.getByRole('region', { name: '계산 결과' })).toContainText('1번째 저장한 입력으로 계산했습니다.');
   // 연 계획 주소를 남기지 않는다. 새로고침하면 목록에서 다시 고른다.
   await expect(page).toHaveURL(/\/plans$/);
 });

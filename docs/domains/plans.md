@@ -25,4 +25,5 @@
   - 계산 버전이 키에 들어가므로, 계산식을 바꾸고 `CALCULATION_VERSION`을 올리지 않으면 같은 revision에서 이전 결과가 재사용된다.
 - 결과 행(`plan_results`)에는 입력 스냅샷(`inputSnapshot`), 결과(`resultJson`), 입력 revision·스키마 버전·계산 버전, 계산 시각을 저장한다. 계획에 대출 가정 출처가 남아 있으면 그 출처(`loanAssumptionJson`)도 복사한다. 출처는 없앤 적용 기능이 저장한 것만 있다([funding.md](funding.md#저장된-대출-가정)).
 - 결과를 수정하는 API는 없다. 계획을 수정하면 revision이 올라가고, 다음 계산이 새 결과를 추가한다. 계산 버전이 바뀌어도 과거 결과를 자동으로 다시 계산하지 않는다.
+- 화면은 보고 있는 결과가 이전 값인지를 revision이 아니라 결과의 `inputSnapshot`과 지금 재무 입력을 견줘 정한다(`finance/form.ts`의 `sameAsCalculatedInput`). 제목·사업 조건·자금 조건만 저장해도 revision이 오르기 때문이다. 스냅샷을 읽지 못하면 revision으로 견준다.
 - 삭제: 계획을 삭제하면(`DELETE /api/plans/{id}`, 204) 그 계획의 결과도 함께 삭제된다(`onDelete: Cascade`). 사용자 행을 지워도 계획과 결과가 함께 삭제된다. 이 삭제와 append-only 계약(AGENTS.md §3의 7번)의 관계는 #17에서 정한다.

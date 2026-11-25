@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { IndustryCode } from '@/features/industries';
 import type { FranchiseBrand, FranchisePayload, FranchiseYearStats } from './types';
 
@@ -32,10 +32,17 @@ function storeChange(brand: FranchiseBrand): string {
   return `전년 대비 ${diff > 0 ? '+' : ''}${numberFormat.format(diff)}개`;
 }
 
+// 계획 단계마다 필요한 부분만 보여 준다. startup은 개업 비용을 정할 때 보는 창업 금액, revenue는 월매출을 정할 때 보는
+// 가맹점 수·평균매출이다. 두 화면은 각자 브랜드를 고른다.
+export type FranchiseFocus = 'startup' | 'revenue';
+const TITLE: Record<FranchiseFocus, string> = { startup: '프랜차이즈 창업 금액', revenue: '프랜차이즈 참고' };
+
 export default function FranchisePanel({
   industryCode,
   savedMonthlyRevenue,
-}: Readonly<{ industryCode: '' | IndustryCode; savedMonthlyRevenue: string | null }>) {
+  focus,
+}: Readonly<{ industryCode: '' | IndustryCode; savedMonthlyRevenue: string | null; focus: FranchiseFocus }>) {
+  const titleId = useId();
   const [query, setQuery] = useState('');
   const [state, setState] = useState<LoadState>({ kind: 'idle' });
   const [selectedId, setSelectedId] = useState('');
@@ -71,8 +78,8 @@ export default function FranchisePanel({
 
   if (!industryCode) {
     return (
-      <section className="picker franchise-panel reference-empty" aria-labelledby="franchise-title">
-        <h2 id="franchise-title">프랜차이즈 참고</h2>
+      <section className="picker franchise-panel reference-empty" aria-labelledby={titleId}>
+        <h2 id={titleId}>{TITLE[focus]}</h2>
         <p className="picker-note">사업 조건에서 업종을 고르면 공정위 정보공개서의 브랜드 현황이 나옵니다.</p>
       </section>
     );
@@ -84,8 +91,8 @@ export default function FranchisePanel({
     : null;
 
   return (
-    <section className="picker franchise-panel" aria-labelledby="franchise-title">
-      <h2 id="franchise-title">프랜차이즈 참고</h2>
+    <section className="picker franchise-panel" aria-labelledby={titleId}>
+      <h2 id={titleId}>{TITLE[focus]}</h2>
       {payload && (
         <p className="picker-note reference-lead">
           {payload.source.latestDisclosureYear}년 정보공개서({payload.source.latestPerformanceYear}년 실적) 기준{' '}
@@ -137,7 +144,7 @@ export default function FranchisePanel({
                 <tr>
                   <th scope="col">브랜드</th>
                   <th scope="col">가맹점 수</th>
-                  <th scope="col">연 평균매출</th>
+                  <th scope="col">{focus === 'startup' ? '창업 금액' : '연 평균매출'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -154,35 +161,113 @@ export default function FranchisePanel({
                       </button>
                     </td>
                     <td>{stores(brand.latest)}</td>
-                    <td>{money(brand.latest.averageSalesWon)}</td>
+                    <td>
+                      {focus === 'startup'
+                        ? brand.latest.startupCosts
+                          ? money(brand.latest.startupCosts.totalWon)
+                          : '자료 없음'
+                        : money(brand.latest.averageSalesWon)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <FranchiseDetail brand={selected} payload={payload} savedMonthlyRevenue={savedMonthlyRevenue} />
+          {focus === 'startup' ? (
+            <StartupDetail brand={selected} payload={payload} />
+          ) : (
+            <FranchiseDetail brand={selected} payload={payload} savedMonthlyRevenue={savedMonthlyRevenue} />
+          )}
         </>
       ) : null}
     </section>
   );
 }
 
+function BrandHeading({ brand }: Readonly<{ brand: FranchiseBrand }>) {
+  return (
+    <h3>
+      {brand.brandName}
+      <span>
+        {brand.corpName} · {brand.industryMiddle}
+      </span>
+    </h3>
+  );
+}
+
+function SourceDetails({ payload }: Readonly<{ payload: FranchisePayload }>) {
+  return (
+    <details className="reference-source">
+      <summary>기준과 출처</summary>
+      <ul>
+        {[...payload.definitions, ...payload.limitations].map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <p className="source-link">
+        <a href={payload.source.sourceUrl} target="_blank" rel="noreferrer">
+          {payload.source.name}
+        </a>{' '}
+        ·{' '}
+        <a href={payload.source.compareUrl} target="_blank" rel="noreferrer">
+          공정위 정보공개서 비교
+        </a>{' '}
+        · 적재 {new Date(payload.source.retrievedAt).toLocaleDateString('ko-KR')}
+      </p>
+    </details>
+  );
+}
+
+// 개업 비용 단계: 정보공개서의 창업 금액과 그 구성.
+function StartupDetail({ brand, payload }: Readonly<{ brand: FranchiseBrand; payload: FranchisePayload }>) {
+  const costs = brand.latest.startupCosts;
+  return (
+    <div className="franchise-detail">
+      <BrandHeading brand={brand} />
+      <div className="summary-grid reference-summary">
+        <div>
+          <span>창업 금액(정보공개서)</span>
+          <strong>{costs ? money(costs.totalWon) : '자료 없음'}</strong>
+          <small>{costs ? '기타에 인테리어·설비 등 포함' : '창업 금액 자료가 없습니다.'}</small>
+        </div>
+      </div>
+      {costs && (
+        <table>
+          <caption className="table-note">창업 금액 구성</caption>
+          <tbody>
+            {(
+              [
+                ['가맹금', costs.franchiseFeeWon],
+                ['교육비', costs.educationFeeWon],
+                ['보증금', costs.depositWon],
+                ['기타(인테리어·설비 등)', costs.otherCostWon],
+                ['합계', costs.totalWon],
+              ] as const
+            ).map(([label, value]) => (
+              <tr key={label}>
+                <th scope="row">{label}</th>
+                <td>{money(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <SourceDetails payload={payload} />
+    </div>
+  );
+}
+
+// 월 운영 단계: 가맹점 수와 평균매출, 이 계획의 월매출 가정과의 비교.
 function FranchiseDetail({
   brand,
   payload,
   savedMonthlyRevenue,
 }: Readonly<{ brand: FranchiseBrand; payload: FranchisePayload; savedMonthlyRevenue: string | null }>) {
   const { latest } = brand;
-  const costs = latest.startupCosts;
   const change = storeChange(brand);
   return (
     <div className="franchise-detail">
-      <h3>
-        {brand.brandName}
-        <span>
-          {brand.corpName} · {brand.industryMiddle}
-        </span>
-      </h3>
+      <BrandHeading brand={brand} />
       <div className="summary-grid reference-summary">
         <div>
           <span>가맹점 수({latest.performanceYear}년 말)</span>
@@ -200,11 +285,6 @@ function FranchiseDetail({
           <span>3.3㎡당 연 평균매출</span>
           <strong>{money(latest.averageSalesPerAreaWon)}</strong>
           <small>{latest.performanceYear}년 실적</small>
-        </div>
-        <div>
-          <span>창업 금액(정보공개서)</span>
-          <strong>{costs ? money(costs.totalWon) : '자료 없음'}</strong>
-          <small>{costs ? '기타에 인테리어·설비 등 포함' : '창업 금액 자료가 없습니다.'}</small>
         </div>
       </div>
 
@@ -227,81 +307,36 @@ function FranchiseDetail({
         </p>
       )}
 
-      <div className="reference-detail-grid">
-        <div>
-          <h3>연도별 추이</h3>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">실적 연도</th>
-                  <th scope="col">가맹점 수</th>
-                  <th scope="col">연 평균매출</th>
+      <div className="franchise-history">
+        <h3>연도별 추이</h3>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">실적 연도</th>
+                <th scope="col">가맹점 수</th>
+                <th scope="col">연 평균매출</th>
+              </tr>
+            </thead>
+            <tbody>
+              {brand.history.map((item: FranchiseYearStats) => (
+                <tr key={item.disclosureYear}>
+                  <td>{item.performanceYear}년</td>
+                  <td>{stores(item)}</td>
+                  <td>
+                    {item.averageSalesWon ? (
+                      formatWon(item.averageSalesWon)
+                    ) : (
+                      <span className="missing-value">미기재</span>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {brand.history.map((item: FranchiseYearStats) => (
-                  <tr key={item.disclosureYear}>
-                    <td>{item.performanceYear}년</td>
-                    <td>{stores(item)}</td>
-                    <td>
-                      {item.averageSalesWon ? (
-                        formatWon(item.averageSalesWon)
-                      ) : (
-                        <span className="missing-value">미기재</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div>
-          <h3>창업 금액 구성</h3>
-          {costs ? (
-            <table>
-              <tbody>
-                {(
-                  [
-                    ['가맹금', costs.franchiseFeeWon],
-                    ['교육비', costs.educationFeeWon],
-                    ['보증금', costs.depositWon],
-                    ['기타(인테리어·설비 등)', costs.otherCostWon],
-                    ['합계', costs.totalWon],
-                  ] as const
-                ).map(([label, value]) => (
-                  <tr key={label}>
-                    <th scope="row">{label}</th>
-                    <td>{money(value)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="picker-note">창업 금액 자료가 없습니다.</p>
-          )}
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <details className="reference-source">
-        <summary>기준과 출처</summary>
-        <ul>
-          {[...payload.definitions, ...payload.limitations].map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="source-link">
-          <a href={payload.source.sourceUrl} target="_blank" rel="noreferrer">
-            {payload.source.name}
-          </a>{' '}
-          ·{' '}
-          <a href={payload.source.compareUrl} target="_blank" rel="noreferrer">
-            공정위 정보공개서 비교
-          </a>{' '}
-          · 적재 {new Date(payload.source.retrievedAt).toLocaleDateString('ko-KR')}
-        </p>
-      </details>
+      <SourceDetails payload={payload} />
     </div>
   );
 }

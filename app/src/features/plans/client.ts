@@ -24,6 +24,8 @@ export type PlanDetail = {
 export type StoredResult = {
   id: string;
   inputRevision: number;
+  // 이 결과를 계산한 재무 입력. 지금 입력과 견줘 결과가 이전 값인지 판단한다(finance/form.ts sameAsCalculatedInput).
+  inputSnapshot: unknown;
   resultJson: FinanceResult;
   loanAssumptionJson?: unknown;
 };
