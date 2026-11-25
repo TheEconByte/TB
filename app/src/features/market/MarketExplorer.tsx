@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import SiteHeader from '@/components/SiteHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QuarterTrendChart, { type ChartPoint } from './QuarterTrendChart';
 import {
@@ -67,8 +67,7 @@ export default function MarketExplorer() {
   const [industryCode, setIndustryCode] = useState('');
   const [summary, setSummary] = useState<MarketReport | null>(null);
   const [businessCategories, setBusinessCategories] = useState<BusinessCategoryInfo[]>([]);
-  const [businessCategoryMessage, setBusinessCategoryMessage] =
-    useState('소진공 세부 업종 스냅샷을 확인하고 있습니다.');
+  const [businessCategoryMessage, setBusinessCategoryMessage] = useState('세부 업종 목록을 불러오는 중…');
   const [detailedIndustryCode, setDetailedIndustryCode] = useState('');
   const [businessSummary, setBusinessSummary] = useState<BusinessSummary | null>(null);
   const [businessLoading, setBusinessLoading] = useState(false);
@@ -99,7 +98,7 @@ export default function MarketExplorer() {
         setIndustries(industryData.industries);
         setActiveRelease(industryData.activeRelease);
         setBusinessCategories(businessData.categories);
-        setBusinessCategoryMessage(businessData.nullReason ?? '활성 소진공 스냅샷 기준입니다.');
+        setBusinessCategoryMessage(businessData.nullReason ?? '소상공인시장진흥공단 점포 자료 기준');
         if (!industryData.activeRelease) return;
         const areaData = await request<MarketAreaList>('/api/markets/areas');
         if (cancelled) return;
@@ -180,7 +179,13 @@ export default function MarketExplorer() {
     try {
       const data = await request<MarketAreaList>(`/api/markets/areas?districtCode=${encodeURIComponent(next)}`);
       if (requestId !== latestAreaRequest.current) return;
-      setAreas(data.areas);
+      // 자치구마다 상권이 100개 가까이 되어 찾기 쉽게 이름 순으로 놓는다.
+      setAreas(
+        [...data.areas].sort(
+          (a, b) =>
+            a.displayName.localeCompare(b.displayName, 'ko') || a.areaTypeName.localeCompare(b.areaTypeName, 'ko'),
+        ),
+      );
       setActiveRelease(data.release);
     } catch (error) {
       if (requestId !== latestAreaRequest.current) return;
@@ -221,52 +226,36 @@ export default function MarketExplorer() {
 
   return (
     <main>
-      <header>
-        <Link href="/" className="brand">
-          TrendBench<span>창업 준비의 기준</span>
-        </Link>
-        <div className="account-actions">
-          <Link className="link-button" href="/">
-            내 창업 계획
-          </Link>
-          <Link className="link-button" href="/funding">
-            자금 후보
-          </Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <section className="hero market-hero">
-        <p className="eyebrow">공개 상권 탐색</p>
-        <h1>
-          자치구에서 상권으로,
-          <br />
-          상권에서 업종으로.
-        </h1>
+        <h1>상권 조회</h1>
+        <p>서울시 상권분석서비스와 소상공인시장진흥공단 점포 자료입니다. 로그인 없이 볼 수 있습니다.</p>
       </section>
 
       {booting && (
         <p className="loading-state" role="status">
-          상권 데이터를 확인하고 있습니다.
+          상권 자료를 불러오는 중…
         </p>
       )}
 
       {!booting && bootError && (
         <div className="error-box" role="alert">
-          <h2>상권 데이터를 불러오지 못했습니다.</h2>
+          <h2>상권 자료를 불러오지 못했습니다.</h2>
           <p>{bootError}</p>
         </div>
       )}
 
       {!booting && !bootError && !activeRelease && (
         <div className="empty-panel" role="status">
-          <h2>상권 데이터가 아직 준비되지 않았습니다.</h2>
+          <h2>상권 자료가 아직 없습니다.</h2>
         </div>
       )}
 
       {!booting && activeRelease && (
         <>
           <details className="notice-box">
-            <summary>이 화면의 값을 읽는 법</summary>
+            <summary>값을 볼 때 주의할 점</summary>
             <ul>
               {MARKET_LIMITATIONS.map((limitation) => (
                 <li key={limitation}>{limitation}</li>
@@ -277,7 +266,7 @@ export default function MarketExplorer() {
           <ReleaseCard release={activeRelease} />
 
           <section className="picker" aria-labelledby="market-picker">
-            <h2 id="market-picker">상권과 업종 선택</h2>
+            <h2 id="market-picker">상권·업종 고르기</h2>
             <div className="select-row market-select-row">
               <label className="field">
                 <span>1. 자치구</span>
@@ -349,7 +338,7 @@ export default function MarketExplorer() {
                     {!industryCode
                       ? '업종을 먼저 선택하세요'
                       : filteredBusinessCategories.length === 0
-                        ? '활성 세부 업종 자료 없음'
+                        ? '세부 업종 자료 없음'
                         : '선택하지 않음'}
                   </option>
                   {filteredBusinessCategories.map((category) => (
@@ -372,12 +361,12 @@ export default function MarketExplorer() {
                 </strong>
                 <p>서울시 상권분석서비스(추정매출-상권) 관측값이며 개인 예상매출이 아닙니다.</p>
               </div>
-              <div className="scope-card secondary">
+              <div className="scope-card">
                 <span>경쟁 점포 현황</span>
                 <strong>
                   {selectedBusinessCategory ? `${selectedBusinessCategory.name} 세부 업종 기준` : '세부 업종 미선택'}
                 </strong>
-                <p>소진공 상가(상권)정보의 점포 스냅샷이며 매출 데이터가 아닙니다.</p>
+                <p>소진공 상가(상권)정보의 점포 목록입니다. 매출은 들어 있지 않습니다.</p>
               </div>
             </section>
           )}
@@ -536,7 +525,7 @@ function SummaryPanel({
 
           <div className="table-card">
             <h3>분기별 지표</h3>
-            <div className="table-scroll">
+            <div className="table-scroll full-length">
               <table className="market-table">
                 <caption>
                   {summary.area.displayName} · {summary.industry.displayName} · 가용 분기 {summary.quarters.length}개
@@ -642,11 +631,10 @@ function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
       <h3>
         {summary.district.name} {summary.category.name} 경쟁 점포
       </h3>
-      <div className="scope-card secondary">
-        <span>경쟁 범위</span>
+      <p className="competition-count">
         <strong>{numberFormat.format(summary.businessCount)}개 점포</strong>
-        <p>{summary.competitionScope.statement}</p>
-      </div>
+      </p>
+      <p className="table-note">{summary.competitionScope.statement}</p>
       {summary.businesses.length === 0 ? (
         <p className="empty-state">해당 자치구에서 관측된 점포가 없습니다.</p>
       ) : (

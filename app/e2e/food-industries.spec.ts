@@ -227,7 +227,7 @@ async function signUp(page: Page, email: string): Promise<void> {
 }
 
 function startUrl(industryCode: string, releaseKey: string): string {
-  return `/?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=${industryCode}&scoreRelease=${releaseKey}`;
+  return `/plans?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=${industryCode}&scoreRelease=${releaseKey}`;
 }
 
 function uniqueSuffix(projectName: string): string {
@@ -268,7 +268,7 @@ test('요식업 업종 열 개를 모두 고를 수 있다', async ({ page }, te
   await seed(uniqueSuffix(testInfo.project.name));
   await openArea(page);
   const options = page.getByLabel('3. 업종').locator('option:not([value=""])');
-  await expect(options).toHaveText(FOOD_INDUSTRIES.map(([code, , displayName]) => `${displayName} (${code})`));
+  await expect(options).toHaveText(FOOD_INDUSTRIES.map(([, , displayName]) => displayName));
 });
 
 test('점수 없는 업종도 상권 지표를 보여 주고, 점수를 0으로 만들거나 재무 계획으로 넘기지 않는다', async ({
@@ -322,8 +322,8 @@ test('점수 없는 업종의 상권 참조로 연 재무 계획은 값을 채�
   await expect(page.locator('.status-message')).toContainText('이 업종은 생존점수를 내지 않습니다.');
   await expect(page.getByTestId('market-source')).toHaveCount(0);
   await expect(page.getByLabel('계획 제목')).toHaveValue('');
-  // 월매출은 상권 값이 아니라 재무 화면의 기본 가정(core-flow와 같은 2천만 원) 그대로다.
-  await expect(page.locator('#monthlyRevenue')).toHaveValue('20,000,000');
+  // 월매출은 상권 값으로 채우지 않고 새 계획처럼 비어 있다(finance/form.ts).
+  await expect(page.locator('#monthlyRevenue')).toHaveValue('');
 });
 
 test('점수를 내는 새 업종은 점수에서 재무 계획을 시작한다', async ({ page }, testInfo) => {

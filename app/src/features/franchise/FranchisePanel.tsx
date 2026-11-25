@@ -71,9 +71,9 @@ export default function FranchisePanel({
 
   if (!industryCode) {
     return (
-      <section className="picker franchise-panel" aria-labelledby="franchise-title">
+      <section className="picker franchise-panel reference-empty" aria-labelledby="franchise-title">
         <h2 id="franchise-title">프랜차이즈 참고</h2>
-        <p className="picker-note">사업 조건에서 업종을 고르면 공정위 정보공개서의 브랜드 현황을 보여 드립니다.</p>
+        <p className="picker-note">사업 조건에서 업종을 고르면 공정위 정보공개서의 브랜드 현황이 나옵니다.</p>
       </section>
     );
   }
@@ -115,7 +115,7 @@ export default function FranchisePanel({
         </p>
       ) : state.kind === 'unavailable' ? (
         <p className="picker-note" role="status">
-          프랜차이즈 자료가 아직 준비되지 않았습니다.
+          프랜차이즈 자료가 아직 없습니다.
         </p>
       ) : state.kind === 'error' ? (
         <p className="inline-error" role="alert">
@@ -193,9 +193,7 @@ function FranchiseDetail({
           <span>가맹점 연 평균매출</span>
           <strong>{money(latest.averageSalesWon)}</strong>
           <small>
-            {latest.averageMonthlySalesWon
-              ? `월 평균 약 ${formatWon(latest.averageMonthlySalesWon)}`
-              : '가맹본부 미기재'}
+            {latest.averageMonthlySalesWon ? `월 평균 ${formatWon(latest.averageMonthlySalesWon)}` : '가맹본부 미기재'}
           </small>
         </div>
         <div>
@@ -206,7 +204,7 @@ function FranchiseDetail({
         <div>
           <span>창업 금액(정보공개서)</span>
           <strong>{costs ? money(costs.totalWon) : '자료 없음'}</strong>
-          <small>{costs ? '기타에 인테리어·설비 등 포함' : '이번 적재본에 창업 금액이 없습니다.'}</small>
+          <small>{costs ? '기타에 인테리어·설비 등 포함' : '창업 금액 자료가 없습니다.'}</small>
         </div>
       </div>
 
@@ -224,7 +222,7 @@ function FranchiseDetail({
 
       {savedMonthlyRevenue !== null && latest.averageMonthlySalesWon !== null && (
         <p className="funding-position">
-          이 계획의 월매출 가정 {formatWon(savedMonthlyRevenue)} · 이 브랜드 전국 월 평균 약{' '}
+          이 계획의 월매출 가정 {formatWon(savedMonthlyRevenue)} · 이 브랜드 전국 월 평균{' '}
           {formatWon(latest.averageMonthlySalesWon)}
         </p>
       )}
@@ -281,7 +279,7 @@ function FranchiseDetail({
               </tbody>
             </table>
           ) : (
-            <p className="picker-note">이번 적재본에는 창업 금액이 포함되지 않았습니다.</p>
+            <p className="picker-note">창업 금액 자료가 없습니다.</p>
           )}
         </div>
       </div>

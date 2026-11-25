@@ -2,7 +2,8 @@
 
 ## 코드 위치
 
-- `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI, 결과 키(`calculation-key.ts`), 계획에 저장한 자금 조건으로 맞춰 보기 조립(`funding-matches.ts`), API 경계 테스트.
+- `app/src/features/plans`: 인증 후 계획 목록·입력·결과 이력 UI(`/plans`), 홈(`/`)의 최근 계획과 마지막 저장 결과 요약(`RecentPlans.tsx`), 홈에서 계획을 여는 주소(`plan-link.ts`), 화면의 계획 API 요청(`client.ts`), 결과 키(`calculation-key.ts`), 계획에 저장한 자금 조건으로 맞춰 보기 조립(`funding-matches.ts`), API 경계 테스트.
+- 홈 요약은 저장된 결과만 옮기고 다시 계산하지 않는다. [열기]는 `/plans?plan=<id>`로 계획을 열고 주소에서 id를 지운다. 없거나 남의 계획이면 API의 404 문구를 보이고 새 계획으로 둔다.
 - 계산 공식과 시나리오는 [finance.md](finance.md)에 있다.
 
 ## API

@@ -7,6 +7,7 @@ import {
   LIMIT_NOTE,
   UNREAD_NOTICE,
   aiPeriodText,
+  aiPeriodValueText,
   applicationPeriodText,
   applicationStateText,
   checkReasonText,
@@ -15,8 +16,10 @@ import {
   conditionValueText,
   fundingGapText,
   fundingProfileSummary,
+  hasAiReading,
   limitText,
   rangeText,
+  sourceRecordText,
   tabCountTexts,
   titleRegionText,
   unconfirmedReasonText,
@@ -297,6 +300,106 @@ describe('신청기간 문장', () => {
     expect(applicationPeriodText({ start: null, end: null, note: null })).toBe('기록 없음');
     expect(aiPeriodText({ start: null, end: '2026-10-15', text: null })).toBe('~ 2026. 10. 15.');
   });
+
+  it('종료일이 없고 출처 표기가 시작일을 이미 담으면 출처 표기만 쓴다', () => {
+    // 소진공·기업마당은 종료일 없는 기간의 원문 표기를 note에 남긴다(funding.md 소진공 정책자금 수집). 시작일을 두 번 쓰면
+    // "2026. 1. 5. ~ (2026-01-05 ~ 자금소진시까지)"처럼 같은 날짜가 두 형식으로 나온다(2026-11-25 화면 점검).
+    expect(applicationPeriodText({ start: '2026-01-05', end: null, note: '2026-01-05 ~ 자금소진시까지' })).toBe(
+      '2026-01-05 ~ 자금소진시까지',
+    );
+    expect(
+      applicationPeriodText({ start: '2026-10-26', end: null, note: '‘26년 10월 26일(월) 10:00 ~ 예산 소진 시까지' }),
+    ).toBe('‘26년 10월 26일(월) 10:00 ~ 예산 소진 시까지');
+    expect(
+      applicationPeriodText({ start: '2026-10-06', end: null, note: '2026. 10. 6.(화) 10:00 ~ 예산소진 시까지' }),
+    ).toBe('2026. 10. 6.(화) 10:00 ~ 예산소진 시까지');
+  });
+
+  it('출처 표기가 시작일을 담지 않거나 기간이 닫혀 있으면 날짜를 지우지 않는다', () => {
+    // 시작일이 note에 없는데 note만 쓰면 시작일을 잃는다.
+    expect(applicationPeriodText({ start: '2026-10-01', end: null, note: '2026년 11월 1일 ~ 예산 소진 시까지' })).toBe(
+      '2026. 10. 1. ~ (2026년 11월 1일 ~ 예산 소진 시까지)',
+    );
+    // 양쪽 날짜가 있으면 note는 날짜를 되풀이하는 표기가 아니라 덧붙인 설명이다.
+    expect(applicationPeriodText({ start: '2026-10-01', end: '2026-12-31', note: '게시 기간입니다.' })).toBe(
+      '2026. 10. 1. ~ 2026. 12. 31. (게시 기간입니다.)',
+    );
+  });
+});
+
+describe('AI가 읽은 신청기간', () => {
+  it('값 문장이 인용과 같으면 값을 따로 쓰지 않는다', () => {
+    // 날짜로 읽지 못한 기간은 원문 표기가 값이 되어 인용과 같은 문장이 두 번 나왔다(2026-11-25 화면 점검).
+    // 인용은 AGENTS.md 3-8에 따라 남기므로 지우는 쪽은 값이다.
+    const text = '연중 수시(자금 소진시 까지)';
+    expect(aiPeriodValueText({ start: null, end: null, text }, text)).toBeNull();
+    expect(aiPeriodValueText({ start: null, end: null, text }, ` ${text} `)).toBeNull();
+  });
+
+  it('값이 인용과 다르면 값을 쓴다', () => {
+    expect(
+      aiPeriodValueText({ start: '2026-10-01', end: '2026-10-20', text: null }, '접수기간: 2026. 10. 1. ~ 10. 20.'),
+    ).toBe('2026. 10. 1. ~ 2026. 10. 20.');
+  });
+});
+
+describe('출처 기록 한 줄', () => {
+  // funding.md 화면 카드: 출처·운영자가 기록한 접수 상태(접수 중·마감·알 수 없음)와 신청기간, 자동 상품은 출처와 마지막
+  // 확인일, 사람 상품은 기록일. 두 칸에 나눠 쓰던 것을 한 줄로 합친다(사용자 결정 2026-11-25).
+  it('자동 수집 공고는 출처 이름과 마지막 확인일을 쓴다', () => {
+    const open = product({ application: { ...product().application, status: 'OPEN' } });
+    expect(sourceRecordText(open)).toBe('기업마당 기록: 접수 중 · ~ 2026. 10. 31. (2026. 10. 28. 확인)');
+  });
+
+  it('운영자가 등록한 공고는 기록일을 쓰고, 기록일이 없으면 날짜를 쓰지 않는다', () => {
+    const operator = product({ automation: null, operatorRecord: { observedAt: '2026-09-20' } });
+    expect(sourceRecordText(operator)).toBe('운영자 기록: 접수 상태 알 수 없음 · ~ 2026. 10. 31. (2026. 9. 20. 기록)');
+    expect(sourceRecordText(product({ automation: null, operatorRecord: null }))).toBe(
+      '운영자 기록: 접수 상태 알 수 없음 · ~ 2026. 10. 31.',
+    );
+  });
+
+  it('마감으로 기록한 공고는 마감으로 쓴다', () => {
+    const closed = product({ application: { ...product().application, status: 'CLOSED' } });
+    expect(sourceRecordText(closed)).toContain('기록: 마감 ·');
+  });
+});
+
+describe('AI 안내를 붙일 카드', () => {
+  // ADR 0009 §4·AGENTS.md 3-8: AI가 읽은 내용임을 밝힌다. AI가 읽은 값이 하나도 없는 카드에 붙이면 "본문을 읽지 못해"
+  // 줄과 어긋난다(2026-11-25 화면 점검). 카드에 적지 않은 "제한 없음" 조건도 AI가 읽어 목록에 남긴 근거이므로 센다.
+  const none = product({
+    application: { ...product().application, aiPeriod: { status: 'NOT_READ' } },
+    supportTypes: { status: 'NOT_READ' },
+  });
+  const withReading = (key: ConditionMatch['key'], reading: unknown) =>
+    ({ key, reading, verdict: 'MATCH', checkReason: null }) as ConditionMatch;
+
+  it('AI가 읽은 값이 없으면 붙이지 않는다', () => {
+    expect(hasAiReading(none)).toBe(false);
+    const operatorOnly = withReading('businessStage', {
+      status: 'READ',
+      source: 'OPERATOR',
+      value: 'BUSINESS_ONLY',
+      evidence: ['사업자'],
+    });
+    const unreadable = withReading('age', { status: 'UNREADABLE' });
+    expect(hasAiReading({ ...none, conditions: [operatorOnly, unreadable] })).toBe(false);
+  });
+
+  it('신청기간·지원 방식·조건 중 하나라도 AI가 읽었으면 붙인다', () => {
+    expect(hasAiReading(product())).toBe(true);
+    expect(
+      hasAiReading({ ...none, supportTypes: { status: 'READ', source: 'AI', value: ['LOAN'], quote: '융자' } }),
+    ).toBe(true);
+    const noRestriction = withReading('foodBusiness', {
+      status: 'READ',
+      source: 'AI',
+      value: 'NOT_EXCLUDED',
+      quote: '업종 제한 없음',
+    });
+    expect(hasAiReading({ ...none, conditions: [noRestriction] })).toBe(true);
+  });
 });
 
 describe('탭 제목의 공고 수', () => {
@@ -412,7 +515,7 @@ describe('한도와 부족자금 문장', () => {
 
   it('보고 있는 저장 결과의 부족자금을 revision과 함께 쓴다', () => {
     const text = fundingGapText({ revision: 3, value: { status: 'READY', value: '50000000' } });
-    expect(text).toContain('revision 3');
+    expect(text).toContain('3번째 저장');
     expect(text).toContain('50,000,000원');
     expect(
       fundingGapText({ revision: 2, value: { status: 'INSUFFICIENT_INPUT', value: null, missingFields: ['equity'] } }),
@@ -465,6 +568,7 @@ describe('쓰지 않는 문구', () => {
       applicationStateText(product(), '2026-10-01') ?? '',
       closedText(product({ application: { ...product().application, closedBy: 'SOURCE_STATUS' } })) ?? '',
       limitText({ publicLimitKrw: '1', limitText: null }),
+      sourceRecordText(product({ application: { ...product().application, status: 'OPEN' } })),
       UNREAD_NOTICE,
       titleRegionText('서울'),
       fundingGapText({ revision: 1, value: { status: 'READY', value: '1' } }),

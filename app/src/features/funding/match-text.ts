@@ -1,6 +1,7 @@
 import type { ValueResult } from '../finance/types.ts';
 import type { ConditionRange, ConditionTargetGroup, ConditionValues } from './condition-fields.ts';
 import { toDate } from './dates.ts';
+import { revisionLabel } from '../../lib/revision-text.ts';
 import { districtName } from './districts.ts';
 import type { DistrictSource } from './match-profile.ts';
 import {
@@ -322,8 +323,19 @@ export function closedText(product: ProductMatch): string | null {
 // 신청기간 문장. 한쪽 날짜만 있으면 빈 쪽은 비워 두고(예: "2026. 10. 1. ~"), 날짜 대신 적힌 문장을 괄호로 붙인다.
 function periodText(start: string | null, end: string | null, note: string | null): string {
   if (start === null && end === null) return note ?? '기록 없음';
+  // 종료일 없는 기간은 출처가 원문 표기("2026-01-05 ~ 자금소진시까지")를 note에 남긴다. 그 표기가 시작일을 이미 담으면
+  // 날짜를 두 형식으로 되풀이하지 않고 표기만 쓴다.
+  if (start !== null && end === null && note !== null && mentionsDate(note, start)) return note;
   const range = `${start === null ? '' : formatDate(start)} ~ ${end === null ? '' : formatDate(end)}`.trim();
   return note === null ? range : `${range} (${note})`;
+}
+
+// 표기 속 숫자에 날짜의 연(네 자리나 두 자리)·월·일이 모두 있는지. 표기 형식이 출처마다 달라('26년 10월 26일,
+// 2026. 10. 6., 2026-01-05) 숫자만 본다.
+function mentionsDate(text: string, date: string): boolean {
+  const numbers = new Set((text.match(/\d+/g) ?? []).map(Number));
+  const [year, month, day] = date.split('-').map(Number);
+  return (numbers.has(year) || numbers.has(year % 100)) && numbers.has(month) && numbers.has(day);
 }
 
 // 출처·운영자가 기록한 신청기간.
@@ -333,6 +345,36 @@ export function applicationPeriodText(period: ProductMatch['application']['perio
 
 export function aiPeriodText(value: ConditionValues['applicationPeriod']): string {
   return periodText(value.start, value.end, value.text);
+}
+
+// 카드에 인용과 함께 쓰는 AI가 읽은 신청기간. 날짜로 읽지 못해 원문 표기가 값이 되면 인용과 같은 문장이라 값을 쓰지 않는다.
+export function aiPeriodValueText(value: ConditionValues['applicationPeriod'], quote: string): string | null {
+  const text = aiPeriodText(value);
+  return text.trim() === quote.trim() ? null : text;
+}
+
+// 출처·운영자가 기록한 접수 상태. 카드의 접수 상태 배지(접수 중 확인·접수 여부 미확인)는 여기에 출처 최신성과 AI가 읽은
+// 종료일까지 본 결과라서, 둘이 같은 말로 읽히지 않게 기록한 값만 짧게 쓴다.
+const RECORDED_STATUS_LABELS: Record<ProductMatch['application']['status'], string> = {
+  OPEN: '접수 중',
+  CLOSED: '마감',
+  UNKNOWN: '접수 상태 알 수 없음',
+};
+
+// 카드의 출처 기록 한 줄: 누가 기록했는지, 기록한 접수 상태와 신청기간, 자동 상품은 마지막 확인일, 사람 상품은 기록일.
+export function sourceRecordText(match: ProductMatch): string {
+  const who = match.automation ? match.automation.sourceLabel : '운영자';
+  const record = `${who} 기록: ${RECORDED_STATUS_LABELS[match.application.status]} · ${applicationPeriodText(match.application.period)}`;
+  if (match.automation) return `${record} (${formatDate(match.automation.lastSucceededOn)} 확인)`;
+  if (match.operatorRecord) return `${record} (${formatDate(match.operatorRecord.observedAt)} 기록)`;
+  return record;
+}
+
+// 카드에 AI 안내(AI_READING_NOTICE)를 붙일지. 신청기간·지원 방식·조건 중 하나라도 AI가 읽은 값이 있을 때만이다. 카드에
+// 적지 않는 "제한 없음" 조건도 AI가 읽어 목록에 남긴 근거라서 센다.
+export function hasAiReading(match: ProductMatch): boolean {
+  const readings = [match.application.aiPeriod, match.supportTypes, ...match.conditions.map((entry) => entry.reading)];
+  return readings.some((reading) => reading.status === 'READ' && reading.source === 'AI');
 }
 
 export function supportTypesText(values: ConditionValues['supportTypes']): string {
@@ -352,8 +394,8 @@ export type ViewedFundingGap = { revision: number; value: ValueResult<string> } 
 
 export function fundingGapText(gap: NonNullable<ViewedFundingGap>): string {
   if (gap.value.status === 'READY')
-    return `참고: 보고 있는 저장 결과(revision ${gap.revision})의 계획 부족자금 ${formatWon(gap.value.value)}`;
-  return `참고: 보고 있는 저장 결과(revision ${gap.revision})에서는 입력이 부족해 계획 부족자금을 계산하지 못했습니다.`;
+    return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)의 계획 부족자금 ${formatWon(gap.value.value)}`;
+  return `참고: 보고 있는 계산 결과(${revisionLabel(gap.revision)} 기준)에서는 입력이 부족해 계획 부족자금을 계산하지 못했습니다.`;
 }
 
 // 맞춰 본 입력 요약. 입력하지 않음과 해당 없음을 구분하고, 사업 조건에서 가져온 자치구는 그렇다고 밝힌다.

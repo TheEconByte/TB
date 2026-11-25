@@ -2,7 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
-import FinancePlanner, { defaultInputWith } from '@/features/finance/FinancePlanner';
+import FinancePlanner from '@/features/finance/FinancePlanner';
+import { newPlanInput } from '@/features/finance/form';
 import { quarterLabel } from '@/features/market/quarter';
 import type { MarketScoreResponse } from '@/features/market/score/api';
 import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
@@ -13,7 +14,8 @@ import {
 } from '@/features/market/score/revenue';
 import { UnusualRevenueWarning } from '@/features/market/score/ScorePanel';
 import { parsePlanMarketScore } from '@/features/plans/market-score';
-import type { FinanceInput, FinanceResult } from '@/features/finance/types';
+import type { FinanceInput } from '@/features/finance/types';
+import { api, type PlanDetail, type PlanSummary, type StoredResult } from '@/features/plans/client';
 import { districtName } from '@/features/funding/districts';
 import FundingProfileFields from '@/features/funding/FundingProfileFields';
 import {
@@ -37,11 +39,14 @@ import {
   type FundingProfileForm,
 } from '@/features/funding/profile-form';
 import type { PlanFundingMatchesResponse } from '@/features/plans/funding-matches';
+import { clearPlanParam, planIdFromSearch } from '@/features/plans/plan-link';
+import { revisionLabel } from '@/lib/revision-text';
 import {
   describeLoanAssumption,
   planLoanAssumptionSchema,
   type PlanLoanAssumption,
 } from '@/features/plans/loan-assumption';
+import SiteHeader from '@/components/SiteHeader';
 import { authClient } from '@/lib/auth-client';
 import BusinessProfileWizard from '@/features/business-profile/BusinessProfileWizard';
 import {
@@ -53,25 +58,11 @@ import {
 import FranchisePanel from '@/features/franchise/FranchisePanel';
 import RentBenchmarkPanel from '@/features/rent-benchmark/RentBenchmarkPanel';
 
-type PlanSummary = { id: string; title: string; revision: number; updatedAt: string; _count: { results: number } };
-type ResultSummary = { id: string; inputRevision: number; calculationVersion: string; calculatedAt: string };
-type PlanDetail = {
-  id: string;
-  title: string;
-  revision: number;
-  inputJson: FinanceInput;
-  fundingProfileJson: unknown;
-  businessProfileJson: unknown;
-  loanAssumptionJson?: unknown;
-  marketScoreJson?: unknown;
-  results: ResultSummary[];
-};
 // 상권 탐색에서 넘어와 아직 저장하지 않은 새 계획의 출처.
 type MarketSource = { handoff: MarketScoreHandoff; score: MarketScoreResponse };
 
 const wonFormat = new Intl.NumberFormat('ko-KR');
 const formatWon = (value: string) => `${wonFormat.format(BigInt(value))}원`;
-type StoredResult = { id: string; inputRevision: number; resultJson: FinanceResult; loanAssumptionJson?: unknown };
 
 // 자금 조건은 재무 입력과 별도로 저장한다(ADR 0009 §4). 입력란 상태와 본문 변환은 /funding과 같은 profile-form.ts를 쓴다.
 
@@ -93,17 +84,6 @@ function parseLoanAssumption(value: unknown): PlanLoanAssumption | null {
   if (value === null || value === undefined) return null;
   const parsed = planLoanAssumptionSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
-}
-
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...init?.headers } });
-  const body = response.status === 204 ? null : await response.json();
-  if (!response.ok) {
-    const error = new Error(body?.error?.message ?? '요청을 처리하지 못했습니다.') as Error & { code?: string };
-    error.code = body?.error?.code;
-    throw error;
-  }
-  return body as T;
 }
 
 function AuthScreen() {
@@ -131,28 +111,11 @@ function AuthScreen() {
   }
   return (
     <main>
-      <header>
-        <span className="brand">
-          TrendBench<span>창업 준비의 기준</span>
-        </span>
-        <div className="header-actions">
-          <a className="link-button" href="/markets">
-            상권 탐색
-          </a>
-          <a className="link-button" href="/funding">
-            자금 후보
-          </a>
-        </div>
-      </header>
+      <SiteHeader />
       <section className="auth-shell">
         <div>
-          <p className="eyebrow">개인 계획 보호</p>
-          <h1>
-            계획을 저장하려면
-            <br />
-            로그인해 주세요.
-          </h1>
-          <p>비밀번호 찾기는 아직 지원하지 않습니다.</p>
+          <h1>재무 계획은 로그인해야 저장됩니다</h1>
+          <p>계획과 계산 결과는 내 계정에만 남습니다. 비밀번호 찾기는 아직 없습니다.</p>
         </div>
         <form className="auth-card" onSubmit={submit}>
           <h2>{mode === 'signin' ? '로그인' : '회원가입'}</h2>
@@ -259,7 +222,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           isEmptyFundingForm(current) ? { ...current, districtCode: score.area.districtCode } : current,
         );
         setMessage(
-          `${score.area.displayName} ${score.industry.displayName} 상권 점수에서 시작합니다. 자치구·월매출을 미리 채웠습니다.`,
+          `${score.area.displayName} ${score.industry.displayName} 상권 기준으로 자치구와 월매출을 채웠습니다. 고쳐도 됩니다.`,
         );
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : '상권 점수를 불러오지 못했습니다.');
@@ -274,7 +237,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
 
   function disconnectMarketSource() {
     setMarketSource(null);
-    setMessage('상권 연결을 해제했습니다. 미리 채운 값은 직접 고칠 수 있습니다.');
+    setMessage('상권 연결을 끊었습니다. 채운 값은 그대로 남습니다.');
   }
 
   const refreshPlans = useCallback(async () => {
@@ -285,7 +248,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     setBusy(true);
     setMessage('');
     try {
-      const data = await api<{ plan: PlanDetail }>(`/api/plans/${id}`);
+      const data = await api<{ plan: PlanDetail }>(`/api/plans/${encodeURIComponent(id)}`);
       setPlan(data.plan);
       setStoredResult(null);
       // 계획을 열면 저장된 자금 조건을 그대로 보여주고 이전 판정 결과는 지운다.
@@ -307,6 +270,14 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     const timer = window.setTimeout(() => void refreshPlans().catch((error) => setMessage(error.message)), 0);
     return () => window.clearTimeout(timer);
   }, [refreshPlans]);
+  // 홈의 [열기]가 넘긴 계획을 연다. 없거나 남의 계획이면 API의 404 문구를 보이고 새 계획으로 둔다.
+  const [linkedPlanId] = useState(() => planIdFromSearch(searchParams.toString()));
+  useEffect(() => {
+    if (!linkedPlanId) return;
+    clearPlanParam();
+    const timer = window.setTimeout(() => void openPlan(linkedPlanId), 0);
+    return () => window.clearTimeout(timer);
+  }, [linkedPlanId, openPlan]);
 
   async function saveDraft(title: string, input: FinanceInput) {
     // 자금 조건 형식(나이·개업 연월)은 서버에 보내기 전에 막는다. 형식이 틀리면 계획 저장 요청 전체가
@@ -321,7 +292,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
     // 사업 조건을 일부만 입력한 채 저장하면 null이 가서 저장된 조건까지 지워진다. 저장 전에 막는다.
     const profileState = businessProfileSaveState(businessForm);
     if (profileState.kind === 'INCOMPLETE') {
-      const profileIssue = `사업 조건에 빠진 항목이 있어 저장하지 않았습니다: ${profileState.missing.join(', ')}. 마저 입력하거나 모두 비워 주세요.`;
+      const profileIssue = `사업 조건이 덜 채워져 저장하지 않았습니다(빠진 항목: ${profileState.missing.join(', ')}). 다 채우거나 모두 비우세요.`;
       setMessage(profileIssue);
       requestAnimationFrame(() => document.querySelector('.status-message')?.scrollIntoView({ block: 'start' }));
       throw new Error(profileIssue);
@@ -362,7 +333,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
       const typed = error as Error & { code?: string };
       setMessage(
         typed.code === 'REVISION_CONFLICT'
-          ? '다른 화면에서 먼저 수정되었습니다. 계획을 다시 열어 최신 내용을 확인해 주세요.'
+          ? '다른 창에서 이 계획이 먼저 수정됐습니다. 계획을 다시 열어 주세요.'
           : typed.message,
       );
       throw error;
@@ -379,9 +350,10 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
         method: 'POST',
       });
       setStoredResult(data.result);
-      await openPlan(saved.id);
+      // 계획 목록의 계산 횟수가 이 결과를 세도록 목록도 다시 읽는다.
+      await Promise.all([openPlan(saved.id), refreshPlans()]);
       setStoredResult(data.result);
-      setMessage(data.reused ? '이미 계산한 결과를 불러왔습니다.' : '새 계산 결과를 저장했습니다.');
+      setMessage(data.reused ? '이미 계산한 결과를 불러왔습니다.' : '계산 결과를 저장했습니다.');
       return data.result.resultJson;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '계산 결과를 저장하지 못했습니다.');
@@ -448,26 +420,37 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const storedMarketScore = plan ? parsePlanMarketScore(plan.marketScoreJson) : null;
   const resultAssumption = parseLoanAssumption(storedResult?.loanAssumptionJson);
 
+  // 계획 머리와 재무 입력 사이에 놓는 사업 조건과 시세 참고. 시세는 참고만 하고 재무 입력에 넣지 않는다.
+  const references = (
+    <>
+      <BusinessProfileWizard
+        form={businessForm}
+        onChange={setBusinessForm}
+        onFinish={() =>
+          document.getElementById('rent-benchmark-title')?.closest('section')?.scrollIntoView({ block: 'start' })
+        }
+      />
+      <RentBenchmarkPanel profile={businessForm} savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null} />
+      <FranchisePanel
+        industryCode={businessForm.marketIndustryCode}
+        savedMonthlyRevenue={plan?.inputJson.monthlyRevenue ?? null}
+      />
+    </>
+  );
+
   return (
     <main>
-      <header>
-        <a href="#top" className="brand">
-          TrendBench<span>창업 준비의 기준</span>
-        </a>
-        <div className="account-actions">
-          <a className="link-button" href="/markets">
-            상권 탐색
-          </a>
-          <a className="link-button" href="/funding">
-            자금 후보
-          </a>
-          <span>{email}</span>
-          <button className="link-button" onClick={() => void authClient.signOut()}>
-            로그아웃
-          </button>
-        </div>
-      </header>
-      <div className="workspace" id="top">
+      <SiteHeader
+        account={
+          <>
+            <span>{email}</span>
+            <button className="link-button" onClick={() => void authClient.signOut()}>
+              로그아웃
+            </button>
+          </>
+        }
+      />
+      <div className="workspace">
         <aside className="plan-sidebar">
           <div className="sidebar-heading">
             <h2>내 계획</h2>
@@ -484,17 +467,14 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                 setBusinessForm(EMPTY_BUSINESS_PROFILE_FORM);
                 setMatches(null);
                 setMatchesError(null);
-                setMessage('새 계획을 작성합니다.');
+                setMessage('');
               }}
             >
               새 계획
             </button>
           </div>
           {plans.length === 0 ? (
-            <p className="empty-state">
-              저장된 계획이 없습니다.
-              <br />첫 초안을 만들어 보세요.
-            </p>
+            <p className="empty-state">저장한 계획이 없습니다.</p>
           ) : (
             <ul>
               {plans.map((item) => (
@@ -502,7 +482,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                   <button className={plan?.id === item.id ? 'active' : ''} onClick={() => void openPlan(item.id)}>
                     <strong>{item.title}</strong>
                     <span>
-                      revision {item.revision} · 결과 {item._count.results}개
+                      저장 {item.revision}회 · 계산 {item._count.results}회
                     </span>
                   </button>
                 </li>
@@ -521,46 +501,17 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
               {message}
             </div>
           )}
-          {plan && plan.results.length > 0 && (
-            <div className="result-history">
-              <strong>저장 결과</strong>
-              {plan.results.map((result) => (
-                <button
-                  key={result.id}
-                  className={storedResult?.id === result.id ? 'active' : ''}
-                  onClick={() => void openResult(result.id)}
-                >
-                  revision {result.inputRevision} · {new Date(result.calculatedAt).toLocaleString('ko-KR')}
-                </button>
-              ))}
-            </div>
-          )}
-          {resultAssumption && (
-            <p className="funding-position">저장 결과에 반영된 대출 가정: {describeLoanAssumption(resultAssumption)}</p>
-          )}
-          <BusinessProfileWizard
-            form={businessForm}
-            onChange={setBusinessForm}
-            onFinish={() =>
-              document.getElementById('rent-benchmark-title')?.closest('section')?.scrollIntoView({ block: 'start' })
-            }
-          />
-          <RentBenchmarkPanel
-            profile={businessForm}
-            savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null}
-          />
-          <FranchisePanel
-            industryCode={businessForm.marketIndustryCode}
-            savedMonthlyRevenue={plan?.inputJson.monthlyRevenue ?? null}
-          />
           {plan === null && marketLoading ? (
-            <p className="loading-state" role="status">
-              상권 점수를 불러오고 있습니다.
-            </p>
+            <>
+              {references}
+              <p className="loading-state" role="status">
+                상권 점수를 불러오고 있습니다.
+              </p>
+            </>
           ) : (
             <FinancePlanner
-              // 상권 연결 여부는 key에 넣지 않는다. 연결을 해제할 때 폼을 다시 만들면 저장하지 않은 입력이 사라진다.
-              key={plan?.id ?? 'new'}
+              // 상권 연결 여부는 resetKey에 넣지 않는다. 연결을 해제할 때 입력을 되돌리면 저장하지 않은 입력이 사라진다.
+              resetKey={plan?.id ?? 'new'}
               initialTitle={
                 plan?.title ??
                 (pendingMarket
@@ -570,7 +521,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
               initialInput={
                 plan?.inputJson ??
                 (pendingMarket?.score.financeDefault
-                  ? defaultInputWith({ monthlyRevenue: pendingMarket.score.financeDefault.monthlyRevenue })
+                  ? newPlanInput({ monthlyRevenue: pendingMarket.score.financeDefault.monthlyRevenue })
                   : undefined)
               }
               initialResult={storedResult?.resultJson}
@@ -584,16 +535,46 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                   onDisconnect={disconnectMarketSource}
                 />
               }
+              references={references}
+              extraInputs={
+                <PlanFundingFields
+                  form={fundingForm}
+                  onChange={setFundingForm}
+                  savedBusinessDistrict={savedBusinessDistrict}
+                />
+              }
+              resultHistory={
+                plan &&
+                plan.results.length > 0 && (
+                  <>
+                    <div className="result-history">
+                      <strong>계산 기록</strong>
+                      {plan.results.map((result) => (
+                        <button
+                          key={result.id}
+                          className={storedResult?.id === result.id ? 'active' : ''}
+                          onClick={() => void openResult(result.id)}
+                        >
+                          {revisionLabel(result.inputRevision)} ·{' '}
+                          {new Date(result.calculatedAt).toLocaleString('ko-KR')}
+                        </button>
+                      ))}
+                    </div>
+                    {resultAssumption && (
+                      <p className="funding-position">
+                        이 결과에 쓴 대출 가정: {describeLoanAssumption(resultAssumption)}
+                      </p>
+                    )}
+                  </>
+                )
+              }
               onSave={saveDraft}
               onCalculate={calculate}
             />
           )}
           <PlanFundingPanel
             plan={plan}
-            form={fundingForm}
-            onChange={setFundingForm}
             stored={storedFunding}
-            savedBusinessDistrict={savedBusinessDistrict}
             fundingGap={viewedFundingGap}
             dirty={fundingDirty}
             businessDistrictDirty={businessDistrictDirty}
@@ -682,12 +663,40 @@ function storedFundingState(plan: PlanDetail): StoredFundingState {
   };
 }
 
-function PlanFundingPanel({
-  plan,
+// 계획에 저장할 자금 조건 입력. [초안 저장]이 재무 입력과 함께 저장하므로 저장 버튼 위에 둔다.
+function PlanFundingFields({
   form,
   onChange,
-  stored,
   savedBusinessDistrict,
+}: {
+  readonly form: FundingProfileForm;
+  readonly onChange: (next: FundingProfileForm) => void;
+  // 자금 조건의 자치구가 비었을 때 서버가 대신 쓰는, 계획에 저장된 사업 조건의 자치구.
+  readonly savedBusinessDistrict: string | null;
+}) {
+  // 자치구만 입력했다가 비우면 조건이 하나도 없어 저장된 조건이 비워진다(조회 불가). 그래서 다른 조건과 함께일 때로 쓴다.
+  const districtHint =
+    savedBusinessDistrict === null
+      ? '비워 두면 사업 조건의 자치구로 찾습니다.'
+      : `비워 두면 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 찾습니다.`;
+  return (
+    <section className="form-section" aria-labelledby="plan-funding-fields">
+      <div className="section-title">
+        <span>04</span>
+        <div>
+          <h2 id="plan-funding-fields">자금 조건</h2>
+          <p className="picker-note">자금 공고를 찾을 때 씁니다. 비워 둬도 계산에는 영향이 없습니다.</p>
+        </div>
+      </div>
+      <FundingProfileFields form={form} onChange={onChange} idPrefix="plan-funding" districtHint={districtHint} />
+    </section>
+  );
+}
+
+// 저장한 자금 조건으로 공고를 찾는다. 조회는 항상 서버에 저장된 조건으로만 한다.
+function PlanFundingPanel({
+  plan,
+  stored,
   fundingGap,
   dirty,
   businessDistrictDirty,
@@ -698,11 +707,7 @@ function PlanFundingPanel({
   appliedSummary,
 }: {
   readonly plan: { id: string; revision: number } | null;
-  readonly form: FundingProfileForm;
-  readonly onChange: (next: FundingProfileForm) => void;
   readonly stored: StoredFundingState | null;
-  // 자금 조건의 자치구가 비었을 때 서버가 대신 쓰는, 계획에 저장된 사업 조건의 자치구.
-  readonly savedBusinessDistrict: string | null;
   readonly fundingGap: ViewedFundingGap;
   readonly dirty: boolean;
   // 자금 조건의 자치구가 비어 있고 사업 조건의 자치구를 바꾼 뒤 저장하지 않았다.
@@ -718,27 +723,19 @@ function PlanFundingPanel({
   // 서버에 저장된 조건으로만 하므로 저장하지 않은 변경이 있으면 막는다.
   const hasStoredProfile = stored !== null && stored.kind !== 'NONE';
   const canQuery = plan !== null && hasStoredProfile && !dirty && !businessDistrictDirty && !loading;
-  // 자치구만 입력했다가 비우면 조건이 하나도 없어 저장된 조건이 비워진다(조회 불가). 그래서 다른 조건과 함께일 때로 쓴다.
-  const districtHint =
-    savedBusinessDistrict === null
-      ? '비워 두면 사업 조건의 자치구로 맞춰 봅니다.'
-      : `비워 두면 사업 조건의 자치구(${districtName(savedBusinessDistrict)})로 맞춰 봅니다.`;
   return (
     <section className="picker" aria-labelledby="plan-funding">
-      <h2 id="plan-funding">계획 기준 자금 공고 맞춰 보기</h2>
-      <p className="picker-note">
-        AI가 공고문에서 읽은 조건과 이 계획의 자금 조건을 맞춰 봅니다. 조건을 바꾸면 초안을 저장해야 반영됩니다.
-      </p>
-      <FundingProfileFields form={form} onChange={onChange} idPrefix="plan-funding" districtHint={districtHint} />
+      <h2 id="plan-funding">자금 공고 찾기</h2>
+      <p className="picker-note">위 자금 조건 중 저장한 값으로 찾습니다. 공고 조건은 AI가 공고문에서 읽은 것입니다.</p>
 
-      {plan === null && <p className="empty-state">초안을 저장하면 공고를 맞춰 볼 수 있습니다.</p>}
+      {plan === null && <p className="empty-state">초안을 저장하면 공고를 찾을 수 있습니다.</p>}
 
       {plan !== null && appliedSummary && <p className="funding-position">저장된 대출 가정 출처: {appliedSummary}</p>}
 
       {plan !== null && !hasStoredProfile && (
         <div className="empty-panel" role="status">
-          <h2>저장된 자금 조건이 없습니다.</h2>
-          <p>조건을 하나 이상 입력하고 초안을 저장해 주세요.</p>
+          <h2>자금 조건이 비어 있습니다.</h2>
+          <p>공고를 찾으려면 위 자금 조건을 하나 이상 넣고 저장하세요. 계산에는 필요 없습니다.</p>
         </div>
       )}
 
@@ -767,13 +764,13 @@ function PlanFundingPanel({
           )}
           <div className="button-row">
             <button type="button" disabled={!canQuery} onClick={onQuery}>
-              {loading ? '맞춰 보는 중…' : '계획 조건으로 공고 맞춰 보기'}
+              {loading ? '찾는 중…' : '저장한 조건으로 공고 찾기'}
             </button>
           </div>
           <div className="market-results" aria-live="polite" aria-busy={loading}>
             {loading && (
               <p className="loading-state" role="status">
-                공고를 맞춰 보는 중…
+                공고를 찾는 중…
               </p>
             )}
             {!loading && error && <FundingMatchesErrorPanel error={error} />}
@@ -781,7 +778,7 @@ function PlanFundingPanel({
               <FundingMatchesPanel
                 result={matches}
                 districtSource={matches.districtSource}
-                planLabel={`계획 revision ${matches.plan.revision}의 조건으로 맞춰 봤습니다.`}
+                planLabel={`${revisionLabel(matches.plan.revision)}의 조건으로 찾았습니다.`}
                 fundingGap={fundingGap}
               />
             )}
