@@ -518,6 +518,8 @@ describe('한도와 부족자금 문장', () => {
     const text = fundingGapText({ revision: 3, value: { status: 'READY', value: '50000000' } });
     expect(text).toContain('3번째 저장');
     expect(text).toContain('50,000,000원');
+    // 재무 결과 화면과 같은 이름을 쓴다(대출을 빼기 전 금액이라 '부족자금'만 쓰면 대출 후에도 모자란 것처럼 읽힌다).
+    expect(text).toContain('대출 전 부족액');
     expect(
       fundingGapText({ revision: 2, value: { status: 'INSUFFICIENT_INPUT', value: null, missingFields: ['equity'] } }),
     ).toContain('계산하지 못했습니다');

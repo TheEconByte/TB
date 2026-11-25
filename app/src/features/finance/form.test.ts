@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateFinance } from './calculate';
 import { financeInputSchema } from './schema';
-import { fromInput, newPlanInput, toInput } from './form';
+import { fromInput, newPlanInput, sameAsCalculatedInput, toInput } from './form';
 
 // 새 계획의 재무 입력. AGENTS.md 2는 샘플 운영 데이터를 만들지 않게 하고, 3-2는 누락(null)과 실제 0을 바꾸지 않게 한다.
 // 예시 금액을 입력값으로 채워 두면 사용자가 고치지 않고 [저장하고 계산]을 눌렀을 때 지어낸 숫자가 저장 결과로 남았다
@@ -67,5 +67,40 @@ describe('입력란과 저장 입력 사이의 변환', () => {
 
   it('저장된 입력이 없으면 새 계획 입력란이다', () => {
     expect(toInput(fromInput(undefined))).toEqual(newPlanInput());
+  });
+});
+
+// 보고 있는 결과가 지금 입력으로 계산한 것인지. 계획은 제목·사업 조건·자금 조건만 저장해도 저장 번호가 오르므로,
+// 저장 번호가 아니라 결과에 남은 입력 스냅샷과 지금 재무 입력을 견준다(2026-11-26 화면 점검: 자금 공고 조건만
+// 저장했는데 "입력이 바뀌어 결과가 이전 값입니다"가 떴다).
+describe('결과를 계산한 입력과 지금 입력 비교', () => {
+  const snapshot = (form = fromInput(newPlanInput({ monthlyRevenue: '20000000' }))) =>
+    financeInputSchema.parse(toInput(form));
+
+  it('재무 입력이 같으면 같다', () => {
+    const form = fromInput(newPlanInput({ monthlyRevenue: '20000000' }));
+    expect(sameAsCalculatedInput(form, snapshot())).toBe(true);
+  });
+
+  it('재무 입력 하나라도 바뀌면 다르다', () => {
+    const form = { ...fromInput(newPlanInput({ monthlyRevenue: '20000000' })), monthlyRevenue: '21000000' };
+    expect(sameAsCalculatedInput(form, snapshot())).toBe(false);
+  });
+
+  it('비운 칸과 0은 다른 입력이다', () => {
+    // AGENTS.md 3-2: 누락 null과 실제 0을 바꾸지 않는다.
+    const form = { ...fromInput(newPlanInput({ monthlyRevenue: '20000000' })), existingDebt: '0' };
+    expect(sameAsCalculatedInput(form, snapshot())).toBe(false);
+  });
+
+  it('지금 입력이 형식에 맞지 않으면 다르다', () => {
+    const form = { ...fromInput(newPlanInput({ monthlyRevenue: '20000000' })), totalMonths: '열두' };
+    expect(sameAsCalculatedInput(form, snapshot())).toBe(false);
+  });
+
+  it('스냅샷을 읽지 못하면 판단하지 않는다', () => {
+    // 호출하는 쪽이 저장 번호 비교로 돌아가게 null을 돌려준다.
+    expect(sameAsCalculatedInput(fromInput(undefined), undefined)).toBeNull();
+    expect(sameAsCalculatedInput(fromInput(undefined), { monthlyRevenue: 'x' })).toBeNull();
   });
 });

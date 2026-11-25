@@ -1,4 +1,4 @@
-import { MAX_AGE, YEAR_MONTH_PATTERN, isFutureYearMonth, isSeoulDistrictCode } from './match-profile.ts';
+import { MAX_AGE, YEAR_MONTH_PATTERN, isFutureYearMonth } from './match-profile.ts';
 import { USER_TARGET_GROUPS, type FundingMatchProfile, type UserTargetGroup } from './matching.ts';
 
 // 자금 조건 입력란의 상태. /funding과 계획 화면이 함께 쓴다. 빈 입력란은 빈 문자열로 다루고, 본문으로 바꿀 때만
@@ -82,18 +82,4 @@ export function toggleTargetGroup(
 // 해당 없음을 고르면 고른 대상을 비우고, 풀면 답하지 않음으로 돌아간다.
 export function toggleNoTargetGroup(_current: UserTargetGroup[] | null, checked: boolean): UserTargetGroup[] | null {
   return checked ? [] : null;
-}
-
-// 자금 조건의 자치구를 비우면 서버는 계획에 저장된 사업 조건의 자치구로 맞춰 본다(match-profile.ts). 화면의 사업 조건
-// 자치구가 저장된 것과 다르면, 저장하기 전에는 화면과 다른 자치구로 맞춰지므로 저장 전 변경으로 본다. 서버는 서울 자치구
-// 코드만 쓰므로 화면 값도 같은 규칙으로 읽는다(그러지 않으면 저장해도 풀리지 않는다).
-export function businessDistrictUnsaved(
-  form: FundingProfileForm,
-  businessFormDistrict: string,
-  savedBusinessDistrict: string | null,
-): boolean {
-  return (
-    form.districtCode === '' &&
-    (isSeoulDistrictCode(businessFormDistrict) ? businessFormDistrict : null) !== savedBusinessDistrict
-  );
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatWon, showValue } from '@/features/finance/FinancePlanner';
+import { formatWonText, showValue } from '@/features/finance/result-text';
 import { api, type PlanDetail, type PlanSummary, type StoredResult } from '@/features/plans/client';
 import { planHref } from '@/features/plans/plan-link';
 import { revisionLabel } from '@/lib/revision-text';
@@ -135,18 +135,18 @@ function LatestResult({ planId }: { planId: string }) {
       <p className="recent-plan-note">{revisionLabel(inputRevision)} 기준 계산 결과</p>
       <dl>
         <div>
-          <dt>계획상 부족자금</dt>
-          <dd>{showValue(resultJson.plannedFundingGap, formatWon)}</dd>
+          <dt>대출 전 부족액</dt>
+          <dd>{showValue(resultJson.plannedFundingGap, formatWonText)}</dd>
         </div>
         {base && (
           <>
             <div>
               <dt>월 운영수지(기본)</dt>
-              <dd>{showValue(base.monthlyOperatingBalance, formatWon)}</dd>
+              <dd>{showValue(base.monthlyOperatingBalance, formatWonText)}</dd>
             </div>
             <div>
               <dt>운영비 충당 매출(기본)</dt>
-              <dd>{showValue(base.operatingBreakEvenRevenue, formatWon)}</dd>
+              <dd>{showValue(base.operatingBreakEvenRevenue, formatWonText)}</dd>
             </div>
           </>
         )}

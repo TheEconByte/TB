@@ -287,6 +287,10 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await expect(page.getByLabel('3. 대표자 나이 (선택)')).toHaveValue('');
 
   // 사용자가 고친 월매출은 재무 입력에, 상권 기본값은 스냅샷에 따로 남는다.
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^월 운영/ })
+    .click();
   await page.locator('#monthlyRevenue').fill('2500000');
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
@@ -333,6 +337,10 @@ test('상권 연결을 해제해도 재무 입력이 그대로 남는다', async
   const source = page.getByTestId('market-source');
   await expect(source).toContainText('등급 A');
   await page.getByLabel('계획 제목').fill('내가 고친 제목');
+  await page
+    .getByRole('navigation', { name: '계획 단계' })
+    .getByRole('button', { name: /^월 운영/ })
+    .click();
   await page.locator('#rent').fill('1500000');
   await source.getByRole('button', { name: '상권 연결 해제' }).click();
 
