@@ -1,7 +1,7 @@
 // 상권 생존점수 모델 정의(ADR 0008). 학습(score:train)과 점수 계산(score:build·API)이
 // 같은 설정을 읽는다. 변수를 추가할 때는 dataset.ts에 정의를 더하고 ACTIVE_FEATURE_KEYS에 넣는다.
 
-export const MODEL_DEFINITION_VERSION = 'market-score-def-v3';
+export const MODEL_DEFINITION_VERSION = 'market-score-def-v4';
 // 점수 릴리스 행·요약의 저장 형식과 월매출 해석(revenue.ts)의 버전. 바꾸면 같은 계수 파일로도 새 점수 릴리스를 만든다.
 export const SCORE_BUILD_VERSION = 'market-score-build-v2';
 
@@ -27,34 +27,70 @@ export const PER_STORE_WINDOW_QUARTERS = 4;
 // 시간 기준 분할: 마지막 기준분기 4개가 테스트셋이다.
 export const TEST_QUARTER_COUNT = 4;
 
-export type FeatureKey =
-  'salesGrowth' | 'salesPerStore' | 'storeCount' | 'pastClosureRate' | 'pastOpenRate' | 'franchiseShare';
+// 정의된 변수 전체(dataset.ts의 FEATURE_DEFINITIONS). 계수 파일 스키마(model.ts)도 이 목록을 쓴다.
+export const FEATURE_KEYS = [
+  'salesGrowth',
+  'salesPerStore',
+  'storeCount',
+  'pastClosureRate',
+  'pastOpenRate',
+  'franchiseShare',
+  'pastTwoYearClosureRate',
+  'storeGrowth',
+  'salesPerTransaction',
+  'industryShare',
+  'areaClosureRate',
+  'areaOpenRate',
+  'areaSalesGrowth',
+  'areaStoreCount',
+] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 // 요청서 원안의 1차 변수. 비교용으로 리포트에 남긴다.
 export const FIRST_ORDER_FEATURE_KEYS: readonly FeatureKey[] = ['salesGrowth', 'salesPerStore', 'storeCount'];
 
-// 채택 모델 변수(ADR 0008): 1차 변수 + 이미 적재된 서울시 점포 자료의 직전 1년 폐업률·개업률, 프랜차이즈 비중.
-// 길단위인구·상권변화지표·임대료는 2차 범위다.
-export const ACTIVE_FEATURE_KEYS: readonly FeatureKey[] = [
+// 모델 정의 v3의 변수: 1차 변수 + 서울시 점포 자료의 직전 1년 폐업률·개업률, 프랜차이즈 비중. 비교용으로 남긴다.
+export const V3_FEATURE_KEYS: readonly FeatureKey[] = [
   ...FIRST_ORDER_FEATURE_KEYS,
   'pastClosureRate',
   'pastOpenRate',
   'franchiseShare',
 ];
 
+// 채택 모델 변수(ADR 0008 개정, 모델 정의 v4): v3 변수 + 업종의 2년 폐업률·점포 수 증감·건당 매출·상권 내
+// 비중, 같은 상권 요식업 전체의 폐업률·개업률·매출 증감·점포 수. 학습 기간 안 검증 분기로 골랐다.
+// 길단위인구·상권변화지표·임대료는 2차 범위다.
+export const ACTIVE_FEATURE_KEYS: readonly FeatureKey[] = [
+  ...V3_FEATURE_KEYS,
+  'pastTwoYearClosureRate',
+  'storeGrowth',
+  'salesPerTransaction',
+  'industryShare',
+  'areaClosureRate',
+  'areaOpenRate',
+  'areaSalesGrowth',
+  'areaStoreCount',
+];
+
+// 채택 모델은 요식업 업종을 함께 학습한다(부분 통합). 업종마다 절편을 두고, 계수는 공통 계수 + 업종 편차이며
+// 편차에 이 L2 벌점을 준다. 표본이 적은 업종일수록 공통 계수를 따른다. 학습 기간 안 검증 분기로 골랐다.
+export const DEVIATION_PENALTY = 300;
+
 // 기준선 비교: 같은 학습·테스트 행으로 학습해 생존점수 모델이 공개 위험 지표보다 변별력을 더 주는지 본다.
+// 비교 모델은 업종마다 따로 학습하고, 채택 모델(survival)만 부분 통합으로 학습한다.
 // 상권변화지표를 적재하면 4단계 지표 더미 변수로 된 기준선 2를 여기에 더한다.
-export type ComparisonModelId = 'baseline' | 'firstOrder' | 'combined' | 'survival';
+export type ComparisonModelId = 'baseline' | 'firstOrder' | 'combined' | 'v3' | 'survival';
 export const COMPARISON_MODELS: readonly {
-  id: ComparisonModelId;
+  id: Exclude<ComparisonModelId, 'survival'>;
   label: string;
   featureKeys: readonly FeatureKey[];
 }[] = [
   { id: 'baseline', label: '기준선', featureKeys: ['pastClosureRate'] },
   { id: 'firstOrder', label: '1차 모델(원안)', featureKeys: FIRST_ORDER_FEATURE_KEYS },
   { id: 'combined', label: '결합 모델(원안)', featureKeys: ['pastClosureRate', ...FIRST_ORDER_FEATURE_KEYS] },
-  { id: 'survival', label: '생존점수 모델(채택)', featureKeys: ACTIVE_FEATURE_KEYS },
+  { id: 'v3', label: '업종별 모델(v3)', featureKeys: V3_FEATURE_KEYS },
 ];
+export const SURVIVAL_MODEL_LABEL = '생존점수 모델(채택, 부분 통합)';
 
 export const GRADES = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'C', 'D'] as const;
 export type Grade = (typeof GRADES)[number];

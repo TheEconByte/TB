@@ -35,49 +35,124 @@ export type LogisticFit = {
 };
 
 // X에는 절편 열을 넣지 않는다. 결과의 첫 계수가 절편이다.
+// penalty[j]는 변수 j 계수의 L2 벌점(½·penalty·β² 를 뺀 우도를 최대화)이다. 없으면 벌점 없는 최대우도다.
 export function fitLogistic(
   features: readonly (readonly number[])[],
   labels: readonly number[],
-  { maxIterations = 50, tolerance = 1e-10 } = {},
-): LogisticFit {
+  { maxIterations = 50, tolerance = 1e-10, penalty = [] as readonly number[] } = {},
+): LogisticFit & { covariance: number[][] } {
   if (features.length === 0 || features.length !== labels.length)
     throw new Error('학습 표본이 비어 있거나 길이가 다릅니다.');
   const rows = features.map((row) => [1, ...row]);
   const size = rows[0].length;
+  const ridge = [0, ...Array.from({ length: size - 1 }, (_, j) => penalty[j] ?? 0)];
+  // 부분 통합처럼 대부분이 0인 행은 0이 아닌 열만 더한다.
+  const nonZero = rows.map((row) => row.flatMap((value, j) => (value === 0 ? [] : [j])));
+  const information = (beta: readonly number[], gradient?: number[]) => {
+    const matrix = Array.from({ length: size }, (_, i) =>
+      Array.from({ length: size }, (_, j) => (i === j ? ridge[i] : 0)),
+    );
+    rows.forEach((row, index) => {
+      const columns = nonZero[index];
+      const probability = sigmoid(columns.reduce((sum, j) => sum + row[j] * beta[j], 0));
+      const weight = probability * (1 - probability);
+      for (const i of columns) {
+        if (gradient) gradient[i] += row[i] * (labels[index] - probability);
+        for (const j of columns) matrix[i][j] += weight * row[i] * row[j];
+      }
+    });
+    return matrix;
+  };
   let beta = new Array<number>(size).fill(0);
-  let information: number[][] = [];
   let converged = false;
   let iterations = 0;
 
   for (; iterations < maxIterations && !converged; iterations++) {
-    const gradient = new Array<number>(size).fill(0);
-    information = Array.from({ length: size }, () => new Array<number>(size).fill(0));
-    rows.forEach((row, index) => {
-      const probability = sigmoid(row.reduce((sum, value, j) => sum + value * beta[j], 0));
-      const weight = probability * (1 - probability);
-      for (let i = 0; i < size; i++) {
-        gradient[i] += row[i] * (labels[index] - probability);
-        for (let j = 0; j < size; j++) information[i][j] += weight * row[i] * row[j];
-      }
-    });
-    const step = invert(information).map((row) => row.reduce((sum, value, j) => sum + value * gradient[j], 0));
+    const gradient = beta.map((value, i) => -ridge[i] * value);
+    const step = invert(information(beta, gradient)).map((row) =>
+      row.reduce((sum, value, j) => sum + value * gradient[j], 0),
+    );
     beta = beta.map((value, i) => value + step[i]);
     converged = Math.max(...step.map(Math.abs)) < tolerance;
   }
 
-  // 표준오차는 수렴한 계수에서 다시 구한 정보행렬의 역행렬 대각선이다.
-  const finalInformation = Array.from({ length: size }, () => new Array<number>(size).fill(0));
-  for (const row of rows) {
-    const probability = sigmoid(row.reduce((sum, value, j) => sum + value * beta[j], 0));
-    const weight = probability * (1 - probability);
-    for (let i = 0; i < size; i++) for (let j = 0; j < size; j++) finalInformation[i][j] += weight * row[i] * row[j];
-  }
-  const covariance = invert(finalInformation);
+  // 표준오차는 수렴한 계수에서 다시 구한 (벌점을 더한) 정보행렬의 역행렬 대각선이다.
+  const covariance = invert(information(beta));
   return {
     coefficients: beta,
     standardErrors: covariance.map((row, i) => Math.sqrt(row[i])),
+    covariance,
     iterations,
     converged,
+  };
+}
+
+// 공통 계수의 벌점. 업종별 편차에 벌점이 없을 때(deviationPenalty 0) 공통 계수와 편차를 나누는 방법이 하나로
+// 정해지지 않아 정보행렬이 특이해지는 것을 막는 값이며, 예측값에는 영향이 없다.
+const SHARED_PENALTY = 1e-3;
+
+export type PooledLogisticFit = {
+  // 업종(그룹)마다 절편과, 공통 계수 + 업종 편차를 더한 계수
+  groups: { intercept: number; coefficients: number[]; standardErrors: number[] }[];
+  iterations: number;
+  converged: boolean;
+};
+
+// 부분 통합 로지스틱 회귀. 그룹마다 절편을 따로 두고, 계수는 공통 계수 + 그룹 편차이며 편차에 L2 벌점을 준다.
+// 벌점이 0이면 그룹별 따로 학습과 같고, 클수록 표본이 적은 그룹의 계수가 공통 계수로 모인다.
+// 설계: [절편(첫 그룹) | 그룹 2..G 절편 차이 | 공통 계수 K | 그룹별 편차 G×K]
+export function fitPooledLogistic(
+  groups: readonly { features: readonly (readonly number[])[]; labels: readonly number[] }[],
+  deviationPenalty: number,
+): PooledLogisticFit {
+  const groupCount = groups.length;
+  const width = groups[0]?.features[0]?.length ?? 0;
+  if (groupCount === 0 || width === 0) throw new Error('학습할 그룹이나 변수가 없습니다.');
+  const interceptColumns = groupCount - 1;
+  const sharedStart = interceptColumns;
+  const deviationStart = sharedStart + width;
+  const features: number[][] = [];
+  const labels: number[] = [];
+  groups.forEach((group, g) => {
+    group.features.forEach((x, n) => {
+      const row = new Array<number>(deviationStart + groupCount * width).fill(0);
+      if (g > 0) row[g - 1] = 1;
+      for (let k = 0; k < width; k++) {
+        row[sharedStart + k] = x[k];
+        row[deviationStart + g * width + k] = x[k];
+      }
+      features.push(row);
+      labels.push(group.labels[n]);
+    });
+  });
+  const penalty = [
+    ...new Array<number>(interceptColumns).fill(0),
+    ...new Array<number>(width).fill(SHARED_PENALTY),
+    ...new Array<number>(groupCount * width).fill(deviationPenalty),
+  ];
+  const fit = fitLogistic(features, labels, { penalty });
+  // fit 계수의 첫 값은 절편이라 설계 열 j는 j + 1번째다.
+  const at = (column: number) => column + 1;
+  return {
+    groups: groups.map((_, g) => {
+      const interceptIndexes = g === 0 ? [0] : [0, at(g - 1)];
+      return {
+        intercept: interceptIndexes.reduce((sum, i) => sum + fit.coefficients[i], 0),
+        coefficients: Array.from(
+          { length: width },
+          (_, k) => fit.coefficients[at(sharedStart + k)] + fit.coefficients[at(deviationStart + g * width + k)],
+        ),
+        // Var(공통 + 편차) = Var(공통) + Var(편차) + 2·Cov
+        standardErrors: Array.from({ length: width }, (_, k) => {
+          const shared = at(sharedStart + k);
+          const deviation = at(deviationStart + g * width + k);
+          const c = fit.covariance;
+          return Math.sqrt(c[shared][shared] + c[deviation][deviation] + 2 * c[shared][deviation]);
+        }),
+      };
+    }),
+    iterations: fit.iterations,
+    converged: fit.converged,
   };
 }
 

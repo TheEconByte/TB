@@ -1,5 +1,5 @@
 import { basisPeriodLabel, quarterLabel } from '../quarter.ts';
-import { MIN_TEST_AUC, MONOTONIC_MIN_GRADE_COUNT } from './config.ts';
+import { DEVIATION_PENALTY, MIN_TEST_AUC, MONOTONIC_MIN_GRADE_COUNT } from './config.ts';
 import type { ExclusionReason } from './dataset.ts';
 import type { MarketScoreModel } from './model.ts';
 import {
@@ -24,7 +24,7 @@ const EXCLUSION_LABELS: Record<SampleExclusion, string> = {
   NO_SALES: 't 매출 0·없음',
   NO_PRIOR_SALES: 't−4 매출 0·없음',
   INCOMPLETE_WINDOW: 't−3~t−1 값 없음',
-  FEATURE_UNAVAILABLE: '폐업·개업·프랜차이즈 값 없음',
+  FEATURE_UNAVAILABLE: '변수 계산 값 없음(폐업·개업·프랜차이즈·t−8 점포 수·상권 등)',
   NO_FUTURE_DATA: 't+1~t+4 폐업 수 없음',
 };
 
@@ -54,7 +54,7 @@ function industrySection(
   lines.push(
     `| 테스트 | ${basisPeriodLabel(m.testQuarters[0], m.testQuarters.at(-1)!)} (${m.testQuarters.length}개) | ${m.testSize} | ${percent(m.testPositiveRate)} | **${fixed(m.testAuc)}** |`,
   );
-  lines.push('', `IRLS ${result.iterations}회 반복, 수렴 ${result.converged ? '예' : '아니오'}.`, '');
+  lines.push('', `부분 통합 학습 IRLS ${result.iterations}회 반복, 수렴 ${result.converged ? '예' : '아니오'}.`, '');
 
   lines.push('기준분기별 표본과 제외 사유:', '');
   const reasons = Object.keys(EXCLUSION_LABELS) as SampleExclusion[];
@@ -92,18 +92,22 @@ function industrySection(
       m.features.map((f) => `${f.label} 평균 ${fixed(f.mean)}, 표준편차 ${fixed(f.std)}`).join(' / '),
   );
 
-  lines.push('', '### 변수 간 상관 (학습셋, |r| ≥ 0.7 표시)', '');
-  lines.push('| 변수 쌍 | r | 0.7 이상 |', '|---|---|---|');
-  for (const item of result.correlations) {
-    const left = m.features.find((f) => f.key === item.left)!.label;
-    const right = m.features.find((f) => f.key === item.right)!.label;
-    lines.push(`| ${left} – ${right} | ${fixed(item.r)} | ${Math.abs(item.r) >= 0.7 ? '**예**' : '아니오'} |`);
+  const strong = result.correlations.filter((item) => Math.abs(item.r) >= 0.7);
+  lines.push('', '### 변수 간 상관 (학습셋, |r| ≥ 0.7)', '');
+  lines.push(`변수 쌍 ${result.correlations.length}개 중 ${strong.length}개.`, '');
+  if (strong.length > 0) {
+    lines.push('| 변수 쌍 | r |', '|---|---|');
+    for (const item of strong) {
+      const left = m.features.find((f) => f.key === item.left)!.label;
+      const right = m.features.find((f) => f.key === item.right)!.label;
+      lines.push(`| ${left} – ${right} | ${fixed(item.r)} |`);
+    }
   }
 
   const sortedBoundaries = [...model.gradeBoundaries].sort((a, b) => b.minScore - a.minScore);
   lines.push('', '### 기준선 비교 (같은 학습·테스트 행)', '');
   lines.push(
-    `모든 모델을 학습 ${m.trainSize}행·테스트 ${m.testSize}행으로 로지스틱 회귀 학습하고, 같은 점수 변환과 등급 구간을 적용했다. KS는 0~100 점수로 계산했다. 등급 단조는 모든 등급 기준과, 테스트 표본 ${MONOTONIC_MIN_GRADE_COUNT}건 미만 등급을 뺀 기준을 함께 적는다.`,
+    `모든 모델을 학습 ${m.trainSize}행·테스트 ${m.testSize}행으로 로지스틱 회귀 학습하고, 같은 점수 변환과 등급 구간을 적용했다. 비교 모델은 이 업종만으로, 채택 모델은 요식업 업종을 함께(부분 통합) 학습했다. KS는 0~100 점수로 계산했다. 등급 단조는 모든 등급 기준과, 테스트 표본 ${MONOTONIC_MIN_GRADE_COUNT}건 미만 등급을 뺀 기준을 함께 적는다.`,
     '',
   );
   lines.push(
@@ -189,6 +193,7 @@ export function renderTrainingReport(input: {
     `- 생성 시각: ${model.createdAt}`,
     `- 최소 점포 수: ${model.minStoreCount}, 점포 수는 유사_업종_점포_수`,
     '- 라벨: 향후 1년(t+1~t+4) 폐업 수 합 ÷ t 점포 수가 같은 업종·기준분기 서울 상권 중앙값보다 크면 1',
+    `- 채택 모델: 요식업 업종을 함께 학습한다(부분 통합). 업종마다 절편을 두고 계수 = 공통 계수 + 업종 편차이며, 편차에 L2 벌점 ${DEVIATION_PENALTY}을 준다. 아래 업종별 β·표준오차는 공통 계수와 편차를 더한 값이다.`,
     '- 점수 = round((1 − p) × 100), 기여도 = −β × z',
     `- 표준화 값 z는 학습과 점수 계산 모두 ±${model.industries[0]?.zClip ?? '—'}에서 자른다(극단값 완화, 원값은 그대로)`,
     '',
