@@ -80,9 +80,9 @@ export default function RentBenchmarkPanel({
 
   if (!buildingType) {
     return (
-      <section className="picker rent-panel" aria-labelledby="rent-benchmark-title">
+      <section className="picker rent-panel reference-empty" aria-labelledby="rent-benchmark-title">
         <h2 id="rent-benchmark-title">임대료 참고</h2>
-        <p className="picker-note">사업 조건에서 상가 유형을 고르면 한국부동산원 조사 임대료를 보여 드립니다.</p>
+        <p className="picker-note">사업 조건에서 상가 유형을 고르면 한국부동산원 조사 임대료가 나옵니다.</p>
       </section>
     );
   }
@@ -96,7 +96,7 @@ export default function RentBenchmarkPanel({
         </p>
       ) : state.kind === 'unavailable' ? (
         <p className="picker-note" role="status">
-          임대료 자료가 아직 준비되지 않았습니다.
+          임대료 자료가 아직 없습니다.
         </p>
       ) : state.kind === 'error' ? (
         <p className="inline-error" role="alert">
@@ -195,8 +195,8 @@ function RentBenchmarkBody({
             {payload.district
               ? nearby.length > 0
                 ? `${payload.district.name}와 겹치는 조사 상권 ${nearby.length}곳이 위에 있습니다.`
-                : `${payload.district.name}와 겹치는 조사 상권이 없어 서울 전체를 보여 드립니다.`
-              : '자치구를 고르면 주변 조사 상권을 먼저 보여 드립니다.'}
+                : `${payload.district.name}와 겹치는 조사 상권이 없어 서울 전체 값입니다.`
+              : '자치구를 고르면 주변 조사 상권이 위로 올라옵니다.'}
           </small>
         </label>
       </div>

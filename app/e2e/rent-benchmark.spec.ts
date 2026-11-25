@@ -61,7 +61,7 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호').fill(password);
   await page.getByRole('button', { name: '회원가입', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '재무 계획', exact: true })).toBeVisible();
 }
 
 test.afterEach(async () => {
@@ -81,7 +81,7 @@ test.afterEach(async () => {
 test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 준다', async ({ page }, testInfo) => {
   const suffix = `${testInfo.project.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await seedRentRelease(suffix);
-  await page.goto('/');
+  await page.goto('/plans');
   await signUp(page, `rent-${suffix}@example.test`);
 
   const panel = page.getByRole('region', { name: '임대료 참고' });
@@ -90,26 +90,27 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
   // 입력 확인 단계는 빠진 항목을 알려 주고, 그 항목을 입력하는 단계로 보낸다.
   const wizard = page.locator('.business-wizard');
   await wizard.getByRole('button', { name: /입력 확인/ }).click();
-  await expect(wizard.getByText('빠진 항목: 지역구, 업종, 면적, 층, 상가 유형')).toBeVisible();
+  const missingItems = wizard.locator('.profile-summary-grid > div', { hasText: '빠진 항목' });
+  await expect(missingItems).toContainText('자치구, 업종, 면적, 층, 상가 유형');
   await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
-  await expect(page.getByLabel('지역구')).toBeVisible();
+  await expect(wizard.getByLabel('자치구')).toBeVisible();
 
   // 사업 조건을 일부만 입력하면 저장하지 않는다(저장된 조건이 null로 지워지는 것을 막는다).
   // 모두 비우면 사업 조건 없는 계획으로 저장된다.
   await page.getByLabel('계획 제목').fill(`임대료 확인 ${suffix}`);
-  await page.getByLabel('지역구').selectOption('11200');
+  await wizard.getByLabel('자치구').selectOption('11200');
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.locator('.status-message')).toContainText(
-    '사업 조건에 빠진 항목이 있어 저장하지 않았습니다: 업종, 면적, 층, 상가 유형',
+    '사업 조건이 덜 채워져 저장하지 않았습니다(빠진 항목: 업종, 면적, 층, 상가 유형)',
   );
-  await expect(page.getByText('저장된 계획이 없습니다.')).toBeVisible();
+  await expect(page.getByText('저장한 계획이 없습니다.')).toBeVisible();
   await wizard.getByRole('button', { name: /입력 확인/ }).click();
   await wizard.getByRole('button', { name: '사업 조건 모두 비우기' }).click();
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.locator('.status-message')).toContainText('초안을 저장했습니다.');
   await wizard.getByRole('button', { name: '빠진 항목 입력', exact: true }).click();
 
-  await page.getByLabel('지역구').selectOption('11200');
+  await wizard.getByLabel('자치구').selectOption('11200');
   await page.getByLabel('업종 대분류').selectOption({ label: '커피·음료' });
   await page.getByRole('button', { name: '다음' }).click();
   await page.getByLabel('정확한 면적').fill('10');
@@ -120,7 +121,7 @@ test('사업 조건에 맞는 부동산원 임대료를 참고값으로 보여 �
 
   // 다 입력하면 입력 확인에 층·상가 유형까지 보이고, 다음 버튼이 아래 참고 자료로 넘어간다.
   await wizard.getByRole('button', { name: '다음', exact: true }).click();
-  await expect(wizard.getByText('저장 가능')).toBeVisible();
+  await expect(missingItems.locator('strong')).toHaveText('없음');
   await expect(wizard.locator('.profile-summary-grid')).toContainText('1층');
   await expect(wizard.locator('.profile-summary-grid')).toContainText('소규모 상가');
   await wizard.getByRole('button', { name: '다음: 참고 자료', exact: true }).click();

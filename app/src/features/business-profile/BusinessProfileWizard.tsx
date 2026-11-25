@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
 import { OPEN_INDUSTRIES, industryByCode } from '@/features/industries';
@@ -36,7 +36,7 @@ export default function BusinessProfileWizard({
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<BusinessCategoryInfo[]>([]);
   const [release, setRelease] = useState<BusinessDirectoryReleaseInfo | null>(null);
-  const [categoryMessage, setCategoryMessage] = useState('세부 업종 스냅샷을 확인하고 있습니다.');
+  const [categoryMessage, setCategoryMessage] = useState('세부 업종 목록을 불러오는 중…');
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +53,7 @@ export default function BusinessProfileWizard({
         if (cancelled) return;
         setCategories(data.categories);
         setRelease(data.activeRelease);
-        setCategoryMessage(data.nullReason ?? `소진공 스냅샷 ${data.activeRelease?.releaseKey ?? ''}`);
+        setCategoryMessage(data.nullReason ?? '소상공인시장진흥공단 점포 자료 기준');
       })
       .catch((error: unknown) => {
         if (!cancelled)
@@ -73,13 +73,13 @@ export default function BusinessProfileWizard({
   const complete = saveState.kind === 'COMPLETE';
   const missing = businessProfileMissingFields(form);
   const district = SEOUL_DISTRICTS.find((item) => item.code === form.districtCode)?.name ?? '미선택';
-  const broadName = industryByCode(form.marketIndustryCode)?.name ?? '미선택';
+  const broadName = industryByCode(form.marketIndustryCode)?.shortName ?? '미선택';
 
   return (
     <section className="business-wizard" aria-labelledby="business-wizard-title">
       <div className="wizard-top">
         <div className="wizard-title-row">
-          <strong id="business-wizard-title">창업 조건 입력</strong>
+          <strong id="business-wizard-title">사업 조건</strong>
           <span>
             {step + 1} / {STEPS.length}
           </span>
@@ -106,17 +106,9 @@ export default function BusinessProfileWizard({
       <div className="wizard-panel">
         {step === 0 && (
           <>
-            <WizardHeading
-              title={
-                <>
-                  <em>어느 지역구</em>에서 <em>어떤 업종</em>으로
-                  <br />
-                  창업하시는지 알려주세요.
-                </>
-              }
-            />
+            <WizardHeading title="자치구와 업종" />
             <label className="field search-field">
-              <span>지역구</span>
+              <span>자치구</span>
               <span className="search-select">
                 <SearchIcon />
                 <select
@@ -139,9 +131,9 @@ export default function BusinessProfileWizard({
                 onChange={(event) => onChange(selectMarketIndustry(form, event.target.value))}
               >
                 <option value="">업종을 선택하세요</option>
-                {OPEN_INDUSTRIES.map(({ code, name }) => (
+                {OPEN_INDUSTRIES.map(({ code, shortName }) => (
                   <option key={code} value={code}>
-                    {name}
+                    {shortName}
                   </option>
                 ))}
               </select>
@@ -154,7 +146,7 @@ export default function BusinessProfileWizard({
                   disabled={!release}
                   onChange={(event) => onChange({ ...form, detailedIndustryCode: event.target.value })}
                 >
-                  <option value="">{!release ? '소진공 스냅샷 적재 전' : '선택하지 않음'}</option>
+                  <option value="">{!release ? '세부 업종 자료 없음' : '선택하지 않음'}</option>
                   {filteredCategories.map((category) => (
                     <option key={category.code} value={category.code}>
                       {category.name}
@@ -169,15 +161,7 @@ export default function BusinessProfileWizard({
         )}
         {step === 1 && (
           <>
-            <WizardHeading
-              title={
-                <>
-                  <em>어떤 크기의 매장</em>을
-                  <br />
-                  생각하시는지 알려주세요.
-                </>
-              }
-            />
+            <WizardHeading title="매장 면적" />
             <div className="choice-grid three">
               {AREA_PRESETS.map(({ value, label, size }) => (
                 <button
@@ -226,15 +210,7 @@ export default function BusinessProfileWizard({
         )}
         {step === 2 && (
           <>
-            <WizardHeading
-              title={
-                <>
-                  <em>매장이 어떤 층</em>에 있는 걸
-                  <br />
-                  생각하시는지 알려주세요.
-                </>
-              }
-            />
+            <WizardHeading title="매장 층" />
             <div className="choice-grid three">
               {(Object.entries(FLOOR_LABELS) as Array<[keyof typeof FLOOR_LABELS, string]>).map(([value, label]) => (
                 <button
@@ -253,15 +229,7 @@ export default function BusinessProfileWizard({
         )}
         {step === 3 && (
           <>
-            <WizardHeading
-              title={
-                <>
-                  <em>매장이 어떤 건물</em>에 있는 걸
-                  <br />
-                  생각하시는지 알려주세요.
-                </>
-              }
-            />
+            <WizardHeading title="상가 유형" />
             <div className="choice-grid three">
               {BUILDING_TYPES.map((value) => (
                 <button
@@ -282,19 +250,13 @@ export default function BusinessProfileWizard({
         {step === 4 && (
           <>
             <WizardHeading
-              title={
-                <>
-                  <em>입력한 창업 조건</em>을
-                  <br />
-                  확인해 주세요.
-                </>
-              }
+              title="입력 확인"
               note={
                 complete
-                  ? '"초안 저장"을 누르면 계획과 함께 저장됩니다.'
+                  ? '[초안 저장]을 누르면 계획과 함께 저장됩니다.'
                   : saveState.kind === 'EMPTY'
-                    ? '비워 두고 재무 계획만 저장할 수도 있습니다.'
-                    : '일부만 입력하면 저장할 수 없습니다. 마저 입력하거나 모두 비워 주세요.'
+                    ? '모두 비워 두고 재무 계획만 저장해도 됩니다.'
+                    : '일부만 채우면 저장되지 않습니다. 다 채우거나 모두 비우세요.'
               }
             />
             <div className="profile-summary-grid">
@@ -309,7 +271,7 @@ export default function BusinessProfileWizard({
               <div>
                 <span>면적</span>
                 <strong>
-                  {form.areaValue || '미입력'} {form.areaValue ? (form.areaUnit === 'PYEONG' ? '평' : '㎡') : ''}
+                  {form.areaValue ? `${form.areaValue}${form.areaUnit === 'PYEONG' ? '평' : '㎡'}` : '미입력'}
                 </strong>
               </div>
               <div>
@@ -321,13 +283,13 @@ export default function BusinessProfileWizard({
                 <strong>{form.buildingType ? BUILDING_TYPE_LABELS[form.buildingType] : '미선택'}</strong>
               </div>
               <div>
-                <span>입력 상태</span>
+                <span>빠진 항목</span>
                 <strong>
                   {complete
-                    ? '저장 가능'
+                    ? '없음'
                     : missing.length > 0
-                      ? `빠진 항목: ${missing.map((field) => field.label).join(', ')}`
-                      : '필수값 미입력'}
+                      ? missing.map((field) => field.label).join(', ')
+                      : '필수 항목'}
                 </strong>
               </div>
             </div>
@@ -368,7 +330,7 @@ export default function BusinessProfileWizard({
   );
 }
 
-function WizardHeading({ title, note }: Readonly<{ title: ReactNode; note?: string }>) {
+function WizardHeading({ title, note }: Readonly<{ title: string; note?: string }>) {
   return (
     <div className="wizard-heading">
       <h2 id="business-profile-title">{title}</h2>
@@ -382,13 +344,13 @@ function ScopeBanner({ detail, broad }: Readonly<{ detail: string | null; broad:
     <div className="scope-banner">
       <strong>
         <TipIcon />
-        데이터 범위
+        집계 범위
       </strong>
       <span>
-        경쟁 현황은 <em>{detail ? `${detail} 세부 업종` : '세부 업종 미선택'}</em> 기준이에요.
+        경쟁 점포는 <em>{detail ? `${detail} 세부 업종` : '세부 업종 미선택'}</em> 기준입니다.
       </span>
       <span>
-        매출·고객 분석은 <em>{broad} 전체</em> 기준이에요.
+        매출·고객은 <em>{broad} 전체</em> 기준입니다.
       </span>
     </div>
   );

@@ -13,7 +13,7 @@ import {
   MATCH_VERDICT_LABELS,
   SUPPORT_TYPE_LABELS,
   aiPeriodText,
-  applicationPeriodText,
+  aiPeriodValueText,
   applicationStateText,
   checkReasonText,
   closedText,
@@ -22,7 +22,9 @@ import {
   formatDate,
   fundingGapText,
   fundingProfileSummary,
+  hasAiReading,
   limitText,
+  sourceRecordText,
   supportTypesText,
   titleRegionText,
   tabCountTexts,
@@ -37,7 +39,6 @@ import {
   type FundingTab,
   type ProductMatch,
 } from './matching.ts';
-import type { ObservedApplicationStatus } from './types.ts';
 
 // 맞춰 보기 결과(ADR 0009 §4). /funding과 계획 화면이 같은 결과를 같은 모양으로 보여 준다. 정책자금·지원사업 탭마다 조건에 안
 // 맞는 공고를 빼고 남은 공고를 한 목록으로 보여 주고, 뺀 공고와 마감 공고는 건수와 함께 두어 버튼으로 펼친다. 접수 상태는
@@ -50,14 +51,6 @@ const TAB_NOTES: Record<FundingTab, string> = {
     '소진공 정책자금, 기업마당 금융 공고, 운영자가 등록한 대출·보증입니다. 대출 조건은 재무 계획에 직접 입력하세요.',
   SUPPORT_PROGRAM:
     '기업마당의 나머지 공고와 운영자가 등록한 지원금·공간·프로그램입니다. 대출 상환으로 계산하지 않습니다.',
-};
-
-// 출처·운영자가 기록한 접수 상태. 카드의 접수 상태 표시(접수 중 확인·접수 여부 미확인)는 여기에 출처 최신성과 AI가 읽은
-// 종료일까지 본 결과라서, 둘이 같은 말로 읽히지 않게 기록한 값만 짧게 쓴다.
-const APPLICATION_STATUS_LABELS: Record<ObservedApplicationStatus, string> = {
-  OPEN: '접수 중',
-  CLOSED: '마감',
-  UNKNOWN: '알 수 없음',
 };
 
 export type FundingLoadError = { code: string | null; message: string };
@@ -76,7 +69,7 @@ export function FundingMatchesErrorPanel({ error }: { readonly error: FundingLoa
   if (error.code === 'CATALOG_UNAVAILABLE') {
     return (
       <div className="empty-panel" role="status">
-        <h2>자금 공고 데이터가 아직 준비되지 않았습니다.</h2>
+        <h2>자금 공고 자료가 아직 없습니다.</h2>
       </div>
     );
   }
@@ -90,7 +83,7 @@ export function FundingMatchesErrorPanel({ error }: { readonly error: FundingLoa
   }
   return (
     <div className="error-box" role="alert">
-      <h2>공고를 맞춰 보지 못했습니다.</h2>
+      <h2>공고를 불러오지 못했습니다.</h2>
       <p>{error.message}</p>
     </div>
   );
@@ -115,7 +108,7 @@ export function FundingMatchesPanel({
   return (
     <>
       <section className="release-card" aria-labelledby="funding-release">
-        <h2 id="funding-release">맞춰 본 기준</h2>
+        <h2 id="funding-release">조회 기준</h2>
         {planLabel && <p className="funding-position">{planLabel}</p>}
         <dl className="release-grid">
           <div>
@@ -134,13 +127,13 @@ export function FundingMatchesPanel({
             </dd>
           </div>
         </dl>
-        <p className="picker-note">맞춰 본 조건: {fundingProfileSummary(result.profile, districtSource)}</p>
+        <p className="picker-note">조회 조건: {fundingProfileSummary(result.profile, districtSource)}</p>
       </section>
 
       {shown === 0 ? (
         <div className="empty-panel" role="status">
           <h2>보여 줄 공고가 없습니다.</h2>
-          <p>{result.hiddenCount > 0 ? '운영자가 모든 공고를 숨겼습니다.' : '적재된 공고가 없습니다.'}</p>
+          <p>{result.hiddenCount > 0 ? '운영자가 모든 공고를 숨겼습니다.' : '등록된 공고가 없습니다.'}</p>
         </div>
       ) : (
         <>
@@ -150,7 +143,7 @@ export function FundingMatchesPanel({
               <p>음식점·카페 제외처럼 입력 없이 정해지는 조건으로만 공고를 뺐습니다.</p>
             </div>
           )}
-          <div className="funding-tabs" role="tablist" aria-label="자금 갈래">
+          <div className="funding-tabs" role="tablist" aria-label="자금 종류">
             {FUNDING_TABS.map((key) => (
               <button
                 key={key}
@@ -216,37 +209,37 @@ function TabPanel({
       className="funding-branch"
     >
       <p className="branch-note">{TAB_NOTES[tab]}</p>
+      {policy && <p className="branch-note">{LIMIT_NOTE}</p>}
       <div className="status-counts branch-counts" aria-label={`${FUNDING_TAB_LABELS[tab]} 공고 수`}>
-        <div className="status-count count-remaining">
+        <div className="status-count">
           <span>남은 공고</span>
           <strong>{numberFormat.format(remaining.length)}건</strong>
         </div>
-        <div className="status-count count-not_matching">
+        <div className="status-count">
           <span>조건에 안 맞아 뺌</span>
           <strong>{numberFormat.format(eliminated.length)}건</strong>
         </div>
-        <div className="status-count count-closed">
+        <div className="status-count">
           <span>{FUNDING_GROUP_BADGE_LABELS.CLOSED}</span>
           <strong>{numberFormat.format(closed.length)}건</strong>
         </div>
       </div>
 
       {list.products.length === 0 ? (
-        <p className="empty-state">이 갈래에 보여 줄 공고가 없습니다.</p>
+        <p className="empty-state">이 탭에는 공고가 없습니다.</p>
       ) : (
         <>
           <div className="candidate-group">
             <div className="group-head">
               <h3>남은 공고</h3>
-              <span>{numberFormat.format(remaining.length)}건</span>
             </div>
             <p className="group-note">
-              남았다고 선정되는 것은 아닙니다. 카드에 없는 조건은 공고문에서 찾지 못한 것이니 원 공고에서 확인해 주세요.
+              남은 공고도 선정이 보장되지 않습니다. 카드에 없는 조건은 공고문에서 못 찾은 것이니 원 공고에서 확인하세요.
             </p>
             {remaining.length === 0 ? (
               <p className="empty-state">
-                남은 공고가 0건입니다.
-                {eliminated.length > 0 && ' 아래에서 뺀 공고를 펼쳐 확인해 보세요.'}
+                남은 공고가 없습니다.
+                {eliminated.length > 0 && ' 뺀 공고는 아래에 있습니다.'}
               </p>
             ) : (
               cards(remaining)
@@ -261,7 +254,9 @@ function TabPanel({
                   {showEliminated ? '숨기기' : `${numberFormat.format(eliminated.length)}건 보기`}
                 </button>
               </div>
-              <p className="group-note">AI가 잘못 읽었을 수 있으니 찾는 공고가 없으면 펼쳐서 확인하세요.</p>
+              <p className="group-note">
+                AI가 조건을 잘못 읽었을 수 있습니다. 찾는 공고가 안 보이면 여기서 확인하세요.
+              </p>
               {showEliminated && cards(eliminated)}
             </div>
           )}
@@ -344,27 +339,21 @@ function MatchCard({
 
       <dl className="candidate-meta">
         <div>
-          <dt>접수(출처 기록)</dt>
-          <dd>
-            {APPLICATION_STATUS_LABELS[match.application.status]} · {applicationPeriodText(match.application.period)}
-          </dd>
-        </div>
-        <div>
-          <dt>확인 방식</dt>
-          <dd>
-            {match.automation
-              ? `자동 수집 · 출처 ${match.automation.sourceLabel} · 마지막 확인 ${formatDate(match.automation.lastSucceededOn)}`
-              : match.operatorRecord
-                ? `운영자 등록 · 기록일 ${formatDate(match.operatorRecord.observedAt)}`
-                : '운영자 등록'}
-          </dd>
+          <dt>출처 기록</dt>
+          <dd>{sourceRecordText(match)}</dd>
         </div>
         {aiPeriod.status === 'READ' && (
           <div>
             <dt>AI가 읽은 신청기간</dt>
             <dd>
-              {aiPeriodText(aiPeriod.value)}
-              {aiPeriod.source === 'AI' && <q className="match-quote">{aiPeriod.quote}</q>}
+              {aiPeriod.source === 'AI' ? (
+                <>
+                  {aiPeriodValueText(aiPeriod.value, aiPeriod.quote)}
+                  <q className="match-quote">{aiPeriod.quote}</q>
+                </>
+              ) : (
+                aiPeriodText(aiPeriod.value)
+              )}
             </dd>
           </div>
         )}
@@ -402,12 +391,11 @@ function MatchCard({
           <p>
             <strong>{limitText(match.limit)}</strong>
           </p>
-          <p>{LIMIT_NOTE}</p>
           {fundingGap && <p>{fundingGapText(fundingGap)}</p>}
         </div>
       )}
 
-      <p className="match-ai-notice">{AI_READING_NOTICE}</p>
+      {hasAiReading(match) && <p className="match-ai-notice">{AI_READING_NOTICE}</p>}
       <p className="source-link">
         <a href={match.officialUrl} target="_blank" rel="noreferrer">
           원 공고 열기
@@ -430,7 +418,7 @@ function ConditionItem({
   const reason = checkReasonText(condition, titleRegionMark);
   const { reading } = condition;
   return (
-    <li className={`match-condition condition-${condition.verdict.toLowerCase()}`}>
+    <li className="match-condition">
       <div className="match-condition-head">
         <strong>{CONDITION_LABELS[condition.key]}</strong>
         <span className={`verdict verdict-${condition.verdict.toLowerCase()}`}>

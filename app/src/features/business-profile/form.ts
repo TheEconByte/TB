@@ -58,7 +58,7 @@ const areaValueSchema = businessProfileInputSchema.shape.area.shape.value;
 // 빠졌거나 서버가 받지 않을 항목과, 그 항목을 입력하는 단계(0부터).
 export function businessProfileMissingFields(form: BusinessProfileForm): Array<{ label: string; step: number }> {
   return [
-    { label: '지역구', step: 0, missing: !form.districtCode },
+    { label: '자치구', step: 0, missing: !form.districtCode },
     { label: '업종', step: 0, missing: !form.marketIndustryCode },
     { label: '면적', step: 1, missing: !areaValueSchema.safeParse(form.areaValue).success },
     { label: '층', step: 2, missing: !form.floor },

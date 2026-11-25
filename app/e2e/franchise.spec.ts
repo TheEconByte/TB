@@ -55,7 +55,7 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호').fill(password);
   await page.getByRole('button', { name: '회원가입', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /내 가정으로 확인하는 창업 재무계획/ })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '재무 계획', exact: true })).toBeVisible();
 }
 
 test.afterEach(async () => {
@@ -75,7 +75,7 @@ test.afterEach(async () => {
 test('업종에 맞는 공정위 가맹정보를 검색하고 브랜드 현황을 본다', async ({ page }, testInfo) => {
   const suffix = `${testInfo.project.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await seedFranchiseRelease(suffix);
-  await page.goto('/');
+  await page.goto('/plans');
   await signUp(page, `franchise-${suffix}@example.test`);
 
   const panel = page.getByRole('region', { name: '프랜차이즈 참고' });
@@ -92,7 +92,7 @@ test('업종에 맞는 공정위 가맹정보를 검색하고 브랜드 현황�
   await expect(detail).toContainText('3,325개');
   await expect(detail).toContainText('전년 대비 +644개');
   await expect(detail).toContainText('360,000,000원');
-  await expect(detail).toContainText('월 평균 약 30,000,000원');
+  await expect(detail).toContainText('월 평균 30,000,000원');
   await expect(detail).toContainText('9,700,000원');
 
   // 창업 금액이 없는 브랜드는 0이 아니라 미기재로 보인다.

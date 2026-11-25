@@ -68,7 +68,7 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
           {score.distribution && <DistributionChart distribution={score.distribution} value={score.score.value} />}
 
           <div className="button-row score-actions">
-            <Link href={`/${handoffSearch(handoff)}`} className="primary-link">
+            <Link href={`/plans${handoffSearch(handoff)}`} className="primary-link">
               이 상권으로 재무 계획 시작
             </Link>
             <Link href={`/funding${handoffSearch(handoff)}`} className="secondary-link">

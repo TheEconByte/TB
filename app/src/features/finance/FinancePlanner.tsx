@@ -1,31 +1,11 @@
 'use client';
 
-import Decimal from 'decimal.js';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { fromInput, toInput, type FinanceForm } from './form';
 import { financeInputSchema } from './schema';
+import { revisionLabel } from '@/lib/revision-text';
 import type { FinanceInput, FinanceResult, ScenarioResult, ValueResult } from './types';
 
-type FormState = Record<string, string>;
-const defaults: FormState = {
-  deposit: '30000000',
-  facilities: '40000000',
-  initialInventory: '5000000',
-  otherPreparation: '5000000',
-  targetReserve: '10000000',
-  equity: '40000000',
-  monthlyRevenue: '20000000',
-  rent: '3000000',
-  labor: '3000000',
-  otherFixed: '1000000',
-  variableCostPercent: '35',
-  existingDebt: '0',
-  loanPrincipal: '50000000',
-  annualRatePercent: '5',
-  totalMonths: '60',
-  graceMonths: '0',
-  repaymentMethod: 'EQUAL_PAYMENT',
-  cashBalanceMonths: '12',
-};
 const labels: Record<string, string> = {
   'openingExpenses.deposit': '보증금',
   'openingExpenses.facilities': '시설비',
@@ -60,77 +40,11 @@ const moneyFields = new Set([
   'existingDebt',
   'loanPrincipal',
 ]);
-const nullable = (value: string) => (value.trim() === '' ? null : value.replaceAll(',', '').trim());
-const integerOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
-const percentToRatio = (value: string) => {
-  if (!value.trim()) return null;
-  try {
-    return new Decimal(value).div(100).toString();
-  } catch {
-    return value;
-  }
-};
 const formatInput = (key: string, value: string) =>
   moneyFields.has(key) && /^\d+$/.test(value.replaceAll(',', ''))
     ? new Intl.NumberFormat('ko-KR').format(BigInt(value.replaceAll(',', '')))
     : value;
-const formatWon = (value: string) => `${new Intl.NumberFormat('ko-KR').format(BigInt(value))}원`;
-
-export function toInput(form: FormState): FinanceInput {
-  return {
-    openingExpenses: {
-      deposit: nullable(form.deposit),
-      facilities: nullable(form.facilities),
-      initialInventory: nullable(form.initialInventory),
-      otherPreparation: nullable(form.otherPreparation),
-    },
-    targetReserve: nullable(form.targetReserve),
-    equity: nullable(form.equity),
-    monthlyRevenue: nullable(form.monthlyRevenue),
-    monthlyFixedCosts: { rent: nullable(form.rent), labor: nullable(form.labor), other: nullable(form.otherFixed) },
-    variableCostRate: percentToRatio(form.variableCostPercent),
-    existingMonthlyDebtPayment: nullable(form.existingDebt),
-    newLoan: {
-      principal: nullable(form.loanPrincipal),
-      annualInterestRatePercent: nullable(form.annualRatePercent),
-      totalMonths: integerOrNull(form.totalMonths),
-      graceMonths: integerOrNull(form.graceMonths),
-      repaymentMethod: form.repaymentMethod
-        ? (form.repaymentMethod as FinanceInput['newLoan']['repaymentMethod'])
-        : null,
-    },
-    cashBalanceMonths: Number(form.cashBalanceMonths),
-  };
-}
-
-// 새 계획의 기본 입력에서 일부만 바꾼 초기값. 상권에서 넘어온 월매출 기본값처럼 사용자가 고칠 수 있는 값에 쓴다.
-export function defaultInputWith(overrides: Readonly<Record<string, string>>): FinanceInput {
-  return toInput({ ...defaults, ...overrides });
-}
-
-function fromInput(input?: FinanceInput): FormState {
-  if (!input) return defaults;
-  return {
-    deposit: input.openingExpenses.deposit ?? '',
-    facilities: input.openingExpenses.facilities ?? '',
-    initialInventory: input.openingExpenses.initialInventory ?? '',
-    otherPreparation: input.openingExpenses.otherPreparation ?? '',
-    targetReserve: input.targetReserve ?? '',
-    equity: input.equity ?? '',
-    monthlyRevenue: input.monthlyRevenue ?? '',
-    rent: input.monthlyFixedCosts.rent ?? '',
-    labor: input.monthlyFixedCosts.labor ?? '',
-    otherFixed: input.monthlyFixedCosts.other ?? '',
-    variableCostPercent: input.variableCostRate === null ? '' : new Decimal(input.variableCostRate).mul(100).toString(),
-    existingDebt: input.existingMonthlyDebtPayment ?? '',
-    loanPrincipal: input.newLoan.principal ?? '',
-    annualRatePercent: input.newLoan.annualInterestRatePercent ?? '',
-    totalMonths: input.newLoan.totalMonths?.toString() ?? '',
-    graceMonths: input.newLoan.graceMonths?.toString() ?? '',
-    repaymentMethod: input.newLoan.repaymentMethod ?? '',
-    cashBalanceMonths: input.cashBalanceMonths.toString(),
-  };
-}
+export const formatWon = (value: string) => `${new Intl.NumberFormat('ko-KR').format(BigInt(value))}원`;
 
 function MoneyInput({
   id,
@@ -141,7 +55,7 @@ function MoneyInput({
 }: {
   id: string;
   label: string;
-  form: FormState;
+  form: FinanceForm;
   change: (key: string, value: string) => void;
   help?: string;
 }) {
@@ -161,7 +75,8 @@ function MoneyInput({
     </label>
   );
 }
-function showValue<T>(result: ValueResult<T>, render: (value: T) => string) {
+// 저장 결과 값을 화면 문구로 바꾼다. 계산하지 못한 값은 0으로 두지 않고 이유를 적는다.
+export function showValue<T>(result: ValueResult<T>, render: (value: T) => string) {
   if (result.status === 'READY') return render(result.value);
   return result.status === 'UNSUPPORTED'
     ? `계산 불가 · ${result.reason}`
@@ -173,7 +88,7 @@ function ScenarioCard({ scenario }: { scenario: ScenarioResult }) {
     <article className="scenario-card">
       <div className="scenario-heading">
         <h3>{scenarioLabel[scenario.name]}</h3>
-        <span>{scenario.name === 'BASE' ? '입력한 원래 가정' : '스트레스 가정'}</span>
+        <span>{scenario.name === 'BASE' ? '입력값 그대로' : '입력값을 바꿔 본 경우'}</span>
       </div>
       {scenario.changes.length > 0 && (
         <ul className="changes">
@@ -209,6 +124,9 @@ function ScenarioCard({ scenario }: { scenario: ScenarioResult }) {
 }
 
 export type PlannerProps = {
+  // 어떤 계획을 보고 있는지. 바뀌면 입력·결과를 initial 값으로 되돌린다. 컴포넌트를 key로 다시 만들지 않는 것은
+  // 아래 자리(references 등)에 넣은 사업 조건 입력 단계 같은 상태가 저장할 때마다 처음으로 돌아가지 않게 하려는 것이다.
+  resetKey: string;
   initialTitle?: string;
   initialInput?: FinanceInput;
   initialResult?: FinanceResult | null;
@@ -217,11 +135,18 @@ export type PlannerProps = {
   busy?: boolean;
   // 월 운영 가정 입력란 위에 보여 줄 출처(예: 상권 점수에서 넘어온 월매출 기본값).
   revenueNotice?: ReactNode;
+  // 계획 머리와 재무 입력 사이에 놓을 사업 조건·시세 참고.
+  references?: ReactNode;
+  // 재무 입력 아래, 저장 버튼 위에 놓을 입력(자금 조건). [초안 저장]이 함께 저장하는 입력은 모두 버튼 위에 둔다.
+  extraInputs?: ReactNode;
+  // 계산 결과 맨 위에 놓을 계산 기록.
+  resultHistory?: ReactNode;
   onSave: (title: string, input: FinanceInput) => Promise<unknown>;
   onCalculate: (title: string, input: FinanceInput) => Promise<FinanceResult>;
 };
 
 export default function FinancePlanner({
+  resetKey,
   initialTitle = '',
   initialInput,
   initialResult = null,
@@ -229,6 +154,9 @@ export default function FinancePlanner({
   resultRevision = null,
   busy = false,
   revenueNotice,
+  references,
+  extraInputs,
+  resultHistory,
   onSave,
   onCalculate,
 }: PlannerProps) {
@@ -237,6 +165,15 @@ export default function FinancePlanner({
   const [errors, setErrors] = useState<string[]>([]);
   const [result, setResult] = useState<FinanceResult | null>(initialResult);
   const [dirty, setDirty] = useState(false);
+  const [loadedKey, setLoadedKey] = useState(resetKey);
+  if (loadedKey !== resetKey) {
+    setLoadedKey(resetKey);
+    setForm(fromInput(initialInput));
+    setTitle(initialTitle);
+    setResult(initialResult);
+    setErrors([]);
+    setDirty(false);
+  }
   useEffect(() => {
     const timer = window.setTimeout(() => setResult(initialResult), 0);
     return () => window.clearTimeout(timer);
@@ -290,37 +227,27 @@ export default function FinancePlanner({
   const stale = dirty || (resultRevision !== null && revision !== null && resultRevision !== revision);
   return (
     <>
-      <section className="hero">
-        <h1>
-          내 가정으로 확인하는
-          <br />
-          창업 재무계획
-        </h1>
+      <section className="plan-head">
+        <h1>재무 계획</h1>
+        <p>입력한 숫자로만 계산합니다. 상권·시세 자료는 자동으로 들어가지 않습니다.</p>
+        <label className="field" htmlFor="plan-title">
+          <span>계획 제목</span>
+          <span className="input-wrap">
+            <input
+              id="plan-title"
+              className="text-input"
+              maxLength={100}
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setDirty(true);
+              }}
+            />
+          </span>
+        </label>
       </section>
-      <form onSubmit={submit} noValidate>
-        <section className="form-section">
-          <div className="section-title">
-            <span>00</span>
-            <div>
-              <h2>계획 이름</h2>
-            </div>
-          </div>
-          <label className="field" htmlFor="plan-title">
-            <span>계획 제목</span>
-            <span className="input-wrap">
-              <input
-                id="plan-title"
-                className="text-input"
-                maxLength={100}
-                value={title}
-                onChange={(event) => {
-                  setTitle(event.target.value);
-                  setDirty(true);
-                }}
-              />
-            </span>
-          </label>
-        </section>
+      {references}
+      <form id="finance-form" onSubmit={submit} noValidate>
         <section className="form-section">
           <div className="section-title">
             <span>01</span>
@@ -351,7 +278,7 @@ export default function FinancePlanner({
               label="월매출 가정 (선택)"
               form={form}
               change={change}
-              help="모르면 비워도 초기 자금 결과는 계산됩니다."
+              help="비워 두면 초기 자금만 계산합니다."
             />
             <MoneyInput id="rent" label="월 임대료" form={form} change={change} />
             <MoneyInput id="labor" label="월 인건비" form={form} change={change} />
@@ -368,7 +295,13 @@ export default function FinancePlanner({
                 <b>%</b>
               </span>
             </label>
-            <MoneyInput id="existingDebt" label="기존 월 상환액" form={form} change={change} />
+            <MoneyInput
+              id="existingDebt"
+              label="기존 월 상환액"
+              form={form}
+              change={change}
+              help="없으면 0을 넣으세요."
+            />
           </div>
         </section>
         <section className="form-section">
@@ -423,6 +356,7 @@ export default function FinancePlanner({
                 value={form.repaymentMethod}
                 onChange={(e) => change('repaymentMethod', e.target.value)}
               >
+                <option value="">선택하지 않음</option>
                 <option value="EQUAL_PAYMENT">원리금균등</option>
                 <option value="EQUAL_PRINCIPAL">원금균등</option>
               </select>
@@ -441,43 +375,49 @@ export default function FinancePlanner({
             </label>
           </div>
         </section>
-        {errors.length > 0 && (
-          <section id="validation-errors" className="error-box" tabIndex={-1} aria-live="assertive">
-            <h2>입력을 확인해 주세요</h2>
-            <ul>
-              {errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </section>
-        )}
+      </form>
+      {extraInputs}
+      {errors.length > 0 && (
+        <section id="validation-errors" className="error-box" tabIndex={-1} aria-live="assertive">
+          <h2>입력을 확인해 주세요</h2>
+          <ul>
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="calculate-bar">
         <div className="draft-state" aria-live="polite">
           <strong>
             {revision === null
-              ? '저장 전'
+              ? '저장 안 됨'
               : dirty
-                ? `저장 후 변경됨 · revision ${revision}`
-                : `저장됨 · revision ${revision}`}
+                ? `${revisionLabel(revision)} 뒤 수정함`
+                : `${revisionLabel(revision)}함`}
           </strong>
-          {stale && result && <span>입력이 바뀌었습니다. 다시 계산해 주세요.</span>}
+          {stale && result && <span>입력이 바뀌어 아래 결과는 이전 값입니다. 다시 계산하세요.</span>}
         </div>
-        <div className="calculate-bar">
-          <div className="button-row">
-            <button className="secondary-button" type="button" disabled={busy} onClick={() => void save()}>
-              초안 저장
-            </button>
-            <button type="submit" disabled={busy}>
-              {busy ? '계산 중…' : '저장하고 서버 계산'}
-            </button>
-          </div>
+        <div className="button-row">
+          {result && (
+            <a className="link-button" href="#results">
+              결과 보기
+            </a>
+          )}
+          <button className="secondary-button" type="button" disabled={busy} onClick={() => void save()}>
+            초안 저장
+          </button>
+          <button type="submit" form="finance-form" disabled={busy}>
+            {busy ? '계산 중…' : '저장하고 계산'}
+          </button>
         </div>
-      </form>
+      </div>
       {result && base && (
         <section id="results" className="results" tabIndex={-1} aria-live="polite">
           <div className="results-head">
-            <p className="eyebrow">저장된 계산 결과</p>
-            <h2>revision {resultRevision} 계산 결과</h2>
+            <h2>계산 결과 · {resultRevision === null ? '저장 전 입력' : `${revisionLabel(resultRevision)} 기준`}</h2>
           </div>
+          {resultHistory}
           <div className="summary-grid">
             <div>
               <span>목표 초기 필요자금</span>
@@ -529,7 +469,7 @@ export default function FinancePlanner({
             </div>
           )}
           <aside className="scope-note">
-            <h3>계산에 포함되지 않은 범위</h3>
+            <h3>계산에 넣지 않은 것</h3>
             <p>{result.excludedScope.join(' · ')}</p>
           </aside>
         </section>

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import SiteHeader from '@/components/SiteHeader';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import MarketGradeBanner from '@/features/market/score/MarketGradeBanner';
 import FundingProfileFields from './FundingProfileFields.tsx';
@@ -30,6 +31,12 @@ export default function FundingMatcher() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<FundingLoadError | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // 결과는 입력란 아래에 생겨 폰 폭에서는 화면 밖이다. 조회가 끝나면 결과로 옮겨 눌러도 아무 일이 없는 것처럼 보이지 않게 한다.
+  const resultsRef = useRef<HTMLElement>(null);
+  const [searched, setSearched] = useState(0);
+  useEffect(() => {
+    if (searched > 0) resultsRef.current?.focus();
+  }, [searched]);
 
   const submit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -65,6 +72,7 @@ export default function FundingMatcher() {
         setError(describeFundingError(caught));
       } finally {
         setLoading(false);
+        setSearched((count) => count + 1);
       }
     },
     [form],
@@ -72,19 +80,7 @@ export default function FundingMatcher() {
 
   return (
     <main>
-      <header>
-        <Link href="/" className="brand">
-          TrendBench<span>창업 준비의 기준</span>
-        </Link>
-        <div className="account-actions">
-          <Link className="link-button" href="/">
-            내 창업 계획
-          </Link>
-          <Link className="link-button" href="/markets">
-            상권 탐색
-          </Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <MarketGradeBanner
         onLoaded={(score) => {
@@ -96,12 +92,8 @@ export default function FundingMatcher() {
       />
 
       <section className="hero funding-hero">
-        <p className="eyebrow">자금 공고 맞춰 보기</p>
-        <h1>
-          공고문의 조건을,
-          <br />내 조건과 나란히.
-        </h1>
-        <p>AI가 공고문에서 읽은 조건과 내 조건을 항목마다 맞춰 봅니다.</p>
+        <h1>자금 공고</h1>
+        <p>정책자금·지원사업 공고 중 내 조건과 안 맞는 것을 걸러 냅니다. 공고 조건은 AI가 공고문에서 읽은 것입니다.</p>
       </section>
 
       {isPending && (
@@ -114,7 +106,7 @@ export default function FundingMatcher() {
         <div className="empty-panel" role="status">
           <h2>로그인이 필요합니다.</h2>
           <p>
-            <Link href="/">내 창업 계획</Link>에서 로그인한 뒤 다시 열어 주세요.
+            <Link href="/plans">로그인</Link>한 뒤 다시 열어 주세요.
           </p>
         </div>
       )}
@@ -122,16 +114,15 @@ export default function FundingMatcher() {
       {!isPending && session && (
         <>
           <details className="notice-box">
-            <summary>결과를 읽는 법</summary>
+            <summary>걸러 내는 기준</summary>
             <ul>
-              <li>남은 공고는 AI가 읽은 조건 중 안 맞는 것이 없다는 뜻이며, 선정을 뜻하지 않습니다.</li>
-              <li>조건에 안 맞는 공고는 빼고 건수를 밝힙니다. 펼쳐서 다시 볼 수 있습니다.</li>
-              <li>입력하지 않은 항목은 확인 필요로 남깁니다. 입력은 AI에 보내지 않습니다.</li>
+              <li>AI가 읽은 조건 중 하나라도 안 맞으면 뺍니다. 뺀 공고는 아래에서 펼쳐 볼 수 있습니다.</li>
+              <li>입력하지 않은 항목은 &lsquo;확인 필요&rsquo;로 둡니다. 입력값은 AI에 보내지 않습니다.</li>
             </ul>
           </details>
 
           <section className="picker" aria-labelledby="funding-picker">
-            <h2 id="funding-picker">내 조건 입력</h2>
+            <h2 id="funding-picker">내 조건</h2>
             <form onSubmit={submit}>
               <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
               {formError && (
@@ -141,17 +132,24 @@ export default function FundingMatcher() {
               )}
               <div className="button-row">
                 <button type="submit" disabled={loading}>
-                  {loading ? '맞춰 보는 중…' : '공고 맞춰 보기'}
+                  {loading ? '찾는 중…' : '공고 찾기'}
                 </button>
               </div>
               <p className="picker-note">입력은 저장되지 않습니다.</p>
             </form>
           </section>
 
-          <section className="market-results" aria-live="polite" aria-busy={loading}>
+          <section
+            ref={resultsRef}
+            tabIndex={-1}
+            className="market-results funding-results"
+            aria-label="공고 찾기 결과"
+            aria-live="polite"
+            aria-busy={loading}
+          >
             {loading && (
               <p className="loading-state" role="status">
-                공고를 맞춰 보는 중…
+                공고를 찾는 중…
               </p>
             )}
             {!loading && error && <FundingMatchesErrorPanel error={error} />}

@@ -45,7 +45,7 @@ describe('사업 조건 저장 판정', () => {
   it('일부만 입력하면 저장을 막고 빠진 항목을 입력 순서대로 알려 준다', () => {
     expect(businessProfileSaveState({ ...EMPTY_BUSINESS_PROFILE_FORM, floor: 'GROUND_1' })).toEqual({
       kind: 'INCOMPLETE',
-      missing: ['지역구', '업종', '면적', '상가 유형'],
+      missing: ['자치구', '업종', '면적', '상가 유형'],
     });
     expect(businessProfileSaveState({ ...complete, buildingType: '' })).toEqual({
       kind: 'INCOMPLETE',

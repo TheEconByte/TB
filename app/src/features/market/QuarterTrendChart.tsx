@@ -1,16 +1,37 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
+
 export type ChartPoint = { quarter: string; label: string; shortLabel: string; amount: number | null };
 
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
+// 막대 한 칸의 최소 폭. 값 라벨("16.2억")이 옆 칸과 겹치지 않는 폭이다.
+const MIN_SLOT = 40;
+const HEIGHT = 210;
+// 위쪽 여백은 최대값 라벨 줄이다. 가장 높은 막대의 값 라벨과 겹치지 않게 막대 영역 위에 둔다.
+const PADDING = { top: 32, right: 14, bottom: 46, left: 14 };
+
 // Dependency-free bar chart: the table next to it carries the exact values, so
 // the chart only has to show the shape of the trend and where data is missing.
+// 폭은 컨테이너에 맞춘다. 칸이 최소 폭보다 좁아지면(폰 폭) 가로로 넘기되, 최근 분기가 먼저 보이게 오른쪽 끝에서 시작한다.
 export default function QuarterTrendChart({ points }: { readonly points: readonly ChartPoint[] }) {
-  const width = Math.max(320, points.length * 72 + 24);
-  const height = 210;
-  // 위쪽 여백은 최대값 라벨 줄이다. 가장 높은 막대의 값 라벨과 겹치지 않게 막대 영역 위에 둔다.
-  const padding = { top: 32, right: 14, bottom: 46, left: 14 };
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (element === null) return;
+    const observer = new ResizeObserver(([entry]) => setContainerWidth(Math.floor(entry.contentRect.width)));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const width = Math.max(320, containerWidth, points.length * MIN_SLOT + PADDING.left + PADDING.right);
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (element !== null) element.scrollLeft = element.scrollWidth;
+  }, [width, points]);
+  const height = HEIGHT;
+  const padding = PADDING;
   const plotHeight = height - padding.top - padding.bottom;
   const observed = points.map((point) => point.amount).filter((amount): amount is number => amount !== null);
   const maximum = observed.length > 0 ? Math.max(...observed) : 0;
@@ -21,7 +42,7 @@ export default function QuarterTrendChart({ points }: { readonly points: readonl
     .join(', ');
 
   return (
-    <div className="chart-scroll">
+    <div className="chart-scroll" ref={scrollRef}>
       <svg
         className="trend-chart"
         viewBox={`0 0 ${width} ${height}`}
