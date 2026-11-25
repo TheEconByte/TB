@@ -1,16 +1,9 @@
 import { z } from 'zod';
-import { GRADES, type FeatureKey, type Grade } from './config.ts';
+import { FEATURE_KEYS, GRADES, type FeatureKey, type Grade } from './config.ts';
 import { sigmoid } from './logistic.ts';
 
 // score:train이 쓰고 score:build·API가 읽는 계수 파일(app/models/market-score/<버전>.json).
-const featureKeySchema = z.enum([
-  'salesGrowth',
-  'salesPerStore',
-  'storeCount',
-  'pastClosureRate',
-  'pastOpenRate',
-  'franchiseShare',
-]);
+const featureKeySchema = z.enum(FEATURE_KEYS);
 
 const featureCoefficientSchema = z.object({
   key: featureKeySchema,

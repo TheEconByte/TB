@@ -30,6 +30,7 @@ export async function loadScoreSeries(
       closedStoreCount: true,
       openedStoreCount: true,
       franchiseStoreCount: true,
+      salesCount: true,
     },
   });
 
@@ -49,6 +50,7 @@ export async function loadScoreSeries(
       closedStoreCount: row.closedStoreCount,
       openedStoreCount: row.openedStoreCount,
       franchiseStoreCount: row.franchiseStoreCount,
+      salesCount: row.salesCount === null ? null : row.salesCount.toNumber(),
     });
   }
 

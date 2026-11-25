@@ -3,7 +3,9 @@ import { shiftQuarter } from '../quarter.ts';
 import { GRADES, MIN_TEST_AUC, MONTHLY_REVENUE_WARNING_QUANTILES, type FeatureKey, type Grade } from './config.ts';
 import {
   FEATURE_DEFINITIONS,
+  areaKeyOf,
   buildFeatureRow,
+  groupSeriesByArea,
   type AreaSeries,
   type DisplayUnit,
   type ExclusionReason,
@@ -120,6 +122,7 @@ export function topPercent(rank: number, total: number): number {
   return Math.max(1, Math.ceil((rank / total) * 100));
 }
 
+// seriesByIndustry는 요식업 업종 전체의 시계열이다. 상권 변수는 이것으로 상권을 묶어 계산한다.
 export function buildScores(input: {
   model: MarketScoreModel;
   seriesByIndustry: ReadonlyMap<string, readonly AreaSeries[]>;
@@ -128,6 +131,7 @@ export function buildScores(input: {
 }): { rows: BuiltScoreRow[]; summary: ScoreSummary } {
   const rows: BuiltScoreRow[] = [];
   const industries: IndustryScoreSummary[] = [];
+  const seriesByArea = groupSeriesByArea(input.seriesByIndustry.values());
 
   for (const industryModel of input.model.industries) {
     const served = industryModel.testAuc >= MIN_TEST_AUC;
@@ -154,11 +158,8 @@ export function buildScores(input: {
     industries.push(summary);
     if (!served) continue;
 
-    const seriesByArea = new Map(
-      (input.seriesByIndustry.get(industryModel.industryCode) ?? []).map((series) => [
-        `${series.areaType}|${series.areaCode}`,
-        series,
-      ]),
+    const industrySeries = new Map(
+      (input.seriesByIndustry.get(industryModel.industryCode) ?? []).map((series) => [areaKeyOf(series), series]),
     );
     const featureKeys = industryModel.features.map((feature) => feature.key);
     const industryRows: BuiltScoreRow[] = [];
@@ -168,9 +169,15 @@ export function buildScores(input: {
         areaType: area.areaType,
         areaCode: area.areaCode,
       };
-      const series = seriesByArea.get(`${area.areaType}|${area.areaCode}`);
+      const series = industrySeries.get(areaKeyOf(area));
       const row = series
-        ? buildFeatureRow(series, input.quarter, featureKeys, input.model.minStoreCount)
+        ? buildFeatureRow(
+            series,
+            input.quarter,
+            featureKeys,
+            input.model.minStoreCount,
+            seriesByArea.get(areaKeyOf(area)) ?? null,
+          )
         : ({ status: 'EXCLUDED', reason: 'NO_DATA', storeCount: null } as const);
       if (row.status === 'EXCLUDED') {
         exclusions[row.reason]++;

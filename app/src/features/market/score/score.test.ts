@@ -10,7 +10,7 @@ import {
   type AreaSeries,
   type QuarterObservation,
 } from './dataset.ts';
-import { areaUnderCurve, fitLogistic, kolmogorovSmirnov, sigmoid } from './logistic.ts';
+import { areaUnderCurve, fitLogistic, fitPooledLogistic, kolmogorovSmirnov, sigmoid } from './logistic.ts';
 import { gradeForScore, marketScoreModelSchema, scoreFeatures, type IndustryModel } from './model.ts';
 import {
   buildQuarterSamples,
@@ -34,6 +34,7 @@ function series(entries: Record<string, Partial<QuarterObservation> | null>): Ar
       closedStoreCount: 1,
       openedStoreCount: 1,
       franchiseStoreCount: 2,
+      salesCount: 10,
       ...value,
     });
   }
@@ -131,6 +132,93 @@ describe('변수 계산', () => {
   });
 });
 
+describe('상권·업종 추가 변수 (모델 정의 v4)', () => {
+  // t=2024Q3. 같은 상권에 한식(점수 낼 업종)과 중식이 있다. 2022Q3(t−8)부터 값이 있다.
+  const quarters = ['20223', '20224', '20231', '20232', '20233', '20234', '20241', '20242', '20243'];
+  const make = (industryCode: string, overrides: Record<string, Partial<QuarterObservation> | null> = {}) => ({
+    ...series({ ...Object.fromEntries(quarters.map((q) => [q, {}])), ...overrides }),
+    industryCode,
+  });
+  const korean = make('CS100001', {
+    '20223': { storeCount: 16 },
+    '20233': { salesAmount: '800', storeCount: 20, salesCount: 10 },
+    '20234': { salesAmount: '1000', storeCount: 8, closedStoreCount: 2, openedStoreCount: 1 },
+    '20241': { salesAmount: '1200', storeCount: 10, closedStoreCount: 0, openedStoreCount: 2 },
+    '20242': { salesAmount: '1400', storeCount: 12, closedStoreCount: 3, openedStoreCount: 0 },
+    '20243': { salesAmount: '1600', storeCount: 10, closedStoreCount: 1, openedStoreCount: 1, salesCount: 40 },
+  });
+  const chinese = make('CS100002', {
+    '20233': { salesAmount: '300', storeCount: 5 },
+    '20234': { storeCount: 5, closedStoreCount: 1, openedStoreCount: 0 },
+    '20241': { storeCount: 5, closedStoreCount: 1, openedStoreCount: 0 },
+    '20242': { storeCount: 5, closedStoreCount: 0, openedStoreCount: 1 },
+    '20243': { salesAmount: '600', storeCount: 6, closedStoreCount: 0, openedStoreCount: 0 },
+  });
+  // 커피는 t−4 매출이 없어 상권 매출 증감에서 빠진다(없는 매출을 0으로 보지 않는다).
+  const coffee = make('CS100010', {
+    '20233': { salesAmount: null, storeCount: 4 },
+    '20234': { storeCount: 4, closedStoreCount: 0, openedStoreCount: 0 },
+    '20241': { storeCount: 4, closedStoreCount: 0, openedStoreCount: 0 },
+    '20242': { storeCount: 4, closedStoreCount: 0, openedStoreCount: 0 },
+    '20243': { salesAmount: '9000', storeCount: 4, closedStoreCount: 0, openedStoreCount: 0 },
+  });
+  const area = [korean, chinese, coffee];
+  const keys: FeatureKey[] = [
+    'areaClosureRate',
+    'areaOpenRate',
+    'areaSalesGrowth',
+    'areaStoreCount',
+    'storeGrowth',
+    'industryShare',
+    'salesPerTransaction',
+    'pastTwoYearClosureRate',
+  ];
+
+  it('같은 상권 요식업 전체와 업종 자신의 값으로 정의대로 계산한다', () => {
+    const row = buildFeatureRow(korean, '20243', keys, 5, area);
+    expect(row.status).toBe('OK');
+    if (row.status !== 'OK') return;
+    // 상권 폐업: 한식 6 + 중식 2 + 커피 0 = 8, t−4 상권 점포 20 + 5 + 4 = 29
+    expect(row.features.areaClosureRate).toBeCloseTo(8 / 29, 12);
+    // 상권 개업: 한식 4 + 중식 1 + 커피 0 = 5
+    expect(row.features.areaOpenRate).toBeCloseTo(5 / 29, 12);
+    // t와 t−4 모두 매출이 있는 한식·중식만: (1600 + 600) ÷ (800 + 300)
+    expect(row.features.areaSalesGrowth).toBeCloseTo(Math.log(2200 / 1100), 12);
+    // t 상권 점포 10 + 6 + 4 = 20
+    expect(row.features.areaStoreCount).toBeCloseTo(Math.log(20), 12);
+    expect(row.features.storeGrowth).toBeCloseTo(Math.log(10 / 20), 12);
+    expect(row.features.industryShare).toBeCloseTo(10 / 20, 12);
+    expect(row.features.salesPerTransaction).toBeCloseTo(Math.log(1600 / 40), 12);
+    // t−7~t 한식 폐업 합: 2022Q4~2023Q3 기본값 1×4 + 2 + 0 + 3 + 1 = 10, t−8 점포 16
+    expect(row.features.pastTwoYearClosureRate).toBeCloseTo(10 / 16, 12);
+  });
+
+  it('계산할 값이 없으면 0으로 바꾸지 않고 FEATURE_UNAVAILABLE로 뺀다', () => {
+    // 같은 상권 다른 업종의 폐업 수가 비면 상권 폐업률을 낼 수 없다.
+    const brokenChinese = make('CS100002', { '20242': { storeCount: 5, closedStoreCount: null } });
+    expect(buildFeatureRow(korean, '20243', ['areaClosureRate'], 5, [korean, brokenChinese, coffee])).toMatchObject({
+      reason: 'FEATURE_UNAVAILABLE',
+    });
+    // 2년 폐업률은 t−8 점포 수가 있어야 한다.
+    const shortHistory = { ...korean, byQuarter: new Map([...korean.byQuarter].filter(([q]) => q !== '20223')) };
+    expect(buildFeatureRow(shortHistory, '20243', ['pastTwoYearClosureRate'], 5, area)).toMatchObject({
+      reason: 'FEATURE_UNAVAILABLE',
+    });
+    // 매출 건수가 없으면 건당 매출을 내지 않는다.
+    const noCount = {
+      ...korean,
+      byQuarter: new Map(korean.byQuarter).set('20243', { ...korean.byQuarter.get('20243')!, salesCount: null }),
+    };
+    expect(buildFeatureRow(noCount, '20243', ['salesPerTransaction'], 5, area)).toMatchObject({
+      reason: 'FEATURE_UNAVAILABLE',
+    });
+  });
+
+  it('상권 변수를 요청하면서 같은 상권 자료를 넘기지 않으면 자료 부족이 아니라 호출 오류다', () => {
+    expect(() => buildFeatureRow(korean, '20243', ['areaClosureRate'])).toThrow('같은 상권');
+  });
+});
+
 describe('라벨 계산', () => {
   it('t+1~t+4 폐업 수 합을 t 점포 수로 나눈다', () => {
     const data = series({
@@ -190,6 +278,45 @@ describe('로지스틱 회귀', () => {
     expect(fit.coefficients[1]).toBeCloseTo(1.2, 1);
     expect(fit.coefficients[2]).toBeCloseTo(-0.8, 1);
     expect(fit.standardErrors.every((value) => value > 0 && value < 0.1)).toBe(true);
+  });
+
+  // 표본이 적은 업종이 공통 계수를 따르게 하는 부분 통합(ADR 0008 개정). 벌점이 0이면 업종별 따로 학습과 같고,
+  // 벌점이 크면 업종별 편차가 0으로 줄어 모든 업종의 계수가 같아진다. 절편은 업종마다 따로다.
+  describe('부분 통합 학습', () => {
+    let seed = 7;
+    const random = () => (seed = (seed * 1664525 + 1013904223) % 2 ** 32) / 2 ** 32;
+    const group = (n: number, intercept: number, betas: number[]) => {
+      const features: number[][] = [];
+      const labels: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const x = betas.map(() => random() * 4 - 2);
+        features.push(x);
+        labels.push(random() < sigmoid(intercept + x.reduce((sum, v, j) => sum + v * betas[j], 0)) ? 1 : 0);
+      }
+      return { features, labels };
+    };
+    const groups = [group(4000, 0.3, [1.0, -0.5]), group(3000, -0.4, [0.4, -1.0])];
+
+    it('벌점 0이면 업종별 따로 학습한 계수와 같다', () => {
+      const pooled = fitPooledLogistic(groups, 0);
+      expect(pooled.converged).toBe(true);
+      groups.forEach((data, i) => {
+        const alone = fitLogistic(data.features, data.labels);
+        expect(pooled.groups[i].intercept).toBeCloseTo(alone.coefficients[0], 6);
+        pooled.groups[i].coefficients.forEach((beta, j) => expect(beta).toBeCloseTo(alone.coefficients[j + 1], 6));
+        pooled.groups[i].standardErrors.forEach((se, j) => expect(se).toBeCloseTo(alone.standardErrors[j + 1], 6));
+      });
+    });
+
+    it('벌점이 크면 업종 계수가 공통 계수로 모이고 절편은 업종마다 남는다', () => {
+      const pooled = fitPooledLogistic(groups, 1e9);
+      const [first, second] = pooled.groups;
+      first.coefficients.forEach((beta, j) => expect(beta).toBeCloseTo(second.coefficients[j], 4));
+      expect(first.intercept).not.toBeCloseTo(second.intercept, 1);
+      // 두 업종 계수의 사이 값이다.
+      expect(first.coefficients[0]).toBeGreaterThan(0.4);
+      expect(first.coefficients[0]).toBeLessThan(1.0);
+    });
   });
 
   it('AUC는 순위로 계산하고 동점은 절반으로 센다', () => {

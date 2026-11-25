@@ -8,21 +8,23 @@ import {
   ACTIVE_FEATURE_KEYS,
   COMPARISON_MODELS,
   DEFAULT_GRADE_BOUNDARIES,
+  DEVIATION_PENALTY,
   MIN_STORE_COUNT,
   MODEL_DEFINITION_VERSION,
 } from '../src/features/market/score/config.ts';
 import { INDUSTRY_CODES } from '../src/features/industries.ts';
+import { groupSeriesByArea } from '../src/features/market/score/dataset.ts';
 import { loadScoreSeries } from '../src/features/market/score/read.ts';
 import { marketScoreModelSchema, type MarketScoreModel } from '../src/features/market/score/model.ts';
 import { renderTrainingReport, type LatestQuarterSummary } from '../src/features/market/score/report.ts';
-import { scoreQuarter, trainIndustryModel } from '../src/features/market/score/train.ts';
+import { scoreQuarter, trainScoreModels } from '../src/features/market/score/train.ts';
 import { marketIndustry } from '../src/features/market/types.ts';
 
 const USAGE = `사용법: npm --prefix app run score:train [-- --version <버전>]
 
-ACTIVE 상권 릴리스로 업종별 상권 생존점수 모델을 학습하고(ADR 0008)
-app/models/market-score/<버전>.json(계수)과 <버전>.report.md(학습 리포트)를 만든다.
-같은 학습·테스트 행으로 기준선(직전 1년 폐업률)과 결합 모델도 학습해 리포트에서 비교한다.
+ACTIVE 상권 릴리스로 요식업 업종의 상권 생존점수 모델을 부분 통합으로 함께 학습하고(ADR 0008)
+app/models/market-score/<버전>.json(업종별 계수)과 <버전>.report.md(학습 리포트)를 만든다.
+같은 학습·테스트 행으로 기준선(직전 1년 폐업률)·원안·v3 모델을 업종마다 학습해 리포트에서 비교한다.
 같은 버전 파일이 있으면 덮어쓰지 않는다.
 
   --version <버전>   기본값: market-score-<모델 정의 버전>-<데이터 끝 분기>
@@ -69,27 +71,28 @@ async function main() {
     }
     console.log(`상권 릴리스 ${data.releaseKey}, 분기 ${dataStart}~${dataEnd} (${data.quarters.length}개)`);
 
-    const results = INDUSTRY_CODES.map((industryCode) => {
-      const industryName = marketIndustry(industryCode)?.displayName ?? industryCode;
-      const result = trainIndustryModel({
+    const results = trainScoreModels({
+      industries: INDUSTRY_CODES.map((industryCode) => ({
         industryCode,
-        industryName,
+        industryName: marketIndustry(industryCode)?.displayName ?? industryCode,
         seriesList: data.seriesByIndustry.get(industryCode) ?? [],
-        dataStart,
-        dataEnd,
-        featureKeys: ACTIVE_FEATURE_KEYS,
-        comparisonModels: COMPARISON_MODELS,
-        minStoreCount: MIN_STORE_COUNT,
-        gradeBoundaries: [...DEFAULT_GRADE_BOUNDARIES],
-      });
-      console.log(`${industryName}: 학습 ${result.model.trainSize} · 테스트 ${result.model.testSize}`);
+      })),
+      dataStart,
+      dataEnd,
+      featureKeys: ACTIVE_FEATURE_KEYS,
+      comparisonModels: COMPARISON_MODELS,
+      deviationPenalty: DEVIATION_PENALTY,
+      minStoreCount: MIN_STORE_COUNT,
+      gradeBoundaries: [...DEFAULT_GRADE_BOUNDARIES],
+    });
+    for (const result of results) {
+      console.log(`${result.model.industryName}: 학습 ${result.model.trainSize} · 테스트 ${result.model.testSize}`);
       for (const item of result.comparisons) {
         console.log(
           `  ${item.label}: 테스트 AUC ${item.evaluation.testAuc.toFixed(3)} · KS ${item.evaluation.ks.toFixed(3)}`,
         );
       }
-      return result;
-    });
+    }
 
     const model: MarketScoreModel = marketScoreModelSchema.parse({
       version,
@@ -103,12 +106,14 @@ async function main() {
     });
 
     const latest: Record<string, LatestQuarterSummary> = {};
+    const seriesByArea = groupSeriesByArea(data.seriesByIndustry.values());
     for (const industry of model.industries) {
       latest[industry.industryCode] = {
         quarter: dataEnd,
         ...scoreQuarter({
           model: industry,
           seriesList: data.seriesByIndustry.get(industry.industryCode) ?? [],
+          seriesByArea,
           quarter: dataEnd,
           minStoreCount: model.minStoreCount,
           gradeBoundaries: model.gradeBoundaries,

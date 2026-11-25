@@ -17,6 +17,7 @@ function series(areaCode: string, entries: Record<string, Partial<QuarterObserva
       closedStoreCount: 1,
       openedStoreCount: 1,
       franchiseStoreCount: 1,
+      salesCount: 10,
       ...value,
     });
   }
@@ -162,6 +163,45 @@ describe('점수 생성', () => {
     expect(korean.featureAverages.storeCount).toBe('10');
     expect(korean.monthlyRevenueWarningRange).toEqual({ low: '33', high: '267' });
     expect(korean.exclusions.FEW_STORES).toBe(1);
+  });
+
+  // 상권 변수(모델 정의 v4)는 점수 내는 업종만이 아니라 같은 상권의 요식업 업종 전체로 계산한다.
+  it('상권 변수는 같은 상권의 다른 업종 점포까지 더해 계산하고 화면 값으로 남긴다', () => {
+    const areaModel: MarketScoreModel = {
+      ...model,
+      industries: [
+        {
+          ...industry('CS100001', 0.65),
+          features: [
+            {
+              key: 'areaStoreCount',
+              label: '상권 요식업 점포 수',
+              definition: '',
+              expectedScoreDirection: 0,
+              beta: 0.5,
+              standardError: 0.1,
+              pValue: 0,
+              mean: Math.log(10),
+              std: 1,
+            },
+          ],
+        },
+      ],
+    };
+    const chinese = { ...full('3110001', { '20262': { storeCount: 7 } }), industryCode: 'CS100002' };
+    const built = buildScores({
+      model: areaModel,
+      seriesByIndustry: new Map([
+        ['CS100001', [full('3110001')]],
+        ['CS100002', [chinese]],
+      ]),
+      areas: [{ areaType: 'A', areaCode: '3110001' }],
+      quarter: '20262',
+    });
+    const feature = built.rows[0].detail!.features[0];
+    // 한식 10 + 중식 7
+    expect(feature).toMatchObject({ key: 'areaStoreCount', displayValue: '17', unit: 'COUNT' });
+    expect(feature.value).toBeCloseTo(Math.log(17), 12);
   });
 
   // 계획 스냅샷과 화면 문구가 릴리스마다 맞는 해석을 고르려면 릴리스에 해석이 남아야 한다.

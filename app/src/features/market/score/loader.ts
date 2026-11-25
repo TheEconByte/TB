@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient } from '../../../generated/prisma/client.ts';
 import { sha256Hex } from '../checksum.ts';
+import { INDUSTRY_CODES } from '../../industries.ts';
 import { findActiveRelease } from '../read.ts';
 import { buildScores, type BuiltScoreRow, type ScoreSummary } from './build.ts';
 import { SCORE_BUILD_VERSION } from './config.ts';
@@ -65,10 +66,8 @@ export async function buildScoreRelease(options: {
       `계수 파일은 ${model.marketReleaseKey}로 학습했고, 점수는 현재 ACTIVE 릴리스 ${marketRelease.releaseKey}로 계산합니다.`,
     );
   }
-  const data = await loadScoreSeries(
-    prisma,
-    model.industries.map((industry) => industry.industryCode),
-  );
+  // 상권 변수는 같은 상권의 요식업 업종 전체로 계산한다. 학습(score:train)과 같은 업종 목록을 읽어야 값이 같다.
+  const data = await loadScoreSeries(prisma, INDUSTRY_CODES);
   const quarter = data.quarters.at(-1);
   if (!quarter) throw new Error('상권 릴리스에 분기 자료가 없습니다.');
   const areas = await prisma.marketArea.findMany({
