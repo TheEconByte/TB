@@ -893,6 +893,20 @@ describe('the extraction prompt', () => {
       expect(verdict(6, 'region', { districtCode: district('중구') })).toBe('MISMATCH');
     });
 
+    // 기업마당은 시·도가 낸 공고의 제목 맨 앞에 그 시·도를 표시한다. 공고문에 지역 조건이 없어도 그 표시를 지역 한정으로
+    // 읽고, 근거는 제목의 표시다(사용자 결정 2026-11-26, 프롬프트 v10). 서울 사용자에게는 안 맞는다.
+    it('reads a province mark at the start of the title as the region when the notice states none', () => {
+      const example = PROMPT_EXAMPLES[7];
+      expect(example.product.startsWith('[충북]')).toBe(true);
+      expect(example.notice).not.toMatch(/충북|충청/);
+      expect(example.output.region.quote).toBe('[충북]');
+      expect(verified(7).region).toMatchObject({
+        status: 'READ',
+        value: { scope: 'PROVINCES', provinces: ['충북'] },
+      });
+      expect(verdict(7, 'region', { districtCode: district('강남구') })).toBe('MISMATCH');
+    });
+
     it('keeps a Seoul district limit, so only that district matches', () => {
       expect(verdict(2, 'region', { districtCode: district('성북구') })).toBe('MATCH');
       expect(verdict(2, 'region', { districtCode: district('강남구') })).toBe('MISMATCH');

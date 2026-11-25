@@ -1040,29 +1040,6 @@ details.release-card[open] > summary {
 .funding-hero {
   padding-bottom: 30px;
 }
-.status-counts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 22px;
-}
-.status-count {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.status-count span {
-  color: var(--muted);
-  font-size: 12px;
-}
-.status-count strong {
-  font-size: 19px;
-  letter-spacing: -0.5px;
-}
 .funding-branch {
   margin: 34px 0 12px;
   scroll-margin-top: 16px;
@@ -1071,16 +1048,6 @@ details.release-card[open] > summary {
   margin: 10px 0 14px;
   color: var(--muted);
   font-size: 13px;
-}
-.status-counts.branch-counts {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 16px;
-}
-.status-counts.branch-counts .status-count {
-  padding: 10px 14px;
-}
-.status-counts.branch-counts strong {
-  font-size: 16px;
 }
 .candidate-group {
   background: var(--paper);
@@ -1221,20 +1188,11 @@ details.release-card[open] > summary {
   color: var(--muted);
 }
 @media (max-width: 850px) {
-  .status-counts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .candidate-meta {
     grid-template-columns: 1fr;
   }
 }
 @media (max-width: 560px) {
-  .status-counts {
-    grid-template-columns: 1fr;
-  }
-  .status-counts.branch-counts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .candidate-group {
     padding: 18px;
   }

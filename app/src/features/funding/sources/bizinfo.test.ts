@@ -82,10 +82,50 @@ describe('기업마당 신청기간 해석', () => {
   });
 });
 
+describe('기업마당 제목의 서울 밖 지역 표시', () => {
+  // 사용자 결정(2026-11-26): 서울 사용자에게 다른 시·도 공고는 신청할 수 없으므로 본문을 받거나 AI로 읽기 전에 뺀다.
+  // 표시에 서울이나 전국이 함께 있으면 서울도 대상이라 남긴다. 표시가 없으면 제목 본문의 지명으로 추측하지 않는다.
+  it('제목 맨 앞 표시가 서울 밖 시·도인 공고만 빼고 센다', () => {
+    const titles: Array<[string, boolean]> = [
+      ['[경남] 김해시 2026년 소상공인 육성자금 지원계획 공고', false],
+      ['[대구ㆍ경북] 소상공인 판로 지원 공고', false],
+      ['[전남광주] 여수시 2026년 소상공인 융자금 이차보전 지원 계획 변경 공고', false],
+      ['  [제주] 소상공인 저금리 대환대출 특별보증 공고', false],
+      ['[서울] 서대문구 2026년 청년창업기업 경영컨설팅 신청 기업 모집 공고', true],
+      ['[서울ㆍ경기] 수도권 소상공인 판로 지원 공고', true],
+      ['[전국] 소상공인 온라인 판로 지원 공고', true],
+      ['2026년 광주 창업BuS 프로그램 창업기업 모집 공고', true],
+      ['2026년 소상공인 경영안정 바우처 지원사업 [경남] 시행 공고', true],
+    ];
+    const { products, skipped } = mapBizinfoItems(
+      titles.map(([title], index) => item({ pblancId: `PBLN_R${index}`, pblancNm: title })),
+      { asOfDate: AS_OF, responseChecksum: CHECKSUM },
+    );
+    expect(products.map((product) => product.name)).toEqual(
+      titles.filter(([, kept]) => kept).map(([title]) => title.trim()),
+    );
+    expect(skipped.outsideSeoul).toBe(4);
+  });
+
+  it('빼는 공고는 본문 계획도 만들지 않고, 수집 로그에 건수를 남긴다', async () => {
+    const { promise, logs } = collect([
+      {
+        status: 200,
+        body: body([item({ pblancId: 'PBLN_S' }), item({ pblancId: 'PBLN_K', pblancNm: '[경기] 소상공인 지원 공고' })]),
+      },
+    ]);
+    const collection = await promise;
+    // 급감 판정은 출처가 준 공고 수로 한다. 지역으로 뺀 공고도 받은 공고다.
+    expect(collection.fetchedCount).toBe(2);
+    expect(collection.products.map((product) => product.sourceRef.externalId)).toEqual(['PBLN_S']);
+    expect(logs.join('\n')).toContain('서울 밖 지역 표시 1건');
+  });
+});
+
 describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
   it('사업 단계·지원 유형·지역을 추측하지 않고, 검증을 통과하는 상품을 만든다', () => {
     const { products, skipped } = mapBizinfoItems([item()], { asOfDate: AS_OF, responseChecksum: CHECKSUM });
-    expect(skipped).toEqual({ notTarget: 0, ended: 0, malformed: 0, duplicate: 0 });
+    expect(skipped).toEqual({ notTarget: 0, ended: 0, outsideSeoul: 0, malformed: 0, duplicate: 0 });
     expect(products).toHaveLength(1);
     const [product] = products;
     expect(product).toMatchObject({
@@ -119,8 +159,8 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
     expect(validation.ok).toBe(true);
   });
 
-  // ADR 0009 §2: 지역으로는 거르지 않는다. 서울 밖으로 보이는 공고도 올리고, 대상 지역은 본문에서 AI가 읽는다.
-  it('소상공인·창업벤처 대상이 아닌 공고, 끝난 공고, 형식이 깨진 공고와 중복은 빼고 세며, 서울 밖 공고는 빼지 않는다', () => {
+  // ADR 0009 §2: 제목 맨 앞 표시가 서울 밖 시·도인 공고만 지역으로 뺀다. 표시가 없으면 소관기관이 다른 시·도여도 올린다.
+  it('소상공인·창업벤처 대상이 아닌 공고, 끝난 공고, 형식이 깨진 공고와 중복은 빼고 세며, 소관기관만으로는 빼지 않는다', () => {
     const { products, skipped } = mapBizinfoItems(
       [
         item({ pblancId: 'PBLN_A', trgetNm: '중소기업' }),
@@ -144,10 +184,10 @@ describe('기업마당 공고를 카탈로그 상품으로 바꾸기', () => {
       ],
       { asOfDate: AS_OF, responseChecksum: CHECKSUM },
     );
-    expect(skipped).toEqual({ notTarget: 1, ended: 1, malformed: 3, duplicate: 1 });
+    expect(skipped).toEqual({ notTarget: 1, ended: 1, outsideSeoul: 1, malformed: 3, duplicate: 1 });
     const byId = new Map(products.map((product) => [product.sourceRef.externalId, product]));
-    expect([...byId.keys()]).toEqual(['PBLN_B', 'PBLN_C', 'PBLN_F', 'PBLN_G', 'PBLN_H']);
-    // 공고명·소관기관(서울·서울 자치구·다른 시·도)으로 지역을 정하지 않는다. 지역 근거도 남기지 않는다(ADR 0009 §7).
+    expect([...byId.keys()]).toEqual(['PBLN_C', 'PBLN_F', 'PBLN_G', 'PBLN_H']);
+    // 남은 공고의 지역은 공고명·소관기관(서울·서울 자치구·다른 시·도)으로 정하지 않는다. 지역 근거도 남기지 않는다(ADR 0009 §7).
     for (const [id, product] of byId) {
       expect(product.region, id).toMatchObject({ scope: 'UNKNOWN', districtCodes: [] });
       expect(

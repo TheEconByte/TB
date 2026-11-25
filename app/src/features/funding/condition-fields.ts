@@ -21,7 +21,10 @@ export const CONDITION_MODEL = 'claude-haiku-5-5';
 // 인용으로 제목을 적은 공고의 지역이 버려졌다). 프롬프트와 출력 스키마는 그대로다.
 // v9(2026-11-13): 검증이 지역의 대상·제외 서울 자치구 이름을 인용이나 제목에서 찾고, 없으면 지역을 읽지 못함으로 둔다(평가에서
 // 대구 동구 공고를 프롬프트의 예시 이름인 강남구로 적었다). 프롬프트와 출력 스키마는 그대로다.
-export const CONDITION_PROMPT_VERSION = 'funding-conditions-v9';
+// v10(2026-11-26): 공고문에 지역 조건이 없으면 제목 맨 앞의 [시·도] 표시를 그 시·도 한정으로 읽게 했다. [충북] 예시를 더했다.
+// v11(2026-11-26): 제목 맨 앞의 [시·도] 표시가 있으면 공고문 내용과 관계없이 그 시·도로 한정한다(사용자 결정). [서울] 공고가
+// 자치구로 더 좁히는 경우만 자치구다. 인용은 제목의 표시다.
+export const CONDITION_PROMPT_VERSION = 'funding-conditions-v11';
 
 export const CONDITION_BUSINESS_STAGES = ['PRE_STARTUP_ONLY', 'BUSINESS_ONLY', 'BOTH'] as const;
 export const CONDITION_FOOD_BUSINESS = ['EXCLUDED', 'NOT_EXCLUDED'] as const;

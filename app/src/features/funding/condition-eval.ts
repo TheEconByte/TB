@@ -7,13 +7,13 @@ import {
 import { SEOUL_DISTRICTS } from './districts.ts';
 import {
   MATCH_CONDITION_KEYS,
-  bizinfoTitleMark,
   judgeOpenNotice,
   matchConditions,
   type FundingMatchProfile,
   type MatchConditionKey,
 } from './matching.ts';
 import { verifyConditionOutput, type ConditionOutput } from './notice-extraction.ts';
+import { bizinfoTitleMark } from './title-mark.ts';
 
 // 공고 조건 추출 평가의 정답과 채점(app/eval/funding-conditions). 운영자 도구이고 웹 요청 경로에서 import하지 않는다.
 

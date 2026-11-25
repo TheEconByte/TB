@@ -3217,15 +3217,15 @@
         "mentioned": true,
         "value": {
           "scope": "PROVINCES",
-          "provinces": ["대전"],
+          "provinces": ["대구"],
           "districts": [],
           "excludedProvinces": [],
           "excludedDistricts": []
         },
-        "quote": "유성구에 영업신고한 상시근로자 5인 미만 사업자",
+        "quote": "[대구]",
         "confidence": "clear",
         "alternatives": [],
-        "note": "대전광역시 유성구의 공고다. 제목의 [대구] 표시는 기업마당이 잘못 단 것으로, 본문의 발행 기관과 맞지 않는다. 어느 쪽이든 서울 밖이라 판정은 같다."
+        "note": "제목 맨 앞의 [대구] 표시를 공고문 내용과 관계없이 지역 조건으로 본다. 사용자 결정(2026-11-26)."
       },
       "foodBusiness": {
         "mentioned": true,
@@ -3393,15 +3393,15 @@
         "mentioned": true,
         "value": {
           "scope": "PROVINCES",
-          "provinces": ["전남"],
+          "provinces": ["전남", "광주"],
           "districts": [],
           "excludedProvinces": [],
           "excludedDistricts": []
         },
-        "quote": "광양시 공고 제2026-1690호",
-        "confidence": "ambiguous",
-        "alternatives": [null],
-        "note": "소재지 요건을 밝힌 문장은 없지만, 광양시가 공고하고 광양시보건소가 접수·선정하며 컨설팅 업체가 영업장을 방문하는 사업이라 광양시 업소 대상으로 읽힌다. 문장이 없으니 언급 없음도 인정한다. 사용자 결정(2026-11-12)."
+        "quote": "[전남광주]",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제목 맨 앞의 [전남광주] 표시를 공고문 내용과 관계없이 지역 조건으로 본다. 사용자 결정(2026-11-26)."
       },
       "foodBusiness": {
         "mentioned": true,
@@ -3668,11 +3668,17 @@
       },
       "region": {
         "mentioned": true,
-        "value": null,
-        "quote": "본사 인천 기업 또는 투자 후 1년 이내 인천으로 본사 이전 기업",
+        "value": {
+          "scope": "PROVINCES",
+          "provinces": ["인천"],
+          "districts": [],
+          "excludedProvinces": [],
+          "excludedDistricts": []
+        },
+        "quote": "[인천]",
         "confidence": "clear",
         "alternatives": [],
-        "note": "인천 본사 기업과 투자 후 1년 안에 인천으로 옮길 기업을 함께 받아, 인천 밖 기업도 이전을 약속하면 신청할 수 있다. 하나의 값으로 옮길 수 없다. 사용자 결정(2026-11-12)."
+        "note": "제목 맨 앞의 [인천] 표시를 공고문 내용과 관계없이 지역 조건으로 본다. 사용자 결정(2026-11-26)."
       },
       "foodBusiness": {
         "mentioned": true,
@@ -4212,16 +4218,16 @@
       "region": {
         "mentioned": true,
         "value": {
-          "scope": "NATIONWIDE",
-          "provinces": [],
+          "scope": "PROVINCES",
+          "provinces": ["부산"],
           "districts": [],
           "excludedProvinces": [],
           "excludedDistricts": []
         },
-        "quote": "사업자등록을 한 국내 소상공인",
-        "confidence": "ambiguous",
-        "alternatives": [null],
-        "note": "부산시·부산경제진흥원의 사업이고 촬영은 소담스퀘어 in 부산에서 하지만, 신청자격을 \"국내 소상공인\"으로 밝혔다. 소재지를 좁히는 문장이 아니라고 보면 언급 없음도 인정한다. 부산 한정은 아니다. 사용자 결정(2026-11-12)."
+        "quote": "[부산]",
+        "confidence": "clear",
+        "alternatives": [],
+        "note": "제목 맨 앞의 [부산] 표시를 공고문 내용과 관계없이 지역 조건으로 본다. 사용자 결정(2026-11-26)."
       },
       "foodBusiness": {
         "mentioned": true,

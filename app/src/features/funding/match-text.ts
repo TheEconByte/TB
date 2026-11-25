@@ -37,14 +37,11 @@ export const FUNDING_GROUP_BADGE_LABELS: Record<Extract<FundingMatchGroup, 'NOT_
   CLOSED: '마감',
 };
 
-// 탭 제목에 쓰는 공고 수. 목록에 남은 공고와 조건에 안 맞아 뺀 공고를 쓴다(마감은 탭 안에 있다). 폰 폭에서는 줄이 바뀌므로
-// 따로 돌려주고, 수는 줄바꿈 없는 공백으로 이름에 붙인다.
-export function tabCountTexts(counts: Record<FundingMatchGroup, number>): string[] {
+// 탭 제목에 쓰는 공고 수. 남은 공고 수만 쓴다(사용자 결정 2026-11-26). 조건에 안 맞아 뺀 공고와 마감 공고의 수는 목록 아래
+// 다시 보기 칸에서만 밝힌다(AGENTS.md §3-8). 수는 줄바꿈 없는 공백으로 이름에 붙인다.
+export function tabRemainingText(counts: Record<FundingMatchGroup, number>): string {
   const remaining = REMAINING_GROUPS.reduce((sum, group) => sum + counts[group], 0);
-  return [
-    `남은 공고\u00a0${numberFormat.format(remaining)}`,
-    `조건에 안 맞아 뺌\u00a0${numberFormat.format(counts.NOT_MATCHING)}`,
-  ];
+  return `남은 공고 ${numberFormat.format(remaining)}`;
 }
 
 // 카드에 조건을 나눠 적는 두 묶음. 공고가 밝힌 조건(읽은 값과 인용이 있다)과 직접 확인할 조건(AI가 읽지 못했거나 아직 읽지

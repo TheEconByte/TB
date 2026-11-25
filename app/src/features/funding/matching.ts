@@ -9,6 +9,7 @@ import {
 } from './condition-fields.ts';
 import { SEOUL_DISTRICTS } from './districts.ts';
 import { sourceRefKey, type FundingAutomation, type FundingCatalog, type FundingProduct } from './schema.ts';
+import { bizinfoTitleMark, isOutsideSeoulMark } from './title-mark.ts';
 import {
   FUNDING_SOURCE_LABELS,
   POLICY_LOAN_SUPPORT_TYPES,
@@ -439,16 +440,11 @@ function aiEndDatePassed(aiPeriod: ConditionReading<ConditionValues['application
 }
 
 // 기업마당은 지자체 공고의 제목 맨 앞에 [시·도]를 붙인다. 표시가 틀린 공고도 있어 지역 값으로는 쓰지 않는다.
-export function bizinfoTitleMark(title: string): string | null {
-  return /^\s*\[([^\]]+)\]/.exec(title)?.[1].trim() ?? null;
-}
-
 function leadingTitleMark(product: FundingProduct): string | null {
   if (product.origin !== 'SYNC' || product.sourceRef?.source !== 'BIZINFO') return null;
   return bizinfoTitleMark(product.name);
 }
 
-const NOT_LIMITING_MARKS = ['서울', '전국'];
 const SEOUL_MARK = '서울';
 const SEOUL_WIDE: ConditionValues['region'] = {
   scope: 'PROVINCES',
@@ -477,7 +473,7 @@ function withTitleRegionMark(conditions: ConditionMatch[], mark: string | null):
         : entry,
     );
   }
-  if (mark === null || NOT_LIMITING_MARKS.some((name) => mark.includes(name))) return conditions;
+  if (!isOutsideSeoulMark(mark)) return conditions;
   return conditions.map((entry) =>
     entry.key === 'region' && entry.checkReason === 'NOT_MENTIONED'
       ? { ...entry, checkReason: 'TITLE_REGION_MARK' as const }
