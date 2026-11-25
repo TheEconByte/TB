@@ -158,17 +158,49 @@ export async function listMarketAreas(prisma: PrismaClient, districtCode: string
           where: { releaseId: release.id, districtCode },
           orderBy: [{ areaType: 'asc' }, { areaCode: 'asc' }],
         });
+  const salesQuarterCounts = await countSalesQuarters(prisma, release.id, areas);
 
   return {
     kind: 'OK',
     payload: {
       release: toReleaseInfo(release),
       districts,
-      areas: areas.map(toAreaInfo),
+      areas: areas.map((area) => ({
+        ...toAreaInfo(area),
+        salesQuarterCounts: salesQuarterCounts(area),
+      })),
       filter: { districtCode },
       limitations: MARKET_LIMITATIONS,
     },
   };
+}
+
+// 상권·업종마다 매출 원값이 있는 분기 수. 사용자가 상권을 고르기 전에 매출 자료가 있는 곳을 알 수 있게 한다.
+// 열린 업종은 모두 키로 두고, 매출 행이 없으면 0이다.
+async function countSalesQuarters(
+  prisma: PrismaClient,
+  releaseId: string,
+  areas: readonly { areaType: string; areaCode: string }[],
+): Promise<(area: { areaType: string; areaCode: string }) => Record<string, number>> {
+  if (areas.length === 0) return () => ({});
+  const [industries, counts] = await Promise.all([
+    prisma.industry.findMany({ where: { releaseId, isSupported: true }, orderBy: { code: 'asc' } }),
+    prisma.marketQuarterly.groupBy({
+      by: ['areaType', 'areaCode', 'industryCode'],
+      where: {
+        releaseId,
+        areaCode: { in: areas.map((area) => area.areaCode) },
+        salesAmount: { not: null },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+  const served = industries.filter(isServedMarketIndustry).map((industry) => industry.code);
+  const byKey = new Map(
+    counts.map((row) => [`${row.areaType}:${row.areaCode}:${row.industryCode}`, row._count._all] as const),
+  );
+  return (area) =>
+    Object.fromEntries(served.map((code) => [code, byKey.get(`${area.areaType}:${area.areaCode}:${code}`) ?? 0]));
 }
 
 type AreaRow = {

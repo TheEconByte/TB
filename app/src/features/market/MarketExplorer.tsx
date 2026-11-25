@@ -6,6 +6,7 @@ import QuarterTrendChart, { type ChartPoint } from './QuarterTrendChart';
 import {
   MARKET_LIMITATIONS,
   type AreaInfo,
+  type AreaListItem,
   type IndustryInfo,
   type MarketAreaList,
   type MarketReport,
@@ -49,6 +50,18 @@ function areaSelectionValue(area: AreaInfo): string {
   return `${area.areaType}:${area.areaCode}`;
 }
 
+// 서울시 추정매출은 점포가 적은 상권·업종에 값을 주지 않는다. 고른 뒤에야 자료 부족을 보지 않도록, 상권 목록이
+// 알려 준 매출 분기 수로 자료가 없는 조합을 목록에서 뺀다. 키가 없으면 알 수 없으므로 빼지 않는다.
+function hasNoSales(area: AreaListItem, industryCode: string): boolean {
+  return area.salesQuarterCounts[industryCode] === 0;
+}
+
+// 요식업 어느 업종에도 매출 원값이 한 분기도 없는 상권. 고를 수 있어도 볼 자료가 없어 목록에서 빼고 뺀 수를 밝힌다.
+function hasNoFoodSales(area: AreaListItem): boolean {
+  const counts = Object.values(area.salesQuarterCounts);
+  return counts.length > 0 && counts.every((count) => count === 0);
+}
+
 // A response from our own API always carries a Korean message. A transport
 // failure does not, so fall back to a plain explanation instead of the
 // browser's "Failed to fetch".
@@ -62,7 +75,8 @@ export default function MarketExplorer() {
   const [activeRelease, setActiveRelease] = useState<ReleaseInfo | null>(null);
   const [districts, setDistricts] = useState<District[]>([]);
   const [districtCode, setDistrictCode] = useState('');
-  const [areas, setAreas] = useState<AreaInfo[]>([]);
+  const [areas, setAreas] = useState<AreaListItem[]>([]);
+  const [excludedAreaCount, setExcludedAreaCount] = useState(0);
   const [selection, setSelection] = useState('');
   const [industryCode, setIndustryCode] = useState('');
   const [summary, setSummary] = useState<MarketReport | null>(null);
@@ -171,6 +185,7 @@ export default function MarketExplorer() {
     setScore(null);
     setScoreError(null);
     setAreaError(null);
+    setExcludedAreaCount(0);
     if (next === '') {
       setAreas([]);
       return;
@@ -181,11 +196,14 @@ export default function MarketExplorer() {
       if (requestId !== latestAreaRequest.current) return;
       // 자치구마다 상권이 100개 가까이 되어 찾기 쉽게 이름 순으로 놓는다.
       setAreas(
-        [...data.areas].sort(
-          (a, b) =>
-            a.displayName.localeCompare(b.displayName, 'ko') || a.areaTypeName.localeCompare(b.areaTypeName, 'ko'),
-        ),
+        data.areas
+          .filter((area) => !hasNoFoodSales(area))
+          .sort(
+            (a, b) =>
+              a.displayName.localeCompare(b.displayName, 'ko') || a.areaTypeName.localeCompare(b.areaTypeName, 'ko'),
+          ),
       );
+      setExcludedAreaCount(data.areas.filter(hasNoFoodSales).length);
       setActiveRelease(data.release);
     } catch (error) {
       if (requestId !== latestAreaRequest.current) return;
@@ -218,6 +236,13 @@ export default function MarketExplorer() {
   }, []);
 
   const selectedArea = areas.find((area) => areaSelectionValue(area) === selection) ?? null;
+  // 고른 업종이나 상권을 기준으로 매출 자료가 없는 상대 항목은 목록에 내지 않는다. 목록에서 고른 짝은 늘 자료가
+  // 있으므로, 양쪽을 함께 걸러도 이미 고른 값이 목록에서 사라지지 않는다.
+  const areaOptions = industryCode ? areas.filter((area) => !hasNoSales(area, industryCode)) : areas;
+  const industryOptions = selectedArea
+    ? industries.filter((industry) => !hasNoSales(selectedArea, industry.code))
+    : industries;
+  const selectedIndustryName = industries.find((item) => item.code === industryCode)?.displayName;
   const filteredBusinessCategories = businessCategories.filter(
     (category) => category.marketIndustryCode === industryCode,
   );
@@ -297,12 +322,20 @@ export default function MarketExplorer() {
                           ? '자치구를 먼저 선택하세요'
                           : '상권을 선택하세요'}
                     </option>
-                    {areas.map((area) => (
+                    {areaOptions.map((area) => (
                       <option key={areaSelectionValue(area)} value={areaSelectionValue(area)}>
                         {area.displayName} · {area.areaTypeName}
                       </option>
                     ))}
                   </select>
+                  {(excludedAreaCount > 0 || areaOptions.length < areas.length) && (
+                    <small>
+                      {excludedAreaCount > 0 &&
+                        `요식업 매출 자료가 없는 상권 ${numberFormat.format(excludedAreaCount)}곳은 목록에서 뺐습니다. `}
+                      {areaOptions.length < areas.length &&
+                        `${selectedIndustryName} 매출 자료가 없는 상권 ${numberFormat.format(areas.length - areaOptions.length)}곳도 뺐습니다.`}
+                    </small>
+                  )}
                 </label>
                 <label className="field">
                   <span>3. 업종</span>
@@ -318,12 +351,18 @@ export default function MarketExplorer() {
                     }}
                   >
                     <option value="">업종을 선택하세요</option>
-                    {industries.map((industry) => (
+                    {industryOptions.map((industry) => (
                       <option key={industry.code} value={industry.code}>
                         {industry.displayName}
                       </option>
                     ))}
                   </select>
+                  {industryOptions.length < industries.length && (
+                    <small>
+                      이 상권에 매출 자료가 없는 업종 {numberFormat.format(industries.length - industryOptions.length)}
+                      개는 목록에서 뺐습니다.
+                    </small>
+                  )}
                 </label>
                 <label className="field">
                   <span>4. 세부 업종 경쟁 범위</span>
@@ -382,7 +421,11 @@ export default function MarketExplorer() {
                 </div>
               )}
               {districtCode !== '' && areas.length === 0 && !areasLoading && !areaError && (
-                <p className="empty-state">이 자치구에는 등록된 상권이 없습니다.</p>
+                <p className="empty-state">
+                  {excludedAreaCount > 0
+                    ? '이 자치구에는 요식업 매출 자료가 있는 상권이 없습니다.'
+                    : '이 자치구에는 등록된 상권이 없습니다.'}
+                </p>
               )}
               {summaryLoading && (
                 <p className="loading-state" role="status">
