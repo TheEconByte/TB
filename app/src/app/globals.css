@@ -40,7 +40,7 @@ select {
   font: inherit;
 }
 main {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: auto;
   padding: 0 32px;
 }
@@ -681,15 +681,6 @@ th {
     position: static;
     margin-top: 24px;
   }
-  .field-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .scenario-grid {
-    grid-template-columns: 1fr;
-  }
-  .changes {
-    min-height: 0;
-  }
 }
 @media (max-width: 560px) {
   main {
@@ -723,10 +714,6 @@ th {
   }
   .form-section {
     padding: 22px 18px;
-  }
-  .field-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
   }
   .button-row {
     display: grid;
@@ -1128,7 +1115,10 @@ details.release-card[open] > summary {
 }
 .candidate-list {
   display: grid;
+  /* 카드가 460px 이상 들어가는 폭이면 두 줄로 놓는다. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
   gap: 16px;
+  align-items: start;
 }
 .candidate-card {
   background: #ffffff;
@@ -1386,7 +1376,7 @@ details.release-card[open] > summary {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
   gap: 10px;
 }
 .match-condition {
@@ -1441,11 +1431,6 @@ details.release-card[open] > summary {
   font-size: 12px;
   font-weight: 700;
   color: #4e5968;
-}
-@media (max-width: 850px) {
-  .match-conditions {
-    grid-template-columns: 1fr;
-  }
 }
 @media (max-width: 560px) {
   .funding-tabs {
@@ -1790,9 +1775,18 @@ details.release-card[open] > summary {
   margin: 0;
   font-size: 18px;
 }
+.competition-details {
+  margin-top: 14px;
+}
+.competition-details > summary {
+  cursor: pointer;
+  padding-block: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
 .competition-list {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   display: grid;
   gap: 8px;
@@ -2373,4 +2367,66 @@ details.release-card[open] > summary {
 }
 .results .result-history {
   margin-bottom: 16px;
+}
+
+/* 넓은 화면 배치. 재무 계획은 입력과 결과·참고를 두 열로, 자금 공고와 상권은 고르는 칸을 왼쪽에 붙여 둔다.
+   좁은 화면에서는 모두 한 열이다. 열 안의 칸 수는 화면 폭이 아니라 열 폭(@container)으로 정한다. */
+.planner-inputs,
+.planner-side {
+  container-type: inline-size;
+  min-width: 0;
+}
+.planner-side > :first-child {
+  margin-top: 0;
+}
+@container (max-width: 640px) {
+  .field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 420px) {
+  .field-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+@container (max-width: 760px) {
+  .scenario-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .changes {
+    min-height: 0;
+  }
+}
+.split-aside,
+.split-main {
+  min-width: 0;
+}
+@media (min-width: 1360px) {
+  .planner-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+}
+@media (min-width: 1200px) {
+  .split-layout {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+  /* 고르는 칸은 내려가도 보이게 붙여 둔다. 화면보다 길면 그 안에서만 스크롤한다. */
+  .split-aside {
+    position: sticky;
+    top: 84px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+  .split-aside .select-row,
+  .split-aside .market-select-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
 }

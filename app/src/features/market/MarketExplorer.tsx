@@ -253,170 +253,174 @@ export default function MarketExplorer() {
       )}
 
       {!booting && activeRelease && (
-        <>
-          <details className="notice-box">
-            <summary>값을 볼 때 주의할 점</summary>
-            <ul>
-              {MARKET_LIMITATIONS.map((limitation) => (
-                <li key={limitation}>{limitation}</li>
-              ))}
-            </ul>
-          </details>
+        <div className="split-layout">
+          <div className="split-aside">
+            <details className="notice-box">
+              <summary>값을 볼 때 주의할 점</summary>
+              <ul>
+                {MARKET_LIMITATIONS.map((limitation) => (
+                  <li key={limitation}>{limitation}</li>
+                ))}
+              </ul>
+            </details>
 
-          <ReleaseCard release={activeRelease} />
+            <ReleaseCard release={activeRelease} />
 
-          <section className="picker" aria-labelledby="market-picker">
-            <h2 id="market-picker">상권·업종 고르기</h2>
-            <div className="select-row market-select-row">
-              <label className="field">
-                <span>1. 자치구</span>
-                <select value={districtCode} onChange={(event) => void changeDistrict(event.target.value)}>
-                  <option value="">자치구를 선택하세요</option>
-                  {districts.map((district) => (
-                    <option key={district.districtCode} value={district.districtCode}>
-                      {district.districtName} ({numberFormat.format(district.areaCount)}개 상권)
+            <section className="picker" aria-labelledby="market-picker">
+              <h2 id="market-picker">상권·업종 고르기</h2>
+              <div className="select-row market-select-row">
+                <label className="field">
+                  <span>1. 자치구</span>
+                  <select value={districtCode} onChange={(event) => void changeDistrict(event.target.value)}>
+                    <option value="">자치구를 선택하세요</option>
+                    {districts.map((district) => (
+                      <option key={district.districtCode} value={district.districtCode}>
+                        {district.districtName} ({numberFormat.format(district.areaCount)}개 상권)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>2. 상권</span>
+                  <select
+                    value={selection}
+                    disabled={areas.length === 0}
+                    onChange={(event) => {
+                      setSelection(event.target.value);
+                      void loadSummary(event.target.value, industryCode);
+                    }}
+                  >
+                    <option value="">
+                      {areasLoading
+                        ? '불러오는 중…'
+                        : districtCode === ''
+                          ? '자치구를 먼저 선택하세요'
+                          : '상권을 선택하세요'}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>2. 상권</span>
-                <select
-                  value={selection}
-                  disabled={areas.length === 0}
-                  onChange={(event) => {
-                    setSelection(event.target.value);
-                    void loadSummary(event.target.value, industryCode);
-                  }}
-                >
-                  <option value="">
-                    {areasLoading
-                      ? '불러오는 중…'
-                      : districtCode === ''
-                        ? '자치구를 먼저 선택하세요'
-                        : '상권을 선택하세요'}
-                  </option>
-                  {areas.map((area) => (
-                    <option key={areaSelectionValue(area)} value={areaSelectionValue(area)}>
-                      {area.displayName} · {area.areaTypeName}
+                    {areas.map((area) => (
+                      <option key={areaSelectionValue(area)} value={areaSelectionValue(area)}>
+                        {area.displayName} · {area.areaTypeName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>3. 업종</span>
+                  <select
+                    value={industryCode}
+                    disabled={industries.length === 0}
+                    onChange={(event) => {
+                      setIndustryCode(event.target.value);
+                      setDetailedIndustryCode('');
+                      setBusinessSummary(null);
+                      setBusinessError(null);
+                      void loadSummary(selection, event.target.value);
+                    }}
+                  >
+                    <option value="">업종을 선택하세요</option>
+                    {industries.map((industry) => (
+                      <option key={industry.code} value={industry.code}>
+                        {industry.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>4. 세부 업종 경쟁 범위</span>
+                  <select
+                    value={detailedIndustryCode}
+                    disabled={!industryCode || filteredBusinessCategories.length === 0}
+                    onChange={(event) => {
+                      setDetailedIndustryCode(event.target.value);
+                      void loadBusinessSummary(districtCode, event.target.value);
+                    }}
+                  >
+                    <option value="">
+                      {!industryCode
+                        ? '업종을 먼저 선택하세요'
+                        : filteredBusinessCategories.length === 0
+                          ? '세부 업종 자료 없음'
+                          : '선택하지 않음'}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>3. 업종</span>
-                <select
-                  value={industryCode}
-                  disabled={industries.length === 0}
-                  onChange={(event) => {
-                    setIndustryCode(event.target.value);
-                    setDetailedIndustryCode('');
-                    setBusinessSummary(null);
-                    setBusinessError(null);
-                    void loadSummary(selection, event.target.value);
-                  }}
-                >
-                  <option value="">업종을 선택하세요</option>
-                  {industries.map((industry) => (
-                    <option key={industry.code} value={industry.code}>
-                      {industry.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>4. 세부 업종 경쟁 범위</span>
-                <select
-                  value={detailedIndustryCode}
-                  disabled={!industryCode || filteredBusinessCategories.length === 0}
-                  onChange={(event) => {
-                    setDetailedIndustryCode(event.target.value);
-                    void loadBusinessSummary(districtCode, event.target.value);
-                  }}
-                >
-                  <option value="">
-                    {!industryCode
-                      ? '업종을 먼저 선택하세요'
-                      : filteredBusinessCategories.length === 0
-                        ? '세부 업종 자료 없음'
-                        : '선택하지 않음'}
-                  </option>
-                  {filteredBusinessCategories.map((category) => (
-                    <option key={category.code} value={category.code}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <small>{businessCategoryMessage}</small>
-              </label>
-            </div>
-          </section>
-
-          {(industryCode || detailedIndustryCode) && (
-            <section className="scope-grid" aria-label="데이터 집계 범위">
-              <div className="scope-card">
-                <span>매출·고객 분석</span>
-                <strong>
-                  {industries.find((item) => item.code === industryCode)?.displayName ?? '상위 업종 미선택'} 전체 기준
-                </strong>
-                <p>서울시 상권분석서비스(추정매출-상권) 관측값이며 개인 예상매출이 아닙니다.</p>
-              </div>
-              <div className="scope-card">
-                <span>경쟁 점포 현황</span>
-                <strong>
-                  {selectedBusinessCategory ? `${selectedBusinessCategory.name} 세부 업종 기준` : '세부 업종 미선택'}
-                </strong>
-                <p>소진공 상가(상권)정보의 점포 목록입니다. 매출은 들어 있지 않습니다.</p>
+                    {filteredBusinessCategories.map((category) => (
+                      <option key={category.code} value={category.code}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small>{businessCategoryMessage}</small>
+                </label>
               </div>
             </section>
-          )}
+          </div>
 
-          <section className="market-results" aria-live="polite" aria-busy={summaryLoading}>
-            {areaError && (
-              <div className="error-box" role="alert">
-                <h2>상권 목록을 불러오지 못했습니다.</h2>
-                <p>{areaError}</p>
-              </div>
+          <div className="split-main">
+            {(industryCode || detailedIndustryCode) && (
+              <section className="scope-grid" aria-label="데이터 집계 범위">
+                <div className="scope-card">
+                  <span>매출·고객 분석</span>
+                  <strong>
+                    {industries.find((item) => item.code === industryCode)?.displayName ?? '상위 업종 미선택'} 전체 기준
+                  </strong>
+                  <p>서울시 상권분석서비스(추정매출-상권) 관측값이며 개인 예상매출이 아닙니다.</p>
+                </div>
+                <div className="scope-card">
+                  <span>경쟁 점포 현황</span>
+                  <strong>
+                    {selectedBusinessCategory ? `${selectedBusinessCategory.name} 세부 업종 기준` : '세부 업종 미선택'}
+                  </strong>
+                  <p>소진공 상가(상권)정보의 점포 목록입니다. 매출은 들어 있지 않습니다.</p>
+                </div>
+              </section>
             )}
-            {districtCode !== '' && areas.length === 0 && !areasLoading && !areaError && (
-              <p className="empty-state">이 자치구에는 등록된 상권이 없습니다.</p>
-            )}
-            {summaryLoading && (
-              <p className="loading-state" role="status">
-                분기 지표를 불러오는 중…
-              </p>
-            )}
-            {!summaryLoading && summaryError && (
-              <div className="error-box" role="alert">
-                <h2>분기 지표를 불러오지 못했습니다.</h2>
-                <p>{summaryError}</p>
-              </div>
-            )}
-            {!summaryLoading && !summaryError && !summary && (
-              <p className="empty-state">자치구 → 상권 → 업종을 고르세요.</p>
-            )}
-            {!summaryLoading && summary && scoreError && (
-              <div className="error-box" role="alert">
-                <h2>상권 생존점수를 불러오지 못했습니다.</h2>
-                <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
-              </div>
-            )}
-            {!summaryLoading && summary && score && <ScorePanel score={score} />}
-            {!summaryLoading && summary && <SummaryPanel summary={summary} selectedArea={selectedArea} />}
-            {businessLoading && (
-              <p className="loading-state" role="status">
-                세부 업종 경쟁 현황을 불러오는 중…
-              </p>
-            )}
-            {!businessLoading && businessError && (
-              <div className="error-box" role="alert">
-                <h2>경쟁 현황을 불러오지 못했습니다.</h2>
-                <p>{businessError}</p>
-              </div>
-            )}
-            {!businessLoading && businessSummary && <CompetitionPanel summary={businessSummary} />}
-          </section>
-        </>
+
+            <section className="market-results" aria-live="polite" aria-busy={summaryLoading}>
+              {areaError && (
+                <div className="error-box" role="alert">
+                  <h2>상권 목록을 불러오지 못했습니다.</h2>
+                  <p>{areaError}</p>
+                </div>
+              )}
+              {districtCode !== '' && areas.length === 0 && !areasLoading && !areaError && (
+                <p className="empty-state">이 자치구에는 등록된 상권이 없습니다.</p>
+              )}
+              {summaryLoading && (
+                <p className="loading-state" role="status">
+                  분기 지표를 불러오는 중…
+                </p>
+              )}
+              {!summaryLoading && summaryError && (
+                <div className="error-box" role="alert">
+                  <h2>분기 지표를 불러오지 못했습니다.</h2>
+                  <p>{summaryError}</p>
+                </div>
+              )}
+              {!summaryLoading && !summaryError && !summary && (
+                <p className="empty-state">자치구 → 상권 → 업종을 고르세요.</p>
+              )}
+              {!summaryLoading && summary && scoreError && (
+                <div className="error-box" role="alert">
+                  <h2>상권 생존점수를 불러오지 못했습니다.</h2>
+                  <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
+                </div>
+              )}
+              {!summaryLoading && summary && score && <ScorePanel score={score} />}
+              {!summaryLoading && summary && <SummaryPanel summary={summary} selectedArea={selectedArea} />}
+              {businessLoading && (
+                <p className="loading-state" role="status">
+                  세부 업종 경쟁 현황을 불러오는 중…
+                </p>
+              )}
+              {!businessLoading && businessError && (
+                <div className="error-box" role="alert">
+                  <h2>경쟁 현황을 불러오지 못했습니다.</h2>
+                  <p>{businessError}</p>
+                </div>
+              )}
+              {!businessLoading && businessSummary && <CompetitionPanel summary={businessSummary} />}
+            </section>
+          </div>
+        </div>
       )}
     </main>
   );
@@ -638,19 +642,25 @@ function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
       {summary.businesses.length === 0 ? (
         <p className="empty-state">해당 자치구에서 관측된 점포가 없습니다.</p>
       ) : (
-        <ul className="competition-list">
-          {summary.businesses.map((business) => (
-            <li key={business.sourceBusinessId}>
-              <strong>
-                {business.businessName}
-                {business.branchName ? ` ${business.branchName}` : ''}
-              </strong>
-              <span>{business.roadAddress ?? business.lotAddress ?? '주소 자료 부족'}</span>
-            </li>
-          ))}
-        </ul>
+        // 점포가 많으면 목록이 결과 화면을 길게 늘려서 처음에는 접어 둔다. 점포 수는 위에 늘 보인다.
+        <details className="competition-details">
+          <summary>
+            점포 목록 {numberFormat.format(summary.businesses.length)}곳 보기
+            {summary.truncated && ` (전체 ${numberFormat.format(summary.businessCount)}곳 중 앞 50곳)`}
+          </summary>
+          <ul className="competition-list">
+            {summary.businesses.map((business) => (
+              <li key={business.sourceBusinessId}>
+                <strong>
+                  {business.businessName}
+                  {business.branchName ? ` ${business.branchName}` : ''}
+                </strong>
+                <span>{business.roadAddress ?? business.lotAddress ?? '주소 자료 부족'}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
-      {summary.truncated && <p className="table-note">목록은 50개까지만 보여 줍니다.</p>}
       <p className="table-note">기준일 {formatDate(summary.asOf)}</p>
     </div>
   );

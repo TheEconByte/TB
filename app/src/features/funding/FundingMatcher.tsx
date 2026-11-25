@@ -113,48 +113,55 @@ export default function FundingMatcher() {
 
       {!isPending && session && (
         <>
-          <details className="notice-box">
-            <summary>걸러 내는 기준</summary>
-            <ul>
-              <li>AI가 읽은 조건 중 하나라도 안 맞으면 뺍니다. 뺀 공고는 아래에서 펼쳐 볼 수 있습니다.</li>
-              <li>입력하지 않은 항목은 &lsquo;확인 필요&rsquo;로 둡니다. 입력값은 AI에 보내지 않습니다.</li>
-            </ul>
-          </details>
+          <div className="split-layout">
+            <div className="split-aside">
+              <details className="notice-box">
+                <summary>걸러 내는 기준</summary>
+                <ul>
+                  <li>AI가 읽은 조건 중 하나라도 안 맞으면 뺍니다. 뺀 공고는 아래에서 펼쳐 볼 수 있습니다.</li>
+                  <li>입력하지 않은 항목은 &lsquo;확인 필요&rsquo;로 둡니다. 입력값은 AI에 보내지 않습니다.</li>
+                </ul>
+              </details>
 
-          <section className="picker" aria-labelledby="funding-picker">
-            <h2 id="funding-picker">내 조건</h2>
-            <form onSubmit={submit}>
-              <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
-              {formError && (
-                <p className="inline-error" role="alert">
-                  {formError}
+              <section className="picker" aria-labelledby="funding-picker">
+                <h2 id="funding-picker">내 조건</h2>
+                <form onSubmit={submit}>
+                  <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
+                  {formError && (
+                    <p className="inline-error" role="alert">
+                      {formError}
+                    </p>
+                  )}
+                  <div className="button-row">
+                    <button type="submit" disabled={loading}>
+                      {loading ? '찾는 중…' : '공고 찾기'}
+                    </button>
+                  </div>
+                  <p className="picker-note">입력은 저장되지 않습니다.</p>
+                </form>
+              </section>
+            </div>
+
+            <section
+              ref={resultsRef}
+              tabIndex={-1}
+              className="market-results funding-results split-main"
+              aria-label="공고 찾기 결과"
+              aria-live="polite"
+              aria-busy={loading}
+            >
+              {loading && (
+                <p className="loading-state" role="status">
+                  공고를 찾는 중…
                 </p>
               )}
-              <div className="button-row">
-                <button type="submit" disabled={loading}>
-                  {loading ? '찾는 중…' : '공고 찾기'}
-                </button>
-              </div>
-              <p className="picker-note">입력은 저장되지 않습니다.</p>
-            </form>
-          </section>
-
-          <section
-            ref={resultsRef}
-            tabIndex={-1}
-            className="market-results funding-results"
-            aria-label="공고 찾기 결과"
-            aria-live="polite"
-            aria-busy={loading}
-          >
-            {loading && (
-              <p className="loading-state" role="status">
-                공고를 찾는 중…
-              </p>
-            )}
-            {!loading && error && <FundingMatchesErrorPanel error={error} />}
-            {!loading && !error && result && <FundingMatchesPanel result={result} />}
-          </section>
+              {!loading && error && <FundingMatchesErrorPanel error={error} />}
+              {!loading && !error && result && <FundingMatchesPanel result={result} />}
+              {!loading && !error && !result && (
+                <p className="empty-state">조건을 고르고 [공고 찾기]를 누르면 여기에 공고가 나옵니다.</p>
+              )}
+            </section>
+          </div>
         </>
       )}
     </main>
