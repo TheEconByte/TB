@@ -92,7 +92,8 @@ describe('자금 조건 입력 스키마', () => {
       expect(fundingMatchProfileSchema.safeParse({ ...FULL, ...extra }).success, JSON.stringify(extra)).toBe(false);
     }
     // 항목이 빠진 본문도 받지 않는다. 빠진 항목을 입력하지 않음으로 대신 채우지 않는다.
-    const { age: _age, ...withoutAge } = FULL;
+    const withoutAge: Partial<typeof FULL> = { ...FULL };
+    delete withoutAge.age;
     expect(fundingMatchProfileSchema.safeParse(withoutAge).success).toBe(false);
   });
 });
