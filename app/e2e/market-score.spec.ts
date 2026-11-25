@@ -152,7 +152,7 @@ async function seedScore(suffix: string): Promise<string> {
         "basisPeriod", "basisPeriodLabel", "retrievedAt", files, "validationSummary", "areaCount", "quarterlyRowCount",
         "activatedAt", "updatedAt")
        VALUES ($1, $1, 'E2E 상권', 'ACTIVE', 'e2e', 'e2e', 'https://data.seoul.go.kr/', '20211-20262',
-        '2021년 1분기~2026년 2분기', now(), '[]', '{}', 1, 0, now() + interval '1 day', now())`,
+        '2021년 1분기~2026년 2분기', now(), '[]', '{}', 1, 2, now() + interval '1 day', now())`,
       [marketReleaseId],
     );
     for (const [code, name] of [
@@ -171,6 +171,15 @@ async function seedScore(suffix: string): Promise<string> {
         "districtCode", "districtName")
        VALUES ($1, $2, 'A', $3, 'E2E 상권', '골목상권', '11200', '성동구')`,
       [`${marketReleaseId}-area`, marketReleaseId, AREA_CODE],
+    );
+    // 점수는 매출 원값에서 계산하므로 점수 있는 상권에는 매출 행이 있다. 매출 자료가 없는 상권·업종은 목록에서
+    // 빠지므로, 점수를 내지 않는 커피도 매출 행을 둔다.
+    await db.query(
+      `INSERT INTO market_quarterly (id, "releaseId", quarter, "areaType", "areaCode", "industryCode", "salesAmount",
+        "salesCount", "storeCount")
+       VALUES ($1, $2, '20262', 'A', $3, 'CS100001', 72000000, 2400, 8),
+              ($4, $2, '20262', 'A', $3, 'CS100010', 15000000, 2100, 6)`,
+      [`${marketReleaseId}-quarterly`, marketReleaseId, AREA_CODE, `${marketReleaseId}-quarterly-coffee`],
     );
     await db.query(
       `INSERT INTO market_score_releases (id, "releaseKey", status, "modelVersion", "modelChecksum", "modelJson",

@@ -852,6 +852,15 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('loading releases into PostgreSQ
     expect(payload.districts).toEqual([{ districtCode: '11200', districtName: '성동구', areaCount: 3 }]);
     expect(payload.areas).toHaveLength(3);
     expect(payload.areas.map((area) => area.areaCode)).toEqual(['3110001', '3110002', '3110003']);
+    // 상권을 고르기 전에 업종마다 매출 원값이 있는 분기 수를 알려 준다. 새 업종은 매출이 없는 상권이 많아
+    // 고른 뒤에야 자료 부족을 보게 되기 때문이다. 0원 매출(커피·음료 2024년 2분기)은 관측값이라 센다.
+    // 점포만 있는 상권(3110002 한식)과 자료가 없는 상권(3110003)은 0이고, 열린 업종 열 개가 모두 있다.
+    const nothing = Object.fromEntries(INDUSTRY_CODES.map((code) => [code, 0]));
+    expect(payload.areas.map((area) => area.salesQuarterCounts)).toEqual([
+      { ...Object.fromEntries(INDUSTRY_CODES.map((code) => [code, 1])), CS100001: 2 },
+      nothing,
+      nothing,
+    ]);
     expect(payload.release.releaseKey).toBe(firstReleaseKey);
     expect(payload.release.quarterlyRowCount).toBe(12);
     expect(payload.release.sources.map((source) => source.fileName)).toEqual([

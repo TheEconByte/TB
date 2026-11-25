@@ -16,6 +16,11 @@ function pool(): Pool {
 }
 
 const AREA_CODE = '3119802';
+// 같은 자치구에서 중식 점포는 있으나 요식업 어느 업종에도 매출 원값이 없는 상권. 목록에서 뺀다.
+const NO_SALES_AREA_CODE = '3119803';
+// 한식 매출만 있고 중식은 점포만 있는 상권. 서울시 추정매출은 점포가 적은 상권·업종에 값을 주지 않아 새 업종은
+// 이런 상권이 많다(docs/domains/market.md). 목록에는 남고 중식을 고르면 "매출 자료 없음"에 든다.
+const KOREAN_ONLY_AREA_CODE = '3119804';
 const CHINESE = 'CS100002';
 const FAST_FOOD = 'CS100006';
 const GRADES = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'C', 'D'];
@@ -164,8 +169,8 @@ async function seed(suffix: string): Promise<string> {
         "basisPeriod", "basisPeriodLabel", "retrievedAt", files, "validationSummary", "areaCount", "quarterlyRowCount",
         "activatedAt", "updatedAt")
        VALUES ($1, $1, 'E2E 요식업 상권', 'ACTIVE', 'e2e', 'e2e', 'https://data.seoul.go.kr/', '20261-20262',
-        '2026년 1분기~2026년 2분기', now(), '[]', '{}', 1, $2, now() + interval '1 day', now())`,
-      [marketReleaseId, QUARTERLY.length],
+        '2026년 1분기~2026년 2분기', now(), '[]', '{}', 3, $2, now() + interval '1 day', now())`,
+      [marketReleaseId, QUARTERLY.length + 3],
     );
     for (const [code, sourceName, displayName] of FOOD_INDUSTRIES) {
       await db.query(
@@ -180,6 +185,35 @@ async function seed(suffix: string): Promise<string> {
         "districtCode", "districtName")
        VALUES ($1, $2, 'A', $3, 'E2E 요식업 상권', '골목상권', '11200', '성동구')`,
       [`${marketReleaseId}-area`, marketReleaseId, AREA_CODE],
+    );
+    await db.query(
+      `INSERT INTO market_areas (id, "releaseId", "areaType", "areaCode", "sourceName", "areaTypeName",
+        "districtCode", "districtName")
+       VALUES ($1, $2, 'A', $3, 'E2E 매출 없는 상권', '골목상권', '11200', '성동구')`,
+      [`${marketReleaseId}-no-sales-area`, marketReleaseId, NO_SALES_AREA_CODE],
+    );
+    await db.query(
+      `INSERT INTO market_quarterly (id, "releaseId", quarter, "areaType", "areaCode", "industryCode", "storeCount")
+       VALUES ($1, $2, '20262', 'A', $3, $4, 2)`,
+      [`${marketReleaseId}-no-sales`, marketReleaseId, NO_SALES_AREA_CODE, CHINESE],
+    );
+    await db.query(
+      `INSERT INTO market_areas (id, "releaseId", "areaType", "areaCode", "sourceName", "areaTypeName",
+        "districtCode", "districtName")
+       VALUES ($1, $2, 'A', $3, 'E2E 한식만 매출 상권', '골목상권', '11200', '성동구')`,
+      [`${marketReleaseId}-korean-only-area`, marketReleaseId, KOREAN_ONLY_AREA_CODE],
+    );
+    await db.query(
+      `INSERT INTO market_quarterly (id, "releaseId", quarter, "areaType", "areaCode", "industryCode", "salesAmount",
+        "salesCount", "storeCount")
+       VALUES ($1, $2, '20262', 'A', $3, 'CS100001', 30000000, 900, 6), ($4, $2, '20262', 'A', $3, $5, NULL, NULL, 2)`,
+      [
+        `${marketReleaseId}-korean-only-korean`,
+        marketReleaseId,
+        KOREAN_ONLY_AREA_CODE,
+        `${marketReleaseId}-korean-only-chinese`,
+        CHINESE,
+      ],
     );
     for (const row of QUARTERLY) {
       await db.query(
@@ -266,9 +300,62 @@ test.afterEach(async () => {
 
 test('요식업 업종 열 개를 모두 고를 수 있다', async ({ page }, testInfo) => {
   await seed(uniqueSuffix(testInfo.project.name));
-  await openArea(page);
+  await page.goto('/markets');
   const options = page.getByLabel('3. 업종').locator('option:not([value=""])');
   await expect(options).toHaveText(FOOD_INDUSTRIES.map(([, , displayName]) => displayName));
+});
+
+// 새 업종은 매출 자료가 없는 상권이 많다. 먼저 고른 쪽을 기준으로 자료가 없는 상대 항목은 목록에 내지 않고,
+// 뺀 수를 밝힌다. 점포만 있고 매출 원값이 없는 조합을 0원처럼 보이게 하지 않는다(AGENTS.md §3-2).
+test('업종을 먼저 고르면 그 업종 매출 자료가 있는 상권만 목록에 낸다', async ({ page }, testInfo) => {
+  await seed(uniqueSuffix(testInfo.project.name));
+  await page.goto('/markets');
+  await page.getByLabel('1. 자치구').selectOption('11200');
+  const areaOptions = page.getByLabel('2. 상권').locator('option:not([value=""])');
+  await expect(areaOptions).toHaveText(['E2E 요식업 상권 · 골목상권', 'E2E 한식만 매출 상권 · 골목상권']);
+
+  // 한식만 매출 상권은 중식 점포만 있고 중식 매출 원값이 없다.
+  await page.getByLabel('3. 업종').selectOption(CHINESE);
+  await expect(areaOptions).toHaveText(['E2E 요식업 상권 · 골목상권']);
+  await expect(page.getByText('중식 매출 자료가 없는 상권 1곳도 뺐습니다.')).toBeVisible();
+
+  // 한식 매출은 한식만 매출 상권에만 있다.
+  await page.getByLabel('3. 업종').selectOption('CS100001');
+  await expect(areaOptions).toHaveText(['E2E 한식만 매출 상권 · 골목상권']);
+
+  // 업종 선택을 풀면 다시 모두 나온다.
+  await page.getByLabel('3. 업종').selectOption('');
+  await expect(areaOptions).toHaveText(['E2E 요식업 상권 · 골목상권', 'E2E 한식만 매출 상권 · 골목상권']);
+});
+
+test('상권을 먼저 고르면 그 상권에 매출 자료가 있는 업종만 목록에 낸다', async ({ page }, testInfo) => {
+  await seed(uniqueSuffix(testInfo.project.name));
+  await openArea(page);
+  const industryOptions = page.getByLabel('3. 업종').locator('option:not([value=""])');
+  // 이 상권의 매출 원값은 중식(2026년 1분기)과 패스트푸드에만 있다.
+  await expect(industryOptions).toHaveText(['중식', '패스트푸드']);
+  await expect(page.getByText('이 상권에 매출 자료가 없는 업종 8개는 목록에서 뺐습니다.')).toBeVisible();
+
+  await page.getByLabel('2. 상권').selectOption(`A:${KOREAN_ONLY_AREA_CODE}`);
+  await expect(industryOptions).toHaveText(['한식']);
+});
+
+// 요식업 어느 업종에도 매출 원값이 없는 상권은 고를 수 있어도 볼 자료가 없다. 목록에서 빼고 뺀 수를 밝힌다.
+test('요식업 매출 자료가 전혀 없는 상권은 목록에서 빼고 뺀 수를 알린다', async ({ page }, testInfo) => {
+  await seed(uniqueSuffix(testInfo.project.name));
+  await page.goto('/markets');
+  await page.getByLabel('1. 자치구').selectOption('11200');
+  const areaSelect = page.getByLabel('2. 상권');
+  await expect(areaSelect.locator('option:not([value=""])')).toHaveText([
+    'E2E 요식업 상권 · 골목상권',
+    'E2E 한식만 매출 상권 · 골목상권',
+  ]);
+  await expect(areaSelect.locator(`option[value="A:${NO_SALES_AREA_CODE}"]`)).toHaveCount(0);
+  await expect(page.getByText('요식업 매출 자료가 없는 상권 1곳은 목록에서 뺐습니다.')).toBeVisible();
+
+  // 업종을 골라도 다시 나타나지 않는다.
+  await page.getByLabel('3. 업종').selectOption(CHINESE);
+  await expect(areaSelect.locator(`option[value="A:${NO_SALES_AREA_CODE}"]`)).toHaveCount(0);
 });
 
 test('점수 없는 업종도 상권 지표를 보여 주고, 점수를 0으로 만들거나 재무 계획으로 넘기지 않는다', async ({
