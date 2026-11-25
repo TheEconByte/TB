@@ -27,7 +27,7 @@
 ## 공개 API
 
 - `/api/industries`: 로그인 없이 지원 업종과 현재 활성 릴리스를 반환한다. 활성 릴리스가 없어도 200이며 `activeRelease`가 null이다.
-- `/api/markets/areas?districtCode=...`: 자치구 목록은 항상 반환하고, `districtCode`가 있으면 그 자치구의 상권을 반환한다. 없는 자치구 코드는 400 `INVALID_DISTRICT_CODE`다.
+- `/api/markets/areas?districtCode=...`: 자치구 목록은 항상 반환하고, `districtCode`가 있으면 그 자치구의 상권을 반환한다. 상권마다 열린 업종별로 매출 원값이 있는 분기 수(`salesQuarterCounts`, 0원 매출도 셈)를 함께 내서, 화면이 고르기 전에 매출 자료가 있는 상권·업종을 알려 준다. 서울시 추정매출은 점포가 적은 상권·업종 조합에 값을 주지 않아, 한식 밖 업종은 골목상권·전통시장 대부분에 매출이 없다. 0은 매출 자료가 없다는 뜻이고 매출 0원이 아니다. 없는 자치구 코드는 400 `INVALID_DISTRICT_CODE`다.
 - `/api/markets/summary?areaCode=...&industryCode=...[&areaType=...]`: 가용 분기를 오래된 순으로, 분기별 원본 지표를 반환한다. 매출 원값은 원 단위 정수 문자열이고 점포 수는 숫자다.
 - `/api/markets/report?areaCode=...&industryCode=...[&areaType=...]`: summary에 상위 업종 집계 범위, 기준분기, 요일·시간대·성별·연령별 원본 구성을 더한다.
 - 상태 구분: 활성 릴리스 없음 503 `RELEASE_UNAVAILABLE`, 형식 오류 400 `INVALID_AREA_CODE`·`INVALID_INDUSTRY_CODE`, 없는 상권 404 `AREA_NOT_FOUND`, 같은 코드가 여러 상권 구분에 있으면 400 `AMBIGUOUS_AREA_CODE`, 원천에 있으나 미지원 업종은 400 `UNSUPPORTED_INDUSTRY`다.

@@ -210,10 +210,16 @@ export type MarketReport = MarketSummary & {
   nullReason: string | null;
 };
 
+// 상권 목록의 한 상권. 열린 업종마다 매출 원값이 있는 분기 수를 함께 낸다(0원 매출도 센다). 0은 그 업종의
+// 매출 자료가 없다는 뜻이고 매출이 0원이라는 뜻이 아니다.
+export type AreaListItem = AreaInfo & {
+  salesQuarterCounts: Record<string, number>;
+};
+
 export type MarketAreaList = {
   release: ReleaseInfo;
   districts: { districtCode: string; districtName: string; areaCount: number }[];
-  areas: AreaInfo[];
+  areas: AreaListItem[];
   filter: { districtCode: string | null };
   limitations: readonly string[];
 };
