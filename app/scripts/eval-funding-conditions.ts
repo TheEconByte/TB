@@ -30,12 +30,14 @@ import { secretMasker } from '../src/features/market/seoul-api.ts';
 // 공고 조건 추출 평가(app/eval/funding-conditions). funding:sync와 같은 추출 코드를 정답 공고에 돌려 채점한다.
 // 실제 Claude API를 부르므로 운영자만 실행한다. 본문은 저장소에 두지 않고 앱 DB의 funding_notice_texts에서 읽는다.
 
-const HELP = `사용법: npm --prefix app run eval:funding-conditions -- [--variant <이름>] [--reps <n>] [--set <dev|test|all>]
+const HELP = `사용법: npm --prefix app run eval:funding-conditions -- [--variant <이름>] [--reps <n>] [--set <dev|test|all>] [--skip-missing]
 
   --variant <이름>  결과를 쓸 폴더 이름. baseline 또는 v1, v2 ... (기본값: baseline)
   --reps <n>        공고마다 몇 번 읽을지(기본값: 2). 같은 공고도 매번 결과가 조금씩 달라서 두 번 이상 본다.
   --set <이름>      읽을 정답 공고. dev는 프롬프트를 고칠 때 보는 공고, test는 고친 뒤 비교할 때만 재는 공고다.
                     고치는 동안에는 dev만 돌린다. (기본값: all)
+  --skip-missing    DB에 본문이 없는 정답 공고(내려간 공고 등)를 이름을 밝히고 빼고 잰다. 없으면 실행하지 않는다.
+                    뺀 공고가 있으면 이전 측정과 표본이 다르므로, 비교할 두 프롬프트를 같은 옵션으로 잰다.
 
 결과: .claude/hillclimb/funding-conditions/<variant>/results.jsonl, traces/, errors.jsonl
 이미 쓴 (공고, 회차)는 건너뛴다. 끊긴 뒤 다시 실행하면 이어서 한다.
@@ -93,6 +95,7 @@ async function main() {
       variant: { type: 'string', default: 'baseline' },
       reps: { type: 'string', default: '2' },
       set: { type: 'string', default: 'all' },
+      'skip-missing': { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
@@ -111,7 +114,7 @@ async function main() {
   const mask = secretMasker(apiKey);
 
   const allCases = JSON.parse(readFileSync(CASES, 'utf8')) as GoldCase[];
-  const cases = allCases.filter((item) => (sets as readonly string[]).includes(item.set));
+  let cases = allCases.filter((item) => (sets as readonly string[]).includes(item.set));
   const otherSets = new Set(allCases.filter((item) => !cases.includes(item)).map((item) => item.id));
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   // AI에 보내는 공고(상품 이름과 본문). 인용 검증도 같은 두 글로 한다.
@@ -128,8 +131,14 @@ async function main() {
     await prisma.$disconnect();
   }
   const missing = cases.filter((item) => !notices.has(item.id)).map((item) => item.id);
-  if (missing.length > 0)
-    throw new Error(`DB에 본문이 없습니다: ${missing.join(', ')}. funding:sync를 먼저 실행하세요.`);
+  if (missing.length > 0 && !values['skip-missing'])
+    throw new Error(
+      `DB에 본문이 없습니다: ${missing.join(', ')}. funding:sync를 먼저 실행하거나 --skip-missing으로 빼고 재세요.`,
+    );
+  if (missing.length > 0) {
+    console.log(`DB에 본문이 없어 뺀 정답 공고 ${missing.length}건: ${missing.join(', ')}`);
+    cases = cases.filter((item) => notices.has(item.id));
+  }
 
   // 정답도 실제 검증을 통과해야 한다. 통과하지 못하면 정답이 틀렸으므로 채점하지 않는다.
   const expected = new Map(cases.map((item) => [item.id, expectedFields(item, notices.get(item.id)!.text)]));

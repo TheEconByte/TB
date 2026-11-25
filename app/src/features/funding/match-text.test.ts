@@ -20,7 +20,7 @@ import {
   limitText,
   rangeText,
   sourceRecordText,
-  tabCountTexts,
+  tabRemainingText,
   titleRegionText,
   unconfirmedReasonText,
 } from './match-text.ts';
@@ -403,12 +403,13 @@ describe('AI 안내를 붙일 카드', () => {
 });
 
 describe('탭 제목의 공고 수', () => {
-  // ADR 0009 §4(2026-11-13): 조건에 안 맞는 공고는 목록에서 빼되 건수를 밝힌다. 남은 공고는 맞아 보임·걸리는 조건 안 보임·
-  // 확인 필요를 합친 수다. 마감은 넣지 않는다. 수는 줄바꿈 없는 공백(U+00A0)으로 이름에 붙여 폰 폭에서 떨어지지 않게 한다.
-  it('남은 공고와 조건에 안 맞아 뺀 공고의 수를 쓴다', () => {
+  // 탭 제목에는 남은 공고 수만 쓴다(사용자 결정 2026-11-26). 남은 공고는 맞아 보임·걸리는 조건 안 보임·확인 필요를 합친
+  // 수다. 조건에 안 맞아 뺀 공고와 마감 공고의 수는 목록 아래 다시 보기 칸에서만 밝힌다(AGENTS.md §3-8).
+  // 수는 줄바꿈 없는 공백(U+00A0)으로 이름에 붙여 폰 폭에서 떨어지지 않게 한다.
+  it('남은 공고 수만 쓴다', () => {
     expect(
-      tabCountTexts({ MATCHING: 1, NOT_MENTIONED_ONLY: 2, NEEDS_CHECK: 1234, NOT_MATCHING: 75, CLOSED: 9 }),
-    ).toEqual(['남은 공고\u00a01,237', '조건에 안 맞아 뺌\u00a075']);
+      tabRemainingText({ MATCHING: 1, NOT_MENTIONED_ONLY: 2, NEEDS_CHECK: 1234, NOT_MATCHING: 75, CLOSED: 9 }),
+    ).toBe('남은 공고 1,237');
   });
 });
 

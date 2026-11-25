@@ -27,7 +27,7 @@ import {
   sourceRecordText,
   supportTypesText,
   titleRegionText,
-  tabCountTexts,
+  tabRemainingText,
   unconfirmedReasonText,
   type ViewedFundingGap,
 } from './match-text.ts';
@@ -156,11 +156,7 @@ export function FundingMatchesPanel({
                 onClick={() => setTab(key)}
               >
                 <span>{FUNDING_TAB_LABELS[key]}</span>
-                <small>
-                  {tabCountTexts(result.tabs[key].counts).map((text) => (
-                    <span key={text}>{text}</span>
-                  ))}
-                </small>
+                <small>{tabRemainingText(result.tabs[key].counts)}</small>
               </button>
             ))}
           </div>
@@ -210,20 +206,6 @@ function TabPanel({
     >
       <p className="branch-note">{TAB_NOTES[tab]}</p>
       {policy && <p className="branch-note">{LIMIT_NOTE}</p>}
-      <div className="status-counts branch-counts" aria-label={`${FUNDING_TAB_LABELS[tab]} 공고 수`}>
-        <div className="status-count">
-          <span>남은 공고</span>
-          <strong>{numberFormat.format(remaining.length)}건</strong>
-        </div>
-        <div className="status-count">
-          <span>조건에 안 맞아 뺌</span>
-          <strong>{numberFormat.format(eliminated.length)}건</strong>
-        </div>
-        <div className="status-count">
-          <span>{FUNDING_GROUP_BADGE_LABELS.CLOSED}</span>
-          <strong>{numberFormat.format(closed.length)}건</strong>
-        </div>
-      </div>
 
       {list.products.length === 0 ? (
         <p className="empty-state">이 탭에는 공고가 없습니다.</p>

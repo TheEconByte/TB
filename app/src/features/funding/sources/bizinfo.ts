@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { secretMasker, type FetchLike } from '../../market/seoul-api.ts';
 import type { NoticeDownload, NoticeFilePart } from '../notice-body.ts';
 import type { CollectedFundingProduct, FundingSourceAdapter, FundingSourceCollection } from '../sync.ts';
+import { bizinfoTitleMark, isOutsideSeoulMark } from '../title-mark.ts';
 import { compareIsoDates, isOfficialUrl, isRealDate } from '../types.ts';
 
 // 기업마당 지원사업정보 Open API(중소벤처기업부). 목록 항목으로는 사업 단계·지원 유형·대상 지역을 알 수 없어
@@ -49,6 +50,8 @@ export type BizinfoSkipCounts = {
   notTarget: number;
   // 신청 종료일이 판정 기준일보다 앞선 공고.
   ended: number;
+  // 제목 맨 앞 표시가 서울 밖 시·도인 공고.
+  outsideSeoul: number;
   // 공고 식별자·이름·주소·기관이 없거나 쓸 수 없는 공고.
   malformed: number;
   // 같은 공고 식별자가 앞에 이미 있던 공고.
@@ -203,7 +206,7 @@ export function mapBizinfoItems(
   items: readonly unknown[],
   context: { asOfDate: string; responseChecksum: string },
 ): BizinfoMapping {
-  const skipped: BizinfoSkipCounts = { notTarget: 0, ended: 0, malformed: 0, duplicate: 0 };
+  const skipped: BizinfoSkipCounts = { notTarget: 0, ended: 0, outsideSeoul: 0, malformed: 0, duplicate: 0 };
   const products: CollectedFundingProduct[] = [];
   const seen = new Set<string>();
   for (const raw of items) {
@@ -236,6 +239,12 @@ export function mapBizinfoItems(
     const period = parseBizinfoPeriod(periodText);
     if (period !== null && compareIsoDates(period.end, context.asOfDate) < 0) {
       skipped.ended += 1;
+      continue;
+    }
+    // 제목 맨 앞에 서울 밖 시·도 표시가 있는 공고는 서울 사용자가 신청할 수 없어 본문을 받거나 AI로 읽기 전에 뺀다
+    // (ADR 0009 §2, 사용자 결정 2026-11-26). 표시가 없으면 소관기관이나 제목의 지명으로 추측하지 않는다.
+    if (isOutsideSeoulMark(bizinfoTitleMark(name))) {
+      skipped.outsideSeoul += 1;
       continue;
     }
     const open =
@@ -272,7 +281,7 @@ export function mapBizinfoItems(
       organization,
       supportType: 'UNKNOWN',
       eligibleBusinessStages: [],
-      // 공고명 [지역] 표시나 소관기관으로 지역을 추측하지 않는다. 지역으로 거르지도 않는다(ADR 0009 §2·§7).
+      // 공고명 [지역] 표시나 소관기관으로 지역 값을 정하지 않는다. 대상 지역은 본문에서 AI가 읽는다(ADR 0009 §2·§7).
       region: {
         scope: 'UNKNOWN',
         districtCodes: [],
@@ -407,7 +416,7 @@ export function createBizinfoAdapter(options: BizinfoAdapterOptions): FundingSou
         const { skipped } = mapping;
         log(
           mask(
-            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 상품으로 만들었습니다(대상 아님 ${skipped.notTarget}건, 신청 종료 ${skipped.ended}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
+            `기업마당: 공고 ${items.length}건 중 ${mapping.products.length}건을 상품으로 만들었습니다(대상 아님 ${skipped.notTarget}건, 신청 종료 ${skipped.ended}건, 서울 밖 지역 표시 ${skipped.outsideSeoul}건, 형식 오류 ${skipped.malformed}건, 중복 ${skipped.duplicate}건).`,
           ),
         );
         return { products: mapping.products, fetchedCount: items.length, responseChecksum };
