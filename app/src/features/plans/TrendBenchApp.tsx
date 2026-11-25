@@ -421,15 +421,17 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const resultAssumption = parseLoanAssumption(storedResult?.loanAssumptionJson);
 
   // 계획 머리와 재무 입력 사이에 놓는 사업 조건과 시세 참고. 시세는 참고만 하고 재무 입력에 넣지 않는다.
+  const businessInputs = (
+    <BusinessProfileWizard
+      form={businessForm}
+      onChange={setBusinessForm}
+      onFinish={() =>
+        document.getElementById('rent-benchmark-title')?.closest('section')?.scrollIntoView({ block: 'start' })
+      }
+    />
+  );
   const references = (
     <>
-      <BusinessProfileWizard
-        form={businessForm}
-        onChange={setBusinessForm}
-        onFinish={() =>
-          document.getElementById('rent-benchmark-title')?.closest('section')?.scrollIntoView({ block: 'start' })
-        }
-      />
       <RentBenchmarkPanel profile={businessForm} savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null} />
       <FranchisePanel
         industryCode={businessForm.marketIndustryCode}
@@ -503,6 +505,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
           )}
           {plan === null && marketLoading ? (
             <>
+              {businessInputs}
               {references}
               <p className="loading-state" role="status">
                 상권 점수를 불러오고 있습니다.
@@ -535,6 +538,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                   onDisconnect={disconnectMarketSource}
                 />
               }
+              businessInputs={businessInputs}
               references={references}
               extraInputs={
                 <PlanFundingFields
