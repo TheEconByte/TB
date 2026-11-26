@@ -4,7 +4,7 @@ import { compareDisplay, scoreStatusMessage, topContributions } from './api.ts';
 import { buildScores, quantile, rankScores, revenueOutlier, topPercent, type ScoreDetail } from './build.ts';
 import { DEFAULT_GRADE_BOUNDARIES } from './config.ts';
 import type { AreaSeries, QuarterObservation } from './dataset.ts';
-import { handoffFromSearch, handoffSearch, parseHandoff } from './handoff.ts';
+import { detailedIndustryFromSearch, handoffFromSearch, handoffSearch, parseHandoff } from './handoff.ts';
 import type { IndustryModel, MarketScoreModel } from './model.ts';
 import { monthlyRevenuePerStore, recordedInterpretation } from './revenue.ts';
 
@@ -305,5 +305,20 @@ describe('재무 계획으로 넘기는 상권 참조', () => {
     expect(parseHandoff({ ...handoff, industryCode: 'CS10001' })).toBeNull();
     expect(parseHandoff({ ...handoff, releaseKey: 'Release Key' })).toBeNull();
     expect(handoffFromSearch('?scoreArea=3110020')).toBeNull();
+  });
+
+  // 상권 화면에서 고른 세부 업종은 사업 조건의 업종 소분류로 이어진다. 고르지 않았으면 넘기지 않는다.
+  it('고른 세부 업종을 함께 넘긴다', () => {
+    const search = handoffSearch(handoff, 'I20101');
+    expect(handoffFromSearch(search)).toEqual(handoff);
+    expect(detailedIndustryFromSearch(search)).toBe('I20101');
+  });
+
+  it('세부 업종을 고르지 않았거나 형식이 틀리면 넘기지 않는다', () => {
+    expect(detailedIndustryFromSearch(handoffSearch(handoff))).toBeNull();
+    expect(detailedIndustryFromSearch(handoffSearch(handoff, null))).toBeNull();
+    expect(
+      detailedIndustryFromSearch(`${handoffSearch(handoff)}&scoreDetail=${encodeURIComponent('I201 01')}`),
+    ).toBeNull();
   });
 });

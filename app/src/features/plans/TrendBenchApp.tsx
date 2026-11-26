@@ -6,7 +6,13 @@ import FinancePlanner, { type PlanStep } from '@/features/finance/FinancePlanner
 import { newPlanInput } from '@/features/finance/form';
 import { quarterLabel } from '@/features/market/quarter';
 import type { MarketScoreResponse } from '@/features/market/score/api';
-import { clearHandoff, handoffFromSearch, scoreApiUrl, type MarketScoreHandoff } from '@/features/market/score/handoff';
+import {
+  clearHandoff,
+  detailedIndustryFromSearch,
+  handoffFromSearch,
+  scoreApiUrl,
+  type MarketScoreHandoff,
+} from '@/features/market/score/handoff';
 import {
   CURRENT_MONTHLY_REVENUE_INTERPRETATION,
   interpretationDivisor,
@@ -45,6 +51,7 @@ import { authClient } from '@/lib/auth-client';
 import BusinessProfileWizard from '@/features/business-profile/BusinessProfileWizard';
 import {
   EMPTY_BUSINESS_PROFILE_FORM,
+  businessProfileFormFromMarket,
   businessProfileFormFromStored,
   businessProfileSaveState,
   type BusinessProfileForm,
@@ -53,7 +60,17 @@ import FranchisePanel from '@/features/franchise/FranchisePanel';
 import RentBenchmarkPanel from '@/features/rent-benchmark/RentBenchmarkPanel';
 
 // 상권 탐색에서 넘어와 아직 저장하지 않은 새 계획의 출처.
-type MarketSource = { handoff: MarketScoreHandoff; score: MarketScoreResponse };
+// detailedIndustryCode: 상권 화면에서 고른 세부 업종. 사업 조건 채우기에만 쓰고 서버에 점수 참조로 보내지 않는다.
+type MarketSource = { handoff: MarketScoreHandoff; score: MarketScoreResponse; detailedIndustryCode: string | null };
+
+// 사용자가 상권 화면에서 고른 자치구·업종·세부 업종. 사업 조건에 채운다(ADR 0008 §5).
+function marketSelection(source: MarketSource) {
+  return {
+    districtCode: source.score.area.districtCode,
+    industryCode: source.score.industry.code,
+    detailedIndustryCode: source.detailedIndustryCode,
+  };
+}
 
 const wonFormat = new Intl.NumberFormat('ko-KR');
 const savedAtFormat = new Intl.DateTimeFormat('ko-KR', {
@@ -200,6 +217,7 @@ function AuthenticatedWorkspace() {
   // next/link로 넘어오면 렌더링 중의 window.location은 아직 이전 화면 주소라 라우터의 검색 파라미터를 읽는다.
   const searchParams = useSearchParams();
   const [handoff] = useState(() => handoffFromSearch(searchParams.toString()));
+  const [handoffDetail] = useState(() => detailedIndustryFromSearch(searchParams.toString()));
   // 넘어온 상권. 새 계획을 저장하면 비운다.
   const [marketSource, setMarketSource] = useState<MarketSource | null>(null);
   // 점수를 읽는 동안에는 새 계획 재무 입력을 열지 않는다. 늦은 응답이 그사이 입력한 값을 덮지 않게 한다.
@@ -219,12 +237,18 @@ function AuthenticatedWorkspace() {
           setMessage(score.message ?? '이 상권 점수는 재무 계획에 연결할 수 없습니다.');
           return;
         }
-        setMarketSource({ handoff: { ...handoff, releaseKey: score.release.releaseKey }, score });
+        const source: MarketSource = {
+          handoff: { ...handoff, releaseKey: score.release.releaseKey },
+          score,
+          detailedIndustryCode: handoffDetail,
+        };
+        setMarketSource(source);
         setFundingForm((current) =>
           isEmptyFundingForm(current) ? { ...current, districtCode: score.area.districtCode } : current,
         );
+        setBusinessForm((current) => businessProfileFormFromMarket(current, marketSelection(source)));
         setMessage(
-          `${score.area.displayName} ${score.industry.displayName} 상권 기준으로 자치구와 월매출을 채웠습니다. 고쳐도 됩니다.`,
+          `${score.area.displayName} ${score.industry.displayName} 상권 기준으로 자치구·업종과 월매출을 채웠습니다. 고쳐도 됩니다. 저장하려면 매장의 면적·층·상가 유형을 마저 입력해 주세요.`,
         );
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : '상권 점수를 불러오지 못했습니다.');
@@ -235,7 +259,7 @@ function AuthenticatedWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [handoff]);
+  }, [handoff, handoffDetail]);
 
   function disconnectMarketSource() {
     setMarketSource(null);
@@ -495,7 +519,11 @@ function AuthenticatedWorkspace() {
                     ? { ...EMPTY_FUNDING_FORM, districtCode: marketSource.score.area.districtCode }
                     : EMPTY_FUNDING_FORM,
                 );
-                setBusinessForm(EMPTY_BUSINESS_PROFILE_FORM);
+                setBusinessForm(
+                  marketSource
+                    ? businessProfileFormFromMarket(EMPTY_BUSINESS_PROFILE_FORM, marketSelection(marketSource))
+                    : EMPTY_BUSINESS_PROFILE_FORM,
+                );
                 setMatches(null);
                 setMatchesError(null);
                 setMessage('');

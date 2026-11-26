@@ -3,6 +3,7 @@ import {
   EMPTY_BUSINESS_PROFILE_FORM,
   businessProfileFormFromStored,
   businessProfileMissingFields,
+  businessProfileFormFromMarket,
   businessProfileSaveState,
   selectMarketIndustry,
   type BusinessProfileForm,
@@ -127,5 +128,52 @@ describe('상위 업종 드롭다운 선택', () => {
       marketIndustryCode: '',
       detailedIndustryCode: '',
     });
+  });
+});
+
+// /markets의 [이 상권으로 재무 계획 시작]은 사용자가 고른 자치구·업종을 사업 조건에 채운다(ADR 0008).
+// 사용자가 고른 값이지 관측값이 아니다. 면적·층·상가 유형은 채우지 않으므로 저장하려면 사용자가 마저 입력해야 한다.
+describe('상권에서 넘어온 사업 조건', () => {
+  const market = { districtCode: '11110', industryCode: 'CS100001' };
+
+  it('비어 있는 사업 조건에 자치구와 업종을 채운다', () => {
+    expect(businessProfileFormFromMarket(EMPTY_BUSINESS_PROFILE_FORM, market)).toEqual({
+      ...EMPTY_BUSINESS_PROFILE_FORM,
+      districtCode: '11110',
+      marketIndustryCode: 'CS100001',
+    });
+  });
+
+  it('채운 뒤 나머지 항목을 입력하기 전에는 저장하지 않는다', () => {
+    const filled = businessProfileFormFromMarket(EMPTY_BUSINESS_PROFILE_FORM, market);
+    expect(businessProfileSaveState(filled)).toEqual({ kind: 'INCOMPLETE', missing: ['면적', '층', '상가 유형'] });
+  });
+
+  it('사용자가 이미 입력한 사업 조건은 덮지 않는다', () => {
+    const typed: BusinessProfileForm = { ...EMPTY_BUSINESS_PROFILE_FORM, areaValue: '10' };
+    expect(businessProfileFormFromMarket(typed, market)).toBe(typed);
+    expect(businessProfileFormFromMarket(complete, market)).toBe(complete);
+  });
+
+  it('상권 화면에서 고른 세부 업종을 업종 소분류로 채운다', () => {
+    expect(
+      businessProfileFormFromMarket(EMPTY_BUSINESS_PROFILE_FORM, { ...market, detailedIndustryCode: 'I20101' }),
+    ).toEqual({
+      ...EMPTY_BUSINESS_PROFILE_FORM,
+      districtCode: '11110',
+      marketIndustryCode: 'CS100001',
+      detailedIndustryCode: 'I20101',
+    });
+  });
+
+  // 지금은 외식업 열 개가 모두 열려 있어(ADR 0010) 목록에 없는 코드로 확인한다. 세부 업종은 상위 업종에 딸려 있어 함께 버린다.
+  it('사업 조건이 받지 않는 업종이면 자치구만 채운다', () => {
+    expect(
+      businessProfileFormFromMarket(EMPTY_BUSINESS_PROFILE_FORM, {
+        ...market,
+        industryCode: 'CS200001',
+        detailedIndustryCode: 'I20101',
+      }),
+    ).toEqual({ ...EMPTY_BUSINESS_PROFILE_FORM, districtCode: '11110' });
   });
 });

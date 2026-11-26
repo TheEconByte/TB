@@ -454,7 +454,9 @@ export default function MarketExplorer() {
                 <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
               </div>
             )}
-            {!summaryLoading && summary && score && <ScorePanel score={score} />}
+            {!summaryLoading && summary && score && (
+              <ScorePanel score={score} detailedIndustryCode={detailedIndustryCode || null} />
+            )}
             {!summaryLoading && summary && <SummaryBody summary={summary} />}
             {businessLoading && (
               <p className="loading-state" role="status">
