@@ -33,7 +33,14 @@ export function handoffFor(score: MarketScoreResponse): MarketScoreHandoff {
   };
 }
 
-export default function ScorePanel({ score }: { readonly score: MarketScoreResponse }) {
+// detailedIndustryCode: 상권 화면에서 고른 세부 업종. 재무 계획으로 넘겨 사업 조건의 업종 소분류를 채운다.
+export default function ScorePanel({
+  score,
+  detailedIndustryCode,
+}: {
+  readonly score: MarketScoreResponse;
+  readonly detailedIndustryCode: string | null;
+}) {
   const handoff = handoffFor(score);
   return (
     <section className="score-panel" aria-labelledby="score-title">
@@ -68,7 +75,7 @@ export default function ScorePanel({ score }: { readonly score: MarketScoreRespo
           {score.distribution && <DistributionChart distribution={score.distribution} value={score.score.value} />}
 
           <div className="button-row score-actions">
-            <Link href={`/plans${handoffSearch(handoff)}`} className="primary-link">
+            <Link href={`/plans${handoffSearch(handoff, detailedIndustryCode)}`} className="primary-link">
               이 상권으로 재무 계획 시작
             </Link>
             <Link href={`/funding${handoffSearch(handoff)}`} className="secondary-link">

@@ -260,6 +260,18 @@ async function signUp(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: '내 계획', exact: true })).toBeVisible();
 }
 
+// 상권에서 넘어오면 사업 조건은 자치구·업종만 채워진다(ADR 0008 §5). 저장하려면 면적·층·상가 유형을 마저 입력한다.
+async function completeBusinessProfile(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^매장/ }).click();
+  const wizard = page.locator('.business-wizard');
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.getByLabel('정확한 면적').fill('10');
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.locator('.choice-card', { has: page.locator('strong', { hasText: /^1층$/ }) }).click();
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.getByRole('button', { name: /소규모 상가/ }).click();
+}
+
 function startUrl(industryCode: string, releaseKey: string): string {
   return `/plans?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=${industryCode}&scoreRelease=${releaseKey}`;
 }
@@ -435,14 +447,20 @@ test('점수를 내는 새 업종은 점수에서 재무 계획을 시작한다'
   await expect(page.locator('#monthlyRevenue')).toHaveValue('2,400,000');
   await expect(page.getByLabel('계획 제목')).toHaveValue('E2E 요식업 상권 패스트푸드 계획');
   await expect(page.getByLabel('2. 사업장·거주 자치구')).toHaveValue('11200');
+  await expect(page.locator('.business-wizard').getByLabel('업종 대분류')).toHaveValue(FAST_FOOD);
 
+  await completeBusinessProfile(page);
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
   const stored = await page.evaluate(async () => {
     const list = (await (await fetch('/api/plans')).json()) as { plans: Array<{ id: string }> };
     const detail = await (await fetch(`/api/plans/${list.plans[0].id}`)).json();
-    return detail.plan as { marketScoreJson: Record<string, unknown> | null };
+    return detail.plan as {
+      marketScoreJson: Record<string, unknown> | null;
+      businessProfileJson: Record<string, unknown> | null;
+    };
   });
+  expect(stored.businessProfileJson).toMatchObject({ districtCode: '11200', marketIndustryCode: FAST_FOOD });
   expect(stored.marketScoreJson).toMatchObject({
     releaseKey,
     industryCode: FAST_FOOD,

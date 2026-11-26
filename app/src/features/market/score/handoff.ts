@@ -2,6 +2,8 @@
 // 받는 쪽이 점수 API에서 다시 읽고 저장할 때는 서버가 점수 릴리스에서 다시 확인한다.
 // 참조는 URL에만 둔다. 이메일 로그인은 페이지를 옮기지 않아 로그인 화면을 거쳐도 URL이 남는다.
 // 받는 쪽은 한 번 읽으면 지운다. 브라우저 저장소에 두면 떠났다가 일반 링크로 돌아와도 다시 채워진다.
+// 상권 화면에서 고른 세부 업종(소진공 업종 코드)은 사업 조건의 업종 소분류를 채우려고 따로 넘긴다.
+// 점수 참조가 아니므로 서버에 보내는 점수 참조(MarketScoreHandoff)에는 넣지 않는다.
 
 export type MarketScoreHandoff = {
   areaType: string;
@@ -16,6 +18,9 @@ const PARAMS = {
   industryCode: 'scoreIndustry',
   releaseKey: 'scoreRelease',
 };
+
+const DETAIL_PARAM = 'scoreDetail';
+const DETAIL_PATTERN = /^[A-Z0-9]{2,20}$/;
 
 const PATTERNS: Record<keyof MarketScoreHandoff, RegExp> = {
   areaType: /^[A-Z]{1,4}$/,
@@ -34,10 +39,16 @@ export function parseHandoff(value: Partial<Record<keyof MarketScoreHandoff, unk
   return result;
 }
 
-export function handoffSearch(handoff: MarketScoreHandoff): string {
+export function handoffSearch(handoff: MarketScoreHandoff, detailedIndustryCode?: string | null): string {
   const params = new URLSearchParams();
   for (const key of Object.keys(PARAMS) as (keyof MarketScoreHandoff)[]) params.set(PARAMS[key], handoff[key]);
+  if (detailedIndustryCode) params.set(DETAIL_PARAM, detailedIndustryCode);
   return `?${params.toString()}`;
+}
+
+export function detailedIndustryFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get(DETAIL_PARAM);
+  return value !== null && DETAIL_PATTERN.test(value) ? value : null;
 }
 
 export function handoffFromSearch(search: string): MarketScoreHandoff | null {
@@ -58,7 +69,7 @@ export function scoreApiUrl(handoff: Pick<MarketScoreHandoff, 'areaType' | 'area
 export function clearHandoff(): void {
   const url = new URL(window.location.href);
   let changed = false;
-  for (const name of Object.values(PARAMS)) {
+  for (const name of [...Object.values(PARAMS), DETAIL_PARAM]) {
     if (url.searchParams.has(name)) {
       url.searchParams.delete(name);
       changed = true;
