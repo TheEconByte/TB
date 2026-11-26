@@ -41,7 +41,6 @@ import {
   planLoanAssumptionSchema,
   type PlanLoanAssumption,
 } from '@/features/plans/loan-assumption';
-import SiteHeader from '@/components/SiteHeader';
 import { authClient } from '@/lib/auth-client';
 import BusinessProfileWizard from '@/features/business-profile/BusinessProfileWizard';
 import {
@@ -109,13 +108,12 @@ function AuthScreen() {
   }
   return (
     <main>
-      <SiteHeader />
       <section className="auth-shell">
-        <div>
+        <div className="auth-intro">
           <h1>재무 계획은 로그인해야 저장됩니다</h1>
           <p>계획과 계산 결과는 내 계정에만 남습니다. 비밀번호 찾기는 아직 없습니다.</p>
         </div>
-        <form className="auth-card" onSubmit={submit}>
+        <form className="panel auth-card" onSubmit={submit}>
           <h2>{mode === 'signin' ? '로그인' : '회원가입'}</h2>
           {mode === 'signup' && (
             <label className="field">
@@ -164,9 +162,11 @@ function AuthScreen() {
               {message}
             </p>
           )}
-          <button disabled={busy}>{busy ? '처리 중…' : mode === 'signin' ? '로그인' : '회원가입'}</button>
+          <button className="button primary" disabled={busy}>
+            {busy ? '처리 중…' : mode === 'signin' ? '로그인' : '회원가입'}
+          </button>
           <button
-            className="link-button"
+            className="text-button"
             type="button"
             onClick={() => {
               setMode(mode === 'signin' ? 'signup' : 'signin');
@@ -181,7 +181,7 @@ function AuthScreen() {
   );
 }
 
-function AuthenticatedWorkspace({ email }: { email: string }) {
+function AuthenticatedWorkspace() {
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [storedResult, setStoredResult] = useState<StoredResult | null>(null);
@@ -444,7 +444,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
   const operatingReference = (
     <>
       <RentBenchmarkPanel profile={businessForm} savedMonthlyRent={plan?.inputJson.monthlyFixedCosts.rent ?? null} />
-      <details className="reference-details">
+      <details className="panel reference-details">
         <summary>프랜차이즈 평균매출과 비교</summary>
         <FranchisePanel
           focus="revenue"
@@ -477,21 +477,13 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
 
   return (
     <main>
-      <SiteHeader
-        account={
-          <>
-            <span>{email}</span>
-            <button className="link-button" onClick={() => void authClient.signOut()}>
-              로그아웃
-            </button>
-          </>
-        }
-      />
       <div className="workspace">
-        <aside className="plan-sidebar">
-          <div className="sidebar-heading">
+        <aside className="panel plan-sidebar">
+          <div className="panel-head">
             <h2>내 계획</h2>
             <button
+              type="button"
+              className="button small"
               onClick={() => {
                 setPlan(null);
                 savedPlanId.current = null;
@@ -518,7 +510,12 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             <ul>
               {plans.map((item) => (
                 <li key={item.id}>
-                  <button className={plan?.id === item.id ? 'active' : ''} onClick={() => void openPlan(item.id)}>
+                  <button
+                    type="button"
+                    className="plan-item"
+                    aria-current={plan?.id === item.id ? 'true' : undefined}
+                    onClick={() => void openPlan(item.id)}
+                  >
                     <strong>{item.title}</strong>
                     <span>
                       {savedAtFormat.format(new Date(item.updatedAt))} 저장 · 계산 {item._count.results}회
@@ -529,7 +526,7 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
             </ul>
           )}
           {plan && (
-            <button className="danger-button" disabled={busy} onClick={() => void removePlan()}>
+            <button type="button" className="text-button danger" disabled={busy} onClick={() => void removePlan()}>
               이 계획 삭제
             </button>
           )}
@@ -589,7 +586,8 @@ function AuthenticatedWorkspace({ email }: { email: string }) {
                       {plan.results.map((result) => (
                         <button
                           key={result.id}
-                          className={storedResult?.id === result.id ? 'active' : ''}
+                          type="button"
+                          aria-pressed={storedResult?.id === result.id}
                           onClick={() => void openResult(result.id)}
                         >
                           {revisionLabel(result.inputRevision)} ·{' '}
@@ -640,7 +638,7 @@ function MarketSourceNotice({
           {interpretationDivisor(score.financeDefault!.interpretation)}). 개인 예상매출이 아니니 고쳐 쓰세요.
         </p>
         {score.financeDefault!.unusual && <UnusualRevenueWarning score={score} />}
-        <button type="button" onClick={onDisconnect}>
+        <button type="button" className="text-button" onClick={onDisconnect}>
           상권 연결 해제
         </button>
       </div>
@@ -704,11 +702,11 @@ function PlanFundingFields({
       ? '비워 두면 01 매장에서 고른 자치구로 찾습니다.'
       : `비워 두면 01 매장에서 고른 ${districtName(businessDistrict)}로 찾습니다.`;
   return (
-    <section className="form-section" aria-labelledby="plan-funding-fields">
+    <section className="panel" aria-labelledby="plan-funding-fields">
       <div className="section-title">
         <div>
           <h2 id="plan-funding-fields">자금 조건</h2>
-          <p className="picker-note">자금 공고를 찾을 때 씁니다. 비워 둬도 계산에는 영향이 없습니다.</p>
+          <p className="note">자금 공고를 찾을 때 씁니다. 비워 둬도 계산에는 영향이 없습니다.</p>
         </div>
       </div>
       <FundingProfileFields form={form} onChange={onChange} idPrefix="plan-funding" districtHint={districtHint} />
@@ -739,35 +737,36 @@ function PlanFundingPanel({
   readonly appliedSummary: string | null;
 }) {
   return (
-    <section className="picker" aria-labelledby="plan-funding">
-      <h2 id="plan-funding">자금 공고 찾기</h2>
-      <p className="picker-note">
-        위 자금 조건을 저장하고 그 조건으로 찾습니다. 공고 조건은 AI가 공고문에서 읽은 것입니다.
-      </p>
+    <>
+      <section className="panel picker" aria-labelledby="plan-funding">
+        <h2 id="plan-funding">자금 공고 찾기</h2>
+        <p className="note">위 자금 조건을 저장하고 그 조건으로 찾습니다. 공고 조건은 AI가 공고문에서 읽은 것입니다.</p>
 
-      {appliedSummary && <p className="funding-position">저장된 대출 가정 출처: {appliedSummary}</p>}
-      {stored?.kind === 'OK' && stored.legacy && (
-        <p className="picker-note" role="note">
-          예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 다음에 저장하면 지금 형식으로 바뀝니다.
-        </p>
-      )}
-      {stored?.kind === 'INVALID' && (
-        <p className="inline-error" role="status">
-          저장된 자금 조건을 읽지 못했습니다. 다시 입력해 저장해 주세요.
-        </p>
-      )}
+        {appliedSummary && <p className="funding-position">저장된 대출 가정 출처: {appliedSummary}</p>}
+        {stored?.kind === 'OK' && stored.legacy && (
+          <p className="note" role="note">
+            예전 자금 조건에서 사업 단계와 자치구만 옮겼습니다. 다음에 저장하면 지금 형식으로 바뀝니다.
+          </p>
+        )}
+        {stored?.kind === 'INVALID' && (
+          <p className="inline-error" role="status">
+            저장된 자금 조건을 읽지 못했습니다. 다시 입력해 저장해 주세요.
+          </p>
+        )}
 
-      <div className="button-row">
-        <button type="button" disabled={!hasCondition || loading} onClick={onQuery}>
-          {loading ? '찾는 중…' : '조건 저장하고 공고 찾기'}
-        </button>
-      </div>
-      {!hasCondition && (
-        <p className="picker-note" role="status">
-          위 자금 조건을 하나 이상 넣으면 찾을 수 있습니다. 계산에는 필요 없습니다.
-        </p>
-      )}
-      <div className="market-results" aria-live="polite" aria-busy={loading}>
+        <div className="button-row">
+          <button type="button" className="button primary" disabled={!hasCondition || loading} onClick={onQuery}>
+            {loading ? '찾는 중…' : '조건 저장하고 공고 찾기'}
+          </button>
+        </div>
+        {!hasCondition && (
+          <p className="note" role="status">
+            위 자금 조건을 하나 이상 넣으면 찾을 수 있습니다. 계산에는 필요 없습니다.
+          </p>
+        )}
+      </section>
+      {/* 찾은 공고는 위 칸 안에 넣지 않고 아래에 따로 놓는다. 공고마다 면이 하나라 칸 안에 넣으면 면이 겹친다. */}
+      <div className="funding-results" aria-live="polite" aria-busy={loading}>
         {loading && (
           <p className="loading-state" role="status">
             공고를 찾는 중…
@@ -783,7 +782,7 @@ function PlanFundingPanel({
           />
         )}
       </div>
-    </section>
+    </>
   );
 }
 
@@ -799,7 +798,7 @@ export default function TrendBenchApp() {
   // 계획 화면은 useSearchParams를 쓰므로 Suspense 경계 안에 둔다.
   return (
     <Suspense>
-      <AuthenticatedWorkspace key={session.user.id} email={session.user.email} />
+      <AuthenticatedWorkspace key={session.user.id} />
     </Suspense>
   );
 }

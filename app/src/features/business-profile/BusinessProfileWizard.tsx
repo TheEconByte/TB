@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { CheckIcon } from '@/components/icons';
 import { SEOUL_DISTRICTS } from '@/features/funding/districts';
 import type { BusinessCategoryInfo, BusinessDirectoryReleaseInfo } from '@/features/business-directory/types';
 import { OPEN_INDUSTRIES, industryByCode } from '@/features/industries';
@@ -75,27 +76,20 @@ export default function BusinessProfileWizard({
   const broadName = industryByCode(form.marketIndustryCode)?.shortName ?? '미선택';
 
   return (
-    <section className="business-wizard" aria-labelledby="business-wizard-title">
+    <section className="panel business-wizard" aria-labelledby="business-wizard-title">
+      {/* 계획 단계 목록 아래에 놓이는 작은 단계다. 계획 단계와 헷갈리지 않게 번호 없이 이름만 잇는다. */}
       <div className="wizard-top">
-        <div className="wizard-title-row">
-          <strong id="business-wizard-title">사업 조건</strong>
-          <span>
-            {step + 1} / {STEPS.length}
-          </span>
-        </div>
-        <div className="wizard-progress">
-          <span style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-        </div>
+        <strong id="business-wizard-title">사업 조건</strong>
         <ol className="wizard-steps">
           {STEPS.map((label, index) => (
-            <li key={label} className={index === step ? 'active' : index < step ? 'done' : ''}>
+            <li key={label}>
               <button
                 type="button"
-                className="step-button"
+                className={index < step ? 'step-button done' : 'step-button'}
                 aria-current={index === step ? 'step' : undefined}
                 onClick={() => setStep(index)}
               >
-                <span>{index < step ? '✓' : index + 1}</span>
+                {index < step && <CheckIcon />}
                 {label}
               </button>
             </li>
@@ -106,7 +100,7 @@ export default function BusinessProfileWizard({
         {step === 0 && (
           <>
             <WizardHeading title="자치구와 업종" />
-            <label className="field search-field">
+            <label className="field">
               <span>자치구</span>
               <span className="search-select">
                 <SearchIcon />
@@ -138,7 +132,7 @@ export default function BusinessProfileWizard({
               </select>
             </label>
             {form.marketIndustryCode && (
-              <label className="field detail-field">
+              <label className="field">
                 <span>업종 소분류</span>
                 <select
                   value={form.detailedIndustryCode}
@@ -294,7 +288,7 @@ export default function BusinessProfileWizard({
             </div>
             <ScopeBanner detail={selectedDetail?.name ?? null} broad={broadName} />
             {saveState.kind !== 'EMPTY' && (
-              <button type="button" className="link-button" onClick={() => onChange(EMPTY_BUSINESS_PROFILE_FORM)}>
+              <button type="button" className="text-button" onClick={() => onChange(EMPTY_BUSINESS_PROFILE_FORM)}>
                 사업 조건 모두 비우기
               </button>
             )}
@@ -303,7 +297,7 @@ export default function BusinessProfileWizard({
         <div className="wizard-nav">
           <button
             type="button"
-            className="secondary-button"
+            className="button"
             disabled={step === 0}
             onClick={() => setStep((value) => Math.max(0, value - 1))}
           >
@@ -311,11 +305,16 @@ export default function BusinessProfileWizard({
           </button>
           {/* 마지막 단계에서는 빠진 항목으로 돌려보낸다. 다 채웠으면 재무 계획의 다음 단계로는 하단 막대의 [다음]이 넘어간다. */}
           {step < STEPS.length - 1 ? (
-            <button type="button" onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))}>
+            // 다 채운 뒤에는 하단 막대의 [다음: 개업 비용]이 기본 버튼이 되므로 이 버튼은 낮춰 둔다.
+            <button
+              type="button"
+              className={complete ? 'button' : 'button primary'}
+              onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))}
+            >
               다음
             </button>
           ) : missing.length > 0 ? (
-            <button type="button" onClick={() => setStep(missing[0].step)}>
+            <button type="button" className="button primary" onClick={() => setStep(missing[0].step)}>
               빠진 항목 입력
             </button>
           ) : null}

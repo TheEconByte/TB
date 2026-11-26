@@ -1,0 +1,63 @@
+/* 디자인 토큰. 화면 스타일은 색·크기·모서리를 여기 값으로만 쓴다. */
+:root {
+  color-scheme: light;
+
+  /* 글자. muted는 회색 바탕(--canvas) 위에서도 4.5:1을 넘는다. faint는 자리 표시·비활성에만 쓴다. */
+  --ink: #191f28;
+  --ink-2: #333d4b;
+  --ink-3: #4e5968;
+  --muted: #5f6b7a;
+  --faint: #8b95a1;
+
+  /* 면과 선. 화면 바탕은 회색, 내용은 흰 면에 올린다. fill은 흰 면 안에서 한 단계 어두운 칸이다. */
+  --canvas: #f2f4f6;
+  --surface: #ffffff;
+  --fill: #f5f6f8;
+  --fill-strong: #eceef1;
+  --line: #e5e8eb;
+  --line-strong: #d1d6db;
+
+  /* 브랜드 파랑. 화면의 기본 버튼 하나, 포커스, 본문 링크, 데이터 막대에만 쓴다. 선택 상태에는 쓰지 않는다. */
+  --primary: #2f6bff;
+  --primary-strong: #1b4fd6;
+  --primary-soft: #e8f0ff;
+
+  /* 뜻을 가진 색. 상태를 알릴 때만 글자·기호와 함께 쓴다. */
+  --positive: #0b6e4b;
+  --positive-soft: #e6f6ef;
+  --warning: #8a5a00;
+  --warning-soft: #fff6dd;
+  --danger: #c4271b;
+  --danger-soft: #fff1f0;
+  --danger-line: #ffc9c4;
+  /* 차트에서 자료 부족·점수를 낮춘 요인을 나타내는 색. */
+  --danger-data: #e5483f;
+
+  /* 글자 크기. 본문 15px, 표·설명 13px, 가장 작은 글자 12px. */
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-15: 0.9375rem;
+  --fs-17: 1.0625rem;
+  --fs-20: 1.25rem;
+  --fs-24: 1.5rem;
+  --fs-32: 2rem;
+
+  /* 모서리. 입력란·버튼 8px, 흰 면 12px, 표식 6px. */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+
+  /* 배치 */
+  --page-max: 1440px;
+  --page-pad: 32px;
+  --header-h: 60px;
+  --control-h: 44px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad: 16px;
+    --header-h: 52px;
+  }
+}

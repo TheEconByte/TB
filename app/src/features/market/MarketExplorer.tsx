@@ -1,6 +1,5 @@
 'use client';
 
-import SiteHeader from '@/components/SiteHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QuarterTrendChart, { type ChartPoint } from './QuarterTrendChart';
 import {
@@ -251,12 +250,10 @@ export default function MarketExplorer() {
 
   return (
     <main>
-      <SiteHeader />
-
-      <section className="hero market-hero">
+      <div className="page-head">
         <h1>상권 조회</h1>
         <p>서울시 상권분석서비스와 소상공인시장진흥공단 점포 자료입니다. 로그인 없이 볼 수 있습니다.</p>
-      </section>
+      </div>
 
       {booting && (
         <p className="loading-state" role="status">
@@ -279,21 +276,11 @@ export default function MarketExplorer() {
 
       {!booting && activeRelease && (
         <div className="split-layout">
+          {/* 고르는 칸이 먼저다. 주의할 점과 출처는 그 아래에 접어 둔다. */}
           <div className="split-aside">
-            <details className="notice-box">
-              <summary>값을 볼 때 주의할 점</summary>
-              <ul>
-                {MARKET_LIMITATIONS.map((limitation) => (
-                  <li key={limitation}>{limitation}</li>
-                ))}
-              </ul>
-            </details>
-
-            <ReleaseCard release={activeRelease} />
-
-            <section className="picker" aria-labelledby="market-picker">
+            <section className="panel picker" aria-labelledby="market-picker">
               <h2 id="market-picker">상권·업종 고르기</h2>
-              <div className="select-row market-select-row">
+              <div className="select-row">
                 <label className="field">
                   <span>1. 자치구</span>
                   <select value={districtCode} onChange={(event) => void changeDistrict(event.target.value)}>
@@ -391,19 +378,67 @@ export default function MarketExplorer() {
                 </label>
               </div>
             </section>
+
+            <details className="panel">
+              <summary>값을 볼 때 주의할 점</summary>
+              <ul className="note">
+                {MARKET_LIMITATIONS.map((limitation) => (
+                  <li key={limitation}>{limitation}</li>
+                ))}
+              </ul>
+            </details>
+
+            <ReleaseCard release={activeRelease} />
           </div>
 
-          <div className="split-main">
+          <section className="split-main market-results" aria-live="polite" aria-busy={summaryLoading}>
+            {areaError && (
+              <div className="error-box" role="alert">
+                <h2>상권 목록을 불러오지 못했습니다.</h2>
+                <p>{areaError}</p>
+              </div>
+            )}
+            {districtCode !== '' && areas.length === 0 && !areasLoading && !areaError && (
+              <p className="empty-state">
+                {excludedAreaCount > 0
+                  ? '이 자치구에는 요식업 매출 자료가 있는 상권이 없습니다.'
+                  : '이 자치구에는 등록된 상권이 없습니다.'}
+              </p>
+            )}
+            {summaryLoading && (
+              <p className="loading-state" role="status">
+                분기 지표를 불러오는 중…
+              </p>
+            )}
+            {!summaryLoading && summaryError && (
+              <div className="error-box" role="alert">
+                <h2>분기 지표를 불러오지 못했습니다.</h2>
+                <p>{summaryError}</p>
+              </div>
+            )}
+            {!summaryLoading && !summaryError && !summary && (
+              <div className="empty-panel">
+                <h2>상권과 업종을 고르면 볼 수 있는 자료</h2>
+                <ul>
+                  <li>상권 생존점수와 서울 내 순위(점수를 내는 업종만)</li>
+                  <li>분기별 매출 추이와 요일·시간대·성별·연령대 구성</li>
+                  <li>분기별 점포 수, 개업·폐업 점포 수</li>
+                  <li>세부 업종을 고르면 같은 자치구의 경쟁 점포</li>
+                </ul>
+                <p>자치구 → 상권 → 업종을 고르세요.</p>
+              </div>
+            )}
+
+            {!summaryLoading && summary && <SummaryHead summary={summary} selectedArea={selectedArea} />}
+
             {(industryCode || detailedIndustryCode) && (
               <section className="scope-grid" aria-label="데이터 집계 범위">
-                <div className="scope-card">
+                <div>
                   <span>매출·고객 분석</span>
-                  <strong>
-                    {industries.find((item) => item.code === industryCode)?.displayName ?? '상위 업종 미선택'} 전체 기준
-                  </strong>
+                  <strong>{selectedIndustryName ?? '상위 업종 미선택'} 전체 기준</strong>
                   <p>서울시 상권분석서비스(추정매출-상권) 관측값이며 개인 예상매출이 아닙니다.</p>
                 </div>
-                <div className="scope-card">
+                <div>
                   <span>경쟁 점포 현황</span>
                   <strong>
                     {selectedBusinessCategory ? `${selectedBusinessCategory.name} 세부 업종 기준` : '세부 업종 미선택'}
@@ -413,56 +448,27 @@ export default function MarketExplorer() {
               </section>
             )}
 
-            <section className="market-results" aria-live="polite" aria-busy={summaryLoading}>
-              {areaError && (
-                <div className="error-box" role="alert">
-                  <h2>상권 목록을 불러오지 못했습니다.</h2>
-                  <p>{areaError}</p>
-                </div>
-              )}
-              {districtCode !== '' && areas.length === 0 && !areasLoading && !areaError && (
-                <p className="empty-state">
-                  {excludedAreaCount > 0
-                    ? '이 자치구에는 요식업 매출 자료가 있는 상권이 없습니다.'
-                    : '이 자치구에는 등록된 상권이 없습니다.'}
-                </p>
-              )}
-              {summaryLoading && (
-                <p className="loading-state" role="status">
-                  분기 지표를 불러오는 중…
-                </p>
-              )}
-              {!summaryLoading && summaryError && (
-                <div className="error-box" role="alert">
-                  <h2>분기 지표를 불러오지 못했습니다.</h2>
-                  <p>{summaryError}</p>
-                </div>
-              )}
-              {!summaryLoading && !summaryError && !summary && (
-                <p className="empty-state">자치구 → 상권 → 업종을 고르세요.</p>
-              )}
-              {!summaryLoading && summary && scoreError && (
-                <div className="error-box" role="alert">
-                  <h2>상권 생존점수를 불러오지 못했습니다.</h2>
-                  <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
-                </div>
-              )}
-              {!summaryLoading && summary && score && <ScorePanel score={score} />}
-              {!summaryLoading && summary && <SummaryPanel summary={summary} selectedArea={selectedArea} />}
-              {businessLoading && (
-                <p className="loading-state" role="status">
-                  세부 업종 경쟁 현황을 불러오는 중…
-                </p>
-              )}
-              {!businessLoading && businessError && (
-                <div className="error-box" role="alert">
-                  <h2>경쟁 현황을 불러오지 못했습니다.</h2>
-                  <p>{businessError}</p>
-                </div>
-              )}
-              {!businessLoading && businessSummary && <CompetitionPanel summary={businessSummary} />}
-            </section>
-          </div>
+            {!summaryLoading && summary && scoreError && (
+              <div className="error-box" role="alert">
+                <h2>상권 생존점수를 불러오지 못했습니다.</h2>
+                <p>{scoreError} 아래 공개 지표는 그대로 볼 수 있습니다.</p>
+              </div>
+            )}
+            {!summaryLoading && summary && score && <ScorePanel score={score} />}
+            {!summaryLoading && summary && <SummaryBody summary={summary} />}
+            {businessLoading && (
+              <p className="loading-state" role="status">
+                세부 업종 경쟁 현황을 불러오는 중…
+              </p>
+            )}
+            {!businessLoading && businessError && (
+              <div className="error-box" role="alert">
+                <h2>경쟁 현황을 불러오지 못했습니다.</h2>
+                <p>{businessError}</p>
+              </div>
+            )}
+            {!businessLoading && businessSummary && <CompetitionPanel summary={businessSummary} />}
+          </section>
         </div>
       )}
     </main>
@@ -471,7 +477,7 @@ export default function MarketExplorer() {
 
 function ReleaseCard({ release }: { readonly release: ReleaseInfo }) {
   return (
-    <details className="release-card">
+    <details className="panel">
       <summary>데이터 출처 · {release.basisPeriodLabel}</summary>
       <dl className="release-grid">
         <div>
@@ -511,19 +517,14 @@ function ReleaseCard({ release }: { readonly release: ReleaseInfo }) {
   );
 }
 
-function SummaryPanel({
+// 결과의 제목. 어느 상권·업종의 자료인지와 자료가 얼마나 있는지를 먼저 밝힌다.
+function SummaryHead({
   summary,
   selectedArea,
 }: {
   readonly summary: MarketReport;
   readonly selectedArea: AreaInfo | null;
 }) {
-  const points: ChartPoint[] = summary.quarters.map((quarter) => ({
-    quarter: quarter.quarter,
-    label: quarter.label,
-    shortLabel: shortQuarter(quarter.quarter),
-    amount: quarter.salesAmount === null ? null : Number(quarter.salesAmount),
-  }));
   const observedQuarters = summary.quarters.filter((quarter) => quarter.salesStatus === 'OBSERVED').length;
   const statusLabel =
     summary.dataStatus === 'AVAILABLE'
@@ -531,99 +532,133 @@ function SummaryPanel({
       : summary.dataStatus === 'PARTIAL'
         ? `가용 분기 ${summary.quarters.length}개 중 매출 원값이 있는 분기 ${observedQuarters}개입니다.`
         : '이 상권·업종 조합의 관측 자료가 없습니다.';
+  const observedName = summary.area.nameMismatch ? summary.area.observedName : selectedArea?.observedName;
 
   return (
-    <>
-      <div className="summary-head">
+    <div className="summary-head">
+      <div>
         <h2>{summary.area.displayName}</h2>
         <p>
           {summary.area.districtName} · {summary.area.areaTypeName} · {summary.industry.displayName}
         </p>
-        {(summary.area.nameMismatch ? summary.area.observedName : selectedArea?.observedName) && (
-          <p className="name-mismatch">
-            매출·점포 자료의 상권 이름:{' '}
-            {summary.area.nameMismatch ? summary.area.observedName : selectedArea?.observedName}
-          </p>
-        )}
+        {observedName && <p className="name-mismatch">매출·점포 자료의 상권 이름: {observedName}</p>}
       </div>
-
       <div className={`data-status status-${summary.dataStatus.toLowerCase()}`} role="status">
         <strong>{statusLabel}</strong>
         {summary.dataStatusMessage && <span>{summary.dataStatusMessage}</span>}
       </div>
+    </div>
+  );
+}
 
-      {summary.quarters.length === 0 ? (
-        <div className="empty-panel" role="status">
-          <h2>자료 부족</h2>
-          <p>
-            {summary.area.displayName} · {summary.industry.displayName} 조합에는 분기 지표가 없습니다. 다른 상권이나
-            업종을 선택해 주세요.
-          </p>
+function SummaryBody({ summary }: { readonly summary: MarketReport }) {
+  const points: ChartPoint[] = summary.quarters.map((quarter) => ({
+    quarter: quarter.quarter,
+    label: quarter.label,
+    shortLabel: shortQuarter(quarter.quarter),
+    amount: quarter.salesAmount === null ? null : Number(quarter.salesAmount),
+  }));
+  const latest = summary.quarters.at(-1);
+
+  if (!latest) {
+    return (
+      <div className="empty-panel" role="status">
+        <h2>자료 부족</h2>
+        <p>
+          {summary.area.displayName} · {summary.industry.displayName} 조합에는 분기 지표가 없습니다. 다른 상권이나
+          업종을 선택해 주세요.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="panel">
+        <h3>분기별 매출 원값 추이 (단위 미확정)</h3>
+        <LatestQuarterStats quarter={latest} />
+        <QuarterTrendChart points={points} />
+        <p className="note">빗금 칸은 자료가 없는 분기입니다.</p>
+      </div>
+
+      {latest.salesBreakdown && <SalesBreakdownPanel quarter={latest} />}
+
+      <div className="panel">
+        <h3>분기별 지표</h3>
+        <div className="table-scroll full-length">
+          <table>
+            <caption>
+              {summary.area.displayName} · {summary.industry.displayName} · 가용 분기 {summary.quarters.length}개
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">분기</th>
+                <th scope="col">매출 원값 (원)</th>
+                <th scope="col">매출 건수 원값</th>
+                <th scope="col">일반 점포 수</th>
+                <th scope="col">유사 업종 점포 수</th>
+                <th scope="col">프랜차이즈 점포 수</th>
+                <th scope="col">개업 점포 수</th>
+                <th scope="col">폐업 점포 수</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.quarters.map((quarter) => (
+                <QuarterRow key={quarter.quarter} quarter={quarter} />
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <>
-          <div className="table-card">
-            <h3>분기별 매출 원값 추이 (단위 미확정)</h3>
-            <QuarterTrendChart points={points} />
-            <p className="table-note">빗금 칸은 자료가 없는 분기입니다.</p>
-          </div>
+      </div>
 
-          {summary.quarters.at(-1)?.salesBreakdown && <SalesBreakdownPanel quarter={summary.quarters.at(-1)!} />}
-
-          <div className="table-card">
-            <h3>분기별 지표</h3>
-            <div className="table-scroll full-length">
-              <table className="market-table">
-                <caption>
-                  {summary.area.displayName} · {summary.industry.displayName} · 가용 분기 {summary.quarters.length}개
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">분기</th>
-                    <th scope="col">매출 원값 (원)</th>
-                    <th scope="col">매출 건수 원값</th>
-                    <th scope="col">일반 점포 수</th>
-                    <th scope="col">유사 업종 점포 수</th>
-                    <th scope="col">프랜차이즈 점포 수</th>
-                    <th scope="col">개업 점포 수</th>
-                    <th scope="col">폐업 점포 수</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.quarters.map((quarter) => (
-                    <QuarterRow key={quarter.quarter} quarter={quarter} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <details className="table-card reference-source">
-            <summary>지표 정의</summary>
-            <div className="table-scroll">
-              <table className="market-table indicator-table">
-                <thead>
-                  <tr>
-                    <th scope="col">지표</th>
-                    <th scope="col">단위</th>
-                    <th scope="col">해석 제한</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.indicators.map((indicator) => (
-                    <tr key={indicator.key}>
-                      <th scope="row">{indicator.label}</th>
-                      <td>{indicator.unitConfirmed ? indicator.unit : '단위 미확정'}</td>
-                      <td className="note-cell">{indicator.note}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        </>
-      )}
+      <details className="panel">
+        <summary>지표 정의</summary>
+        <div className="table-scroll">
+          <table className="indicator-table">
+            <thead>
+              <tr>
+                <th scope="col">지표</th>
+                <th scope="col">단위</th>
+                <th scope="col">해석 제한</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.indicators.map((indicator) => (
+                <tr key={indicator.key}>
+                  <th scope="row">{indicator.label}</th>
+                  <td>{indicator.unitConfirmed ? indicator.unit : '단위 미확정'}</td>
+                  <td className="note-cell">{indicator.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </>
+  );
+}
+
+// 표의 마지막 행(가장 최근 분기)을 표를 끝까지 내리지 않아도 보이게 위에 옮겨 적는다. 값과 표기는 표와 같다.
+function LatestQuarterStats({ quarter }: { readonly quarter: QuarterIndicatorRow }) {
+  return (
+    <div className="summary-grid" role="group" aria-label={`${quarter.label} 지표`}>
+      <div>
+        <span>{quarter.label} 매출 원값</span>
+        <strong>{quarter.salesAmount === null ? '자료 부족' : numberFormat.format(Number(quarter.salesAmount))}</strong>
+      </div>
+      <div>
+        <span>일반 점포 수</span>
+        <strong>{formatCount(quarter.storeCount)}</strong>
+      </div>
+      <div>
+        <span>개업 점포 수</span>
+        <strong>{formatCount(quarter.openedStoreCount)}</strong>
+      </div>
+      <div>
+        <span>폐업 점포 수</span>
+        <strong>{formatCount(quarter.closedStoreCount)}</strong>
+      </div>
+    </div>
   );
 }
 
@@ -631,7 +666,7 @@ function SalesBreakdownPanel({ quarter }: { readonly quarter: QuarterIndicatorRo
   const breakdown = quarter.salesBreakdown;
   if (!breakdown) return null;
   return (
-    <div className="table-card">
+    <div className="panel">
       <h3>{quarter.label} 매출 구성 · 상위 업종 기준</h3>
       <div className="breakdown-grid">
         <MetricBars title="요일별" points={breakdown.dayOfWeek} />
@@ -639,7 +674,7 @@ function SalesBreakdownPanel({ quarter }: { readonly quarter: QuarterIndicatorRo
         <MetricBars title="성별" points={breakdown.gender} />
         <MetricBars title="연령대별" points={breakdown.age} />
       </div>
-      <ul className="table-note">
+      <ul className="note">
         {breakdown.limitations.map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -674,19 +709,19 @@ function MetricBars({ title, points }: { readonly title: string; readonly points
 
 function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
   return (
-    <div className="table-card">
+    <div className="panel">
       <h3>
         {summary.district.name} {summary.category.name} 경쟁 점포
       </h3>
       <p className="competition-count">
         <strong>{numberFormat.format(summary.businessCount)}개 점포</strong>
       </p>
-      <p className="table-note">{summary.competitionScope.statement}</p>
+      <p className="note">{summary.competitionScope.statement}</p>
       {summary.businesses.length === 0 ? (
         <p className="empty-state">해당 자치구에서 관측된 점포가 없습니다.</p>
       ) : (
         // 점포가 많으면 목록이 결과 화면을 길게 늘려서 처음에는 접어 둔다. 점포 수는 위에 늘 보인다.
-        <details className="competition-details">
+        <details>
           <summary>
             점포 목록 {numberFormat.format(summary.businesses.length)}곳 보기
             {summary.truncated && ` (전체 ${numberFormat.format(summary.businessCount)}곳 중 앞 50곳)`}
@@ -704,7 +739,7 @@ function CompetitionPanel({ summary }: { readonly summary: BusinessSummary }) {
           </ul>
         </details>
       )}
-      <p className="table-note">기준일 {formatDate(summary.asOf)}</p>
+      <p className="note">기준일 {formatDate(summary.asOf)}</p>
     </div>
   );
 }

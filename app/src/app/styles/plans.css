@@ -1,0 +1,774 @@
+/* 재무 계획(/plans): 로그인, 계획 목록, 단계, 사업 조건, 결과, 참고 자료. */
+
+/* 로그인 */
+.auth-shell {
+  display: grid;
+  justify-items: center;
+  gap: 24px;
+  padding: 48px 0 24px;
+}
+.auth-intro {
+  max-width: 400px;
+  text-align: center;
+}
+.auth-intro p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: var(--fs-14);
+}
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+}
+.auth-card .text-button {
+  justify-self: center;
+}
+
+/* 왼쪽은 내 계획 목록, 오른쪽은 고른 계획 하나다. */
+.workspace {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.plan-sidebar {
+  position: sticky;
+  top: calc(var(--header-h) + 20px);
+  gap: 12px;
+  padding: 16px;
+}
+.plan-sidebar ul {
+  display: grid;
+  gap: 2px;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+.plan-item {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  transition: background-color 0.12s ease;
+}
+.plan-item:hover {
+  background: var(--fill);
+}
+.plan-item strong {
+  display: block;
+  overflow: hidden;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-item span {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+/* 연 계획은 색이 아니라 한 단계 어두운 면과 굵기로 표시한다. */
+.plan-item[aria-current='true'] {
+  background: var(--fill-strong);
+}
+.plan-item[aria-current='true'] strong {
+  font-weight: 700;
+}
+.plan-sidebar > .text-button {
+  justify-self: start;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  width: 100%;
+}
+.planner-column {
+  min-width: 0;
+  /* 입력란과 결과의 칸 수는 화면 폭이 아니라 이 열의 폭에 맞춘다. 옆에 계획 목록이 있어 화면이 넓어도 열은 좁다. */
+  container-type: inline-size;
+}
+.planner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+/* 계획 머리: 화면 제목, 계획 제목 입력, 단계 목록. */
+.plan-head {
+  gap: 0;
+  padding: 0;
+}
+.plan-head-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  align-items: center;
+  gap: 12px 32px;
+  padding: 20px 24px;
+}
+.plan-head h1 {
+  font-size: var(--fs-20);
+}
+.plan-head-title p {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.plan-steps {
+  border-top: 1px solid var(--line);
+  scroll-margin-top: calc(var(--header-h) + 12px);
+}
+/* 좁은 화면에서는 목록을 옆으로 넘긴다. 잘린 단계 이름이 더 있음을 알리므로 스크롤 막대는 그리지 않는다. */
+.plan-steps ol,
+.wizard-steps {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.plan-steps ol {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+.plan-steps li {
+  flex: 1 0 auto;
+}
+/* position: 화면에서 숨긴 "(입력함)" 글자가 가로로 넘치는 목록 밖으로 나가 쪽 전체를 넓히지 않게 버튼 안에 묶는다. */
+.plan-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.12s ease;
+}
+.plan-step:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.plan-step > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 22px;
+  border-radius: var(--r-xs);
+  background: var(--fill-strong);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: 700;
+}
+/* 지금 단계는 한 단계 어두운 면과 검은 번호로 표시한다. 선택 표시에 브랜드 색을 쓰지 않는다. */
+.plan-step[aria-current='step'] {
+  background: var(--fill-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+.plan-step[aria-current='step'] > span {
+  background: var(--ink);
+  color: #ffffff;
+}
+.plan-step.done:not([aria-current]) > span {
+  color: var(--ink-2);
+}
+
+/* 한 단계 화면. 면은 같은 간격으로 쌓는다. */
+.plan-step-panel,
+.step-aside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+/* display를 정했으므로 브라우저 기본 [hidden]이 이기지 못한다. 지금 단계가 아닌 화면은 여기서 숨긴다. */
+.plan-step-panel[hidden] {
+  display: none;
+}
+/* 입력과 그 값을 정할 때 볼 참고를 나란히 둔다. 좁은 화면에서는 참고가 입력 아래로 간다. */
+.step-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.step-layout > * {
+  min-width: 0;
+  container-type: inline-size;
+}
+@container (max-width: 880px) {
+  .step-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.step-note {
+  color: var(--ink-3);
+  font-size: var(--fs-14);
+}
+.section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.section-title > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 26px;
+  border-radius: var(--r-xs);
+  background: var(--ink);
+  color: #ffffff;
+  font-size: var(--fs-12);
+  font-weight: 700;
+}
+.section-title .note {
+  margin-top: 2px;
+}
+
+/* 01 매장: 사업 조건 입력 */
+.business-wizard {
+  gap: 0;
+  padding: 0;
+}
+.wizard-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.wizard-steps {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-xs);
+  color: var(--muted);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.step-button:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.step-button.done {
+  color: var(--ink-3);
+}
+.step-button[aria-current='step'] {
+  background: var(--fill-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+.wizard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 28px 24px 24px;
+}
+.wizard-heading h2 {
+  font-size: var(--fs-20);
+}
+.wizard-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--fs-14);
+}
+.wizard-panel > .field,
+.inline-fields {
+  max-width: 480px;
+}
+.search-select {
+  position: relative;
+  display: block;
+}
+.search-select svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+.search-select select {
+  padding-left: 38px;
+}
+.choice-grid {
+  display: grid;
+  gap: 12px;
+}
+.choice-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 760px;
+}
+.choice-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 148px;
+  padding: 16px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  text-align: center;
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease;
+}
+.choice-card:hover {
+  border-color: var(--faint);
+  background: var(--fill);
+}
+/* 고른 칸은 검은 테두리와 한 단계 어두운 면으로 표시한다. */
+.choice-card.selected {
+  border-color: var(--ink);
+  background: var(--fill);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+.choice-card strong {
+  font-size: var(--fs-15);
+  font-weight: 600;
+}
+.choice-card.selected strong {
+  font-weight: 700;
+}
+.choice-card span {
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: 1.5;
+}
+.inline-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+}
+.scope-banner {
+  display: grid;
+  gap: 2px;
+  max-width: 760px;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  color: var(--ink-3);
+  font-size: var(--fs-13);
+}
+.scope-banner strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.scope-banner em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 700;
+}
+.profile-summary-grid {
+  max-width: 760px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.profile-summary-grid > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  padding: 12px 16px;
+  font-size: var(--fs-14);
+}
+.profile-summary-grid > div + div {
+  border-top: 1px solid var(--line);
+}
+.profile-summary-grid span {
+  color: var(--muted);
+}
+.profile-summary-grid strong {
+  font-weight: 600;
+}
+.wizard-panel > .text-button {
+  align-self: flex-start;
+}
+.wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 760px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.wizard-nav .button {
+  min-width: 96px;
+}
+
+/* 월매출 입력란 위의 상권 출처(ADR 0008) */
+.market-source {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  font-size: var(--fs-14);
+}
+.market-source p {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.market-source .inline-error {
+  color: var(--danger);
+}
+
+/* 계산 결과. 묶음마다 판단 문장을 먼저, 근거 금액을 아래에 둔다. */
+.results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+/* 계산이 끝나면 스크립트가 결과로 포커스를 옮긴다. 키보드로 옮겨 왔을 때만 테두리를 그린다. */
+.results:focus:not(:focus-visible) {
+  outline: none;
+}
+.results-head p {
+  color: var(--muted);
+  font-size: var(--fs-14);
+}
+.stale-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+.result-history {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  font-size: var(--fs-13);
+}
+.result-history strong {
+  margin-right: 6px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.result-history button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.result-history button:hover {
+  background: var(--fill);
+}
+.result-history button[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--fill-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+/* 이 계획의 숫자와 견줘 보라고 적는 한 줄. 판정이 아니라 참고다. */
+.funding-position {
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  align-items: start;
+}
+@container (max-width: 880px) {
+  .result-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* 시나리오 표가 넓어도 칸이 화면 밖으로 밀리지 않게 한다. 표는 자기 안에서 가로로 스크롤한다. */
+.result-grid > .result-block {
+  min-width: 0;
+  gap: 8px;
+}
+.result-block h3 {
+  margin-bottom: 4px;
+  font-size: var(--fs-17);
+}
+/* 판단 문장. 색은 상태를 뜻하고, 앞의 기호가 색 없이도 같은 뜻을 전한다. */
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-14);
+  font-weight: 600;
+}
+.verdict p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.verdict p::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  background: currentColor;
+}
+.verdict .text-button {
+  min-height: 24px;
+  color: inherit;
+}
+.verdict-positive {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+.verdict-positive p::before {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='m3.2 8.4 3.2 3.2 6.4-7' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+}
+.verdict-caution {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.verdict-negative {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.verdict-caution p::before,
+.verdict-negative p::before {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M8 2.2 14.3 13H1.7L8 2.2Z' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M8 6.6v3' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.2' r='.9' fill='%23000'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+}
+.verdict-missing {
+  background: var(--fill-strong);
+  color: var(--ink-3);
+}
+.verdict-missing p::before {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Ccircle cx='8' cy='8' r='6.2' stroke='%23000' stroke-width='1.6'/%3E%3Cpath d='M5.2 8h5.6' stroke='%23000' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+}
+.scenario-table td:not(.value-pending) {
+  font-weight: 600;
+}
+.scenario-table tbody th {
+  font-weight: 500;
+}
+.scenario-legend {
+  display: grid;
+  gap: 2px;
+  margin: 12px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  list-style: none;
+}
+.scenario-legend strong {
+  margin-right: 8px;
+  color: var(--ink-2);
+}
+.result-setting {
+  max-width: 260px;
+}
+.result-details > p {
+  color: var(--ink-3);
+  font-size: var(--fs-13);
+}
+
+/* 단계 이동은 화면 아래에 붙어 따라오는 이 막대에서만 한다. */
+.calculate-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 12px 12px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(25, 31, 40, 0.1);
+}
+.draft-state {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-13);
+}
+/* 저장 상태는 바뀌는 상태라 점과 글자로 함께 알린다. */
+.draft-state strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+.draft-state strong::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.draft-state strong[data-state='saved']::before {
+  background: var(--positive);
+}
+.draft-state span {
+  color: var(--danger);
+}
+
+/* 임대료·프랜차이즈 참고. 재무 입력에 자동으로 들어가지 않는 참고 자료다. */
+.reference-empty {
+  gap: 4px;
+  padding-block: 16px;
+}
+.reference-empty h2 {
+  font-size: var(--fs-15);
+}
+/* 펼친 패널은 바깥 면 안에 있으므로 패널 자체의 면을 뺀다. */
+.reference-details > .picker {
+  padding: 0;
+  border: 0;
+}
+.reference-details > .picker > h2 {
+  display: none;
+}
+.reference-select-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.reference-detail-grid {
+  display: grid;
+  gap: 20px;
+}
+.reference-detail-grid h3,
+.franchise-history h3 {
+  margin-bottom: 8px;
+}
+.franchise-list {
+  max-height: 340px;
+}
+.franchise-list .text-button {
+  min-height: 24px;
+}
+.franchise-list tr.selected > * {
+  background: var(--fill-strong);
+  font-weight: 700;
+}
+.franchise-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.franchise-detail > h3 {
+  font-size: var(--fs-17);
+}
+.franchise-detail > h3 span {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  font-weight: 400;
+}
+
+@media (max-width: 1023px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .plan-sidebar {
+    position: static;
+  }
+  .plan-head-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .auth-shell {
+    padding-top: 16px;
+  }
+  .plan-head-row {
+    padding: 16px;
+  }
+  .wizard-top {
+    padding: 10px 16px;
+  }
+  .wizard-panel {
+    padding: 20px 16px 16px;
+  }
+  .choice-grid.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .choice-grid.three .choice-card {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    min-height: 0;
+    padding: 12px 16px;
+    text-align: left;
+  }
+  .choice-grid.three .choice-card svg {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+  }
+  .choice-grid.three .choice-card span {
+    margin-left: auto;
+    text-align: right;
+  }
+  .inline-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profile-summary-grid > div {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+  /* 화면에 붙어 따라오므로 휴대폰에서는 버튼을 두 칸씩 놓는다. 첫 줄은 저장 상태, 그 아래가 버튼이고, 버튼이 셋이면
+     기본 버튼([다음])이 한 줄을 다 쓴다. */
+  .calculate-bar {
+    bottom: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+  .calculate-bar .draft-state,
+  .calculate-bar .button-row {
+    display: contents;
+  }
+  .calculate-bar .draft-state strong,
+  .calculate-bar .draft-state span {
+    grid-column: 1 / -1;
+  }
+  .calculate-bar .button-row > .button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}

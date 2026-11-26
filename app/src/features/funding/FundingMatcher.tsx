@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import SiteHeader from '@/components/SiteHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import MarketGradeBanner from '@/features/market/score/MarketGradeBanner';
@@ -80,8 +79,6 @@ export default function FundingMatcher() {
 
   return (
     <main>
-      <SiteHeader />
-
       <MarketGradeBanner
         onLoaded={(score) => {
           // 상권에서 넘어오면 비어 있는 자치구만 채운다(ADR 0009 §6의 ADR 0008 개정). 나머지는 사용자가 고른다.
@@ -91,10 +88,10 @@ export default function FundingMatcher() {
         }}
       />
 
-      <section className="hero funding-hero">
+      <div className="page-head">
         <h1>자금 공고</h1>
         <p>정책자금·지원사업 공고 중 내 조건과 안 맞는 것을 걸러 냅니다. 공고 조건은 AI가 공고문에서 읽은 것입니다.</p>
-      </section>
+      </div>
 
       {isPending && (
         <p className="loading-state" role="status">
@@ -112,57 +109,57 @@ export default function FundingMatcher() {
       )}
 
       {!isPending && session && (
-        <>
-          <div className="split-layout">
-            <div className="split-aside">
-              <details className="notice-box">
-                <summary>걸러 내는 기준</summary>
-                <ul>
-                  <li>AI가 읽은 조건 중 하나라도 안 맞으면 뺍니다. 뺀 공고는 아래에서 펼쳐 볼 수 있습니다.</li>
-                  <li>입력하지 않은 항목은 &lsquo;확인 필요&rsquo;로 둡니다. 입력값은 AI에 보내지 않습니다.</li>
-                </ul>
-              </details>
-
-              <section className="picker" aria-labelledby="funding-picker">
-                <h2 id="funding-picker">내 조건</h2>
-                <form onSubmit={submit}>
-                  <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
-                  {formError && (
-                    <p className="inline-error" role="alert">
-                      {formError}
-                    </p>
-                  )}
-                  <div className="button-row">
-                    <button type="submit" disabled={loading}>
-                      {loading ? '찾는 중…' : '공고 찾기'}
-                    </button>
-                  </div>
-                  <p className="picker-note">입력은 저장되지 않습니다.</p>
-                </form>
-              </section>
-            </div>
-
-            <section
-              ref={resultsRef}
-              tabIndex={-1}
-              className="market-results funding-results split-main"
-              aria-label="공고 찾기 결과"
-              aria-live="polite"
-              aria-busy={loading}
-            >
-              {loading && (
-                <p className="loading-state" role="status">
-                  공고를 찾는 중…
-                </p>
-              )}
-              {!loading && error && <FundingMatchesErrorPanel error={error} />}
-              {!loading && !error && result && <FundingMatchesPanel result={result} />}
-              {!loading && !error && !result && (
-                <p className="empty-state">조건을 고르고 [공고 찾기]를 누르면 여기에 공고가 나옵니다.</p>
-              )}
+        <div className="split-layout">
+          {/* 조건 입력이 먼저다. 걸러 내는 기준은 그 아래에 접어 둔다. */}
+          <div className="split-aside">
+            <section className="panel picker" aria-labelledby="funding-picker">
+              <h2 id="funding-picker">내 조건</h2>
+              <form onSubmit={submit}>
+                <FundingProfileFields form={form} onChange={setForm} idPrefix="funding-page" />
+                {formError && (
+                  <p className="inline-error" role="alert">
+                    {formError}
+                  </p>
+                )}
+                <button type="submit" className="button primary" disabled={loading}>
+                  {loading ? '찾는 중…' : '공고 찾기'}
+                </button>
+                <p className="note">입력은 저장되지 않습니다.</p>
+              </form>
             </section>
+
+            <details className="panel">
+              <summary>걸러 내는 기준</summary>
+              <ul className="note">
+                <li>AI가 읽은 조건 중 하나라도 안 맞으면 뺍니다. 뺀 공고는 아래에서 펼쳐 볼 수 있습니다.</li>
+                <li>입력하지 않은 항목은 &lsquo;확인 필요&rsquo;로 둡니다. 입력값은 AI에 보내지 않습니다.</li>
+              </ul>
+            </details>
           </div>
-        </>
+
+          <section
+            ref={resultsRef}
+            tabIndex={-1}
+            className="split-main funding-results"
+            aria-label="공고 찾기 결과"
+            aria-live="polite"
+            aria-busy={loading}
+          >
+            {loading && (
+              <p className="loading-state" role="status">
+                공고를 찾는 중…
+              </p>
+            )}
+            {!loading && error && <FundingMatchesErrorPanel error={error} />}
+            {!loading && !error && result && <FundingMatchesPanel result={result} />}
+            {!loading && !error && !result && (
+              <div className="empty-panel">
+                <h2>찾은 공고가 여기에 나옵니다</h2>
+                <p>조건을 고르고 [공고 찾기]를 누르면 여기에 공고가 나옵니다. 조건을 비워 둬도 찾을 수 있습니다.</p>
+              </div>
+            )}
+          </section>
+        </div>
       )}
     </main>
   );

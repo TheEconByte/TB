@@ -42,7 +42,8 @@ Operator load commands (*:load)
 | 책임 | 위치 |
 |---|---|
 | 페이지·Route Handler | `app/src/app` |
-| 모든 화면의 공통 머리말(주요 화면 목록) | `app/src/components/SiteHeader.tsx` |
+| 모든 화면의 공통 머리말(주요 화면 목록, 로그인·로그아웃)과 꼬리말(자료 출처) | `app/src/components/SiteHeader.tsx`, `SiteFooter.tsx`. `app/src/app/layout.tsx`가 모든 화면에 붙인다 |
+| 화면 스타일 | `app/src/app/styles/`: 토큰(`tokens.css`) → 기본 요소(`base.css`) → 화면 틀(`shell.css`) → 공통 조각(`components.css`) → 화면별. `globals.css`가 이 순서로 읽는다. 방향은 [DESIGN.md](DESIGN.md) |
 | 다루는 외식 업종 목록(도메인 공통, [ADR 0010](decisions/0010-food-service-industry-scope.md)) | `app/src/features/industries.ts` |
 | DB schema·migration | `app/prisma` |
 | 운영 적재·검증·하네스 명령 | `app/scripts` |

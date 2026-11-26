@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatWonText, showValue } from '@/features/finance/result-text';
+import { formatWonText, showValue, valueKind } from '@/features/finance/result-text';
 import { api, type PlanDetail, type PlanSummary, type StoredResult } from '@/features/plans/client';
 import { planHref } from '@/features/plans/plan-link';
 import { revisionLabel } from '@/lib/revision-text';
@@ -19,23 +19,25 @@ const errorMessage = (error: unknown, fallback: string) => (error instanceof Err
 
 export default function RecentPlans() {
   const { data: session, isPending } = authClient.useSession();
-  if (isPending)
-    return (
-      <p className="loading-state" role="status">
-        로그인 상태를 확인하고 있습니다.
-      </p>
-    );
-  if (!session)
-    return (
-      <section className="home-account" aria-labelledby="home-account-title">
-        <h2 id="home-account-title">내 계획</h2>
-        <p>로그인하면 최근에 고친 계획과 마지막 계산 결과가 여기 나옵니다.</p>
-        <Link className="primary-link" href="/plans">
-          로그인
-        </Link>
-      </section>
-    );
-  return <RecentPlanList key={session.user.id} />;
+  if (session) return <RecentPlanList key={session.user.id} />;
+  return (
+    <section className="panel home-account" aria-labelledby="home-account-title">
+      <h2 id="home-account-title">내 계획</h2>
+      {isPending ? (
+        <p className="loading-state" role="status">
+          로그인 상태를 확인하고 있습니다.
+        </p>
+      ) : (
+        <>
+          <p className="note">로그인하면 최근에 고친 계획과 마지막 계산 결과가 여기 나옵니다.</p>
+          {/* 로그인 링크는 머리말에 있다. 여기서는 계획 화면으로 보내고, 로그인하지 않았으면 그 화면이 로그인을 받는다. */}
+          <Link className="button" href="/plans">
+            계획 만들기
+          </Link>
+        </>
+      )}
+    </section>
+  );
 }
 
 function RecentPlanList() {
@@ -54,10 +56,10 @@ function RecentPlanList() {
   }, []);
 
   return (
-    <section className="home-account" aria-labelledby="recent-plans-title">
-      <div className="home-account-heading">
+    <section className="panel home-account" aria-labelledby="recent-plans-title">
+      <div className="panel-head">
         <h2 id="recent-plans-title">내 계획</h2>
-        <Link className="secondary-link" href="/plans">
+        <Link className="button small" href="/plans">
           새 계획
         </Link>
       </div>
@@ -97,7 +99,7 @@ function RecentPlanItem({ plan }: { plan: PlanSummary }) {
       ) : (
         <LatestResult planId={plan.id} />
       )}
-      <Link className="link-button" href={planHref(plan.id)}>
+      <Link className="button small" href={planHref(plan.id)}>
         열기
       </Link>
     </li>
@@ -136,17 +138,23 @@ function LatestResult({ planId }: { planId: string }) {
       <dl>
         <div>
           <dt>대출 전 부족액</dt>
-          <dd>{showValue(resultJson.plannedFundingGap, formatWonText)}</dd>
+          <dd className={`value-${valueKind(resultJson.plannedFundingGap)}`}>
+            {showValue(resultJson.plannedFundingGap, formatWonText)}
+          </dd>
         </div>
         {base && (
           <>
             <div>
               <dt>월 운영수지(기본)</dt>
-              <dd>{showValue(base.monthlyOperatingBalance, formatWonText)}</dd>
+              <dd className={`value-${valueKind(base.monthlyOperatingBalance)}`}>
+                {showValue(base.monthlyOperatingBalance, formatWonText)}
+              </dd>
             </div>
             <div>
               <dt>운영비 충당 매출(기본)</dt>
-              <dd>{showValue(base.operatingBreakEvenRevenue, formatWonText)}</dd>
+              <dd className={`value-${valueKind(base.operatingBreakEvenRevenue)}`}>
+                {showValue(base.operatingBreakEvenRevenue, formatWonText)}
+              </dd>
             </div>
           </>
         )}

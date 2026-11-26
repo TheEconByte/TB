@@ -1,0 +1,190 @@
+/* 화면 틀: 머리말, 본문 폭, 화면 제목, 좌우 배치, 꼬리말. */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px 28px;
+  min-height: var(--header-h);
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-pad);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: var(--fs-17);
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand svg {
+  flex: 0 0 auto;
+}
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.site-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.12s ease;
+}
+.site-nav a:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+/* 지금 화면은 색이 아니라 한 단계 어두운 면과 굵기로 표시한다. */
+.site-nav a[aria-current='page'] {
+  background: var(--fill-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  min-width: 0;
+}
+.account-email {
+  overflow: hidden;
+  max-width: 240px;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 28px var(--page-pad) 72px;
+}
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-bottom: 20px;
+}
+.page-head p {
+  color: var(--muted);
+  font-size: var(--fs-14);
+}
+
+/* 고르는 칸은 왼쪽에 붙여 두고 결과를 오른쪽 넓은 칸에 둔다. */
+.split-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.split-aside,
+.split-main {
+  min-width: 0;
+}
+.split-aside {
+  position: sticky;
+  top: calc(var(--header-h) + 20px);
+  display: grid;
+  gap: 12px;
+  /* 화면보다 길면 그 안에서만 스크롤한다. 안쪽 여백은 입력란의 포커스 테두리가 잘리지 않게 둔 것이다. */
+  max-height: calc(100vh - var(--header-h) - 40px);
+  margin: -4px;
+  padding: 4px;
+  overflow-y: auto;
+}
+.split-aside .select-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.split-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.site-footer-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px 48px;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 28px var(--page-pad) 36px;
+}
+.site-footer strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 1023px) {
+  .split-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .split-aside {
+    position: static;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
+@media (max-width: 640px) {
+  /* 주요 화면 링크가 브랜드·계정과 한 줄에 들어가지 않아 아래 줄로 내린다. */
+  .site-header-inner {
+    flex-wrap: wrap;
+    padding-block: 8px 6px;
+  }
+  .site-nav {
+    order: 3;
+    width: 100%;
+    margin-inline: -8px;
+  }
+  .site-nav a {
+    padding: 0 10px;
+    font-size: var(--fs-14);
+  }
+  .account-email {
+    display: none;
+  }
+  main {
+    padding-top: 20px;
+  }
+  .site-footer-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

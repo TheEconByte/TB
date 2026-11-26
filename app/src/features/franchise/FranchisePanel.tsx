@@ -78,9 +78,9 @@ export default function FranchisePanel({
 
   if (!industryCode) {
     return (
-      <section className="picker franchise-panel reference-empty" aria-labelledby={titleId}>
+      <section className="panel picker reference-empty" aria-labelledby={titleId}>
         <h2 id={titleId}>{TITLE[focus]}</h2>
-        <p className="picker-note">사업 조건에서 업종을 고르면 공정위 정보공개서의 브랜드 현황이 나옵니다.</p>
+        <p className="note">사업 조건에서 업종을 고르면 공정위 정보공개서의 브랜드 현황이 나옵니다.</p>
       </section>
     );
   }
@@ -91,10 +91,10 @@ export default function FranchisePanel({
     : null;
 
   return (
-    <section className="picker franchise-panel" aria-labelledby={titleId}>
+    <section className="panel picker" aria-labelledby={titleId}>
       <h2 id={titleId}>{TITLE[focus]}</h2>
       {payload && (
-        <p className="picker-note reference-lead">
+        <p className="note">
           {payload.source.latestDisclosureYear}년 정보공개서({payload.source.latestPerformanceYear}년 실적) 기준{' '}
           {payload.industry.label} 브랜드 {numberFormat.format(payload.summary.brandCount)}개 중 가맹점이 있는 곳{' '}
           {numberFormat.format(payload.summary.brandsWithStores)}개, 평균매출을 공개한 곳{' '}
@@ -117,11 +117,11 @@ export default function FranchisePanel({
         </label>
       </div>
       {state.kind === 'loading' || state.kind === 'idle' ? (
-        <p className="picker-note" role="status">
+        <p className="note" role="status">
           프랜차이즈 자료를 불러오고 있습니다.
         </p>
       ) : state.kind === 'unavailable' ? (
-        <p className="picker-note" role="status">
+        <p className="note" role="status">
           프랜차이즈 자료가 아직 없습니다.
         </p>
       ) : state.kind === 'error' ? (
@@ -129,14 +129,14 @@ export default function FranchisePanel({
           {state.message}
         </p>
       ) : payload && payload.brands.length === 0 ? (
-        <p className="picker-note" role="status">
+        <p className="note" role="status">
           ‘{payload.query}’와 일치하는 {payload.industry.label} 브랜드가 없습니다.
         </p>
       ) : payload && selected ? (
         <>
           <div className="table-scroll franchise-list">
             <table>
-              <caption className="table-note">
+              <caption className="note">
                 {payload.query ? `검색 결과 ${numberFormat.format(payload.totalMatches)}개` : '가맹점 수 상위 브랜드'}
                 {payload.totalMatches > payload.brands.length ? ` 중 ${payload.brands.length}개` : ''}
               </caption>
@@ -153,7 +153,7 @@ export default function FranchisePanel({
                     <td>
                       <button
                         type="button"
-                        className="link-button"
+                        className="text-button"
                         aria-pressed={brand.id === selected.id}
                         onClick={() => setSelectedId(brand.id)}
                       >
@@ -233,7 +233,7 @@ function StartupDetail({ brand, payload }: Readonly<{ brand: FranchiseBrand; pay
       </div>
       {costs && (
         <table>
-          <caption className="table-note">창업 금액 구성</caption>
+          <caption className="note">창업 금액 구성</caption>
           <tbody>
             {(
               [
@@ -288,7 +288,7 @@ function FranchiseDetail({
         </div>
       </div>
 
-      <p className="picker-note">
+      <p className="note">
         {latest.statusReported ? (
           <>
             {latest.performanceYear}년 신규 개점 {formatCount(latest.newStoreCount)} · 계약 종료{' '}

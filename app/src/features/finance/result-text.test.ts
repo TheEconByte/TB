@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateFinance } from './calculate';
 import { newPlanInput } from './form';
-import { cashRunwayText, formatWonText, fundingPositionText, revenueVerdict } from './result-text';
+import { cashRunwayText, formatWonText, fundingPositionText, revenueVerdict, valueKind } from './result-text';
 import type { FinanceInput, ValueResult } from './types';
 
 const ready = <T>(value: T): ValueResult<T> => ({ status: 'READY', value });
@@ -144,5 +144,25 @@ describe('실제 계산 결과와 이어 붙이기', () => {
         base.debtInclusiveBreakEvenRevenue,
       )?.tone,
     ).toBe('positive');
+  });
+});
+
+// 값 칸의 종류. 계산하지 못한 값의 칸에는 금액이 아니라 "입력 필요 · 빠진 항목" 같은 글이 들어간다. 그 칸을 금액처럼
+// 굵게 한 줄로 두면 긴 글이 칸 밖으로 넘치므로 화면이 종류를 구분해야 한다. 빠진 값은 0과도 다른 종류다(AGENTS.md 3-2).
+describe('값 칸의 종류', () => {
+  it('계산한 금액은 amount, 음수 금액은 negative다', () => {
+    expect(valueKind(ready('10000000'))).toBe('amount');
+    expect(valueKind(ready('0'))).toBe('amount');
+    expect(valueKind(ready('-250000'))).toBe('negative');
+  });
+
+  it('계산하지 못한 값은 금액이나 0이 아니라 pending이다', () => {
+    expect(valueKind(missing<string>(['equity']))).toBe('pending');
+    expect(valueKind<string>({ status: 'UNSUPPORTED', value: null, reason: '지원하지 않는 상환방식' })).toBe('pending');
+  });
+
+  it('금액이 아닌 계산값(현금이 0원 아래로 가는 달, 없음)은 amount다', () => {
+    expect(valueKind(ready(4))).toBe('amount');
+    expect(valueKind(ready<number | null>(null))).toBe('amount');
   });
 });
