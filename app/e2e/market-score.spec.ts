@@ -210,6 +210,18 @@ async function signUp(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: '내 계획', exact: true })).toBeVisible();
 }
 
+// 상권에서 넘어오면 사업 조건은 자치구·업종만 채워진다(ADR 0008 §5). 저장하려면 면적·층·상가 유형을 마저 입력한다.
+async function completeBusinessProfile(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: '계획 단계' }).getByRole('button', { name: /^매장/ }).click();
+  const wizard = page.locator('.business-wizard');
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.getByLabel('정확한 면적').fill('10');
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.locator('.choice-card', { has: page.locator('strong', { hasText: /^1층$/ }) }).click();
+  await wizard.getByRole('button', { name: '다음', exact: true }).click();
+  await wizard.getByRole('button', { name: /소규모 상가/ }).click();
+}
+
 // [이 상권으로 재무 계획 시작]이 여는 주소. 화면은 참조만 넘긴다(ADR 0008 §5).
 function startUrl(releaseKey: string): string {
   return `/plans?scoreAreaType=A&scoreArea=${AREA_CODE}&scoreIndustry=CS100001&scoreRelease=${releaseKey}`;
@@ -276,6 +288,10 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   await expect(page).toHaveURL(/scoreArea=3119801/);
   await signUp(page, `market-score-${suffix}@example.test`);
 
+  // 사업 조건에는 상권 화면에서 고른 자치구·업종을 채운다(ADR 0008 §5).
+  const wizard = page.locator('.business-wizard');
+  await expect(wizard.getByLabel('자치구')).toHaveValue('11200');
+  await expect(wizard.getByLabel('업종 대분류')).toHaveValue('CS100001');
   const source = page.getByTestId('market-source');
   await expect(source).toContainText('E2E 상권 한식 점포당 평균 기준 · 등급 A');
   await expect(page.locator('#monthlyRevenue')).toHaveValue('3,000,000');
@@ -292,6 +308,10 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
     .getByRole('button', { name: /^월 운영/ })
     .click();
   await page.locator('#monthlyRevenue').fill('2500000');
+  // 면적·층·상가 유형을 입력하기 전에는 일부만 채운 사업 조건이라 저장하지 않는다.
+  await page.getByRole('button', { name: '초안 저장' }).click();
+  await expect(page.locator('.status-message')).toContainText('(빠진 항목: 면적, 층, 상가 유형)');
+  await completeBusinessProfile(page);
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
   await expect(page).not.toHaveURL(/scoreArea=/);
@@ -307,8 +327,13 @@ test('상권 점수에서 재무 계획을 시작하고 저장 당시 등급을 
   const stored = await page.evaluate(async () => {
     const list = (await (await fetch('/api/plans')).json()) as { plans: Array<{ id: string }> };
     const detail = await (await fetch(`/api/plans/${list.plans[0].id}`)).json();
-    return detail.plan as { marketScoreJson: Record<string, unknown>; inputJson: { monthlyRevenue: string } };
+    return detail.plan as {
+      marketScoreJson: Record<string, unknown>;
+      businessProfileJson: Record<string, unknown>;
+      inputJson: { monthlyRevenue: string };
+    };
   });
+  expect(stored.businessProfileJson).toMatchObject({ districtCode: '11200', marketIndustryCode: 'CS100001' });
   expect(stored.marketScoreJson).toMatchObject({
     releaseKey,
     grade: 'A',
@@ -351,6 +376,7 @@ test('상권 연결을 해제해도 재무 입력이 그대로 남는다', async
   await expect(page.locator('#monthlyRevenue')).toHaveValue('3,000,000');
 
   // 해제한 뒤 저장하면 상권 스냅샷 없이 폼에 남은 값만 저장한다.
+  await completeBusinessProfile(page);
   await page.getByRole('button', { name: '초안 저장' }).click();
   await expect(page.getByText('초안을 저장했습니다.')).toBeVisible();
   const stored = await storedPlan(page);

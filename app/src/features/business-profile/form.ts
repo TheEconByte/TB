@@ -53,6 +53,23 @@ export function selectMarketIndustry(form: BusinessProfileForm, value: string): 
   return { ...form, marketIndustryCode: code, detailedIndustryCode: '' };
 }
 
+// /markets의 [이 상권으로 재무 계획 시작]으로 넘어온 자치구·업종·세부 업종을 사업 조건에 채운다(ADR 0008).
+// 사용자가 이미 무언가 입력했으면 덮지 않는다. 면적·층·상가 유형은 채우지 않으므로 저장하려면 마저 입력해야 한다.
+export function businessProfileFormFromMarket(
+  form: BusinessProfileForm,
+  market: Readonly<{ districtCode: string; industryCode: string; detailedIndustryCode?: string | null }>,
+): BusinessProfileForm {
+  if (businessProfileSaveState(form).kind !== 'EMPTY') return form;
+  const filled = selectMarketIndustry(
+    { ...EMPTY_BUSINESS_PROFILE_FORM, districtCode: market.districtCode },
+    market.industryCode,
+  );
+  // 세부 업종은 상위 업종에 딸려 있으므로 상위 업종을 채운 경우에만 채운다.
+  return filled.marketIndustryCode && market.detailedIndustryCode
+    ? { ...filled, detailedIndustryCode: market.detailedIndustryCode }
+    : filled;
+}
+
 const areaValueSchema = businessProfileInputSchema.shape.area.shape.value;
 
 // 빠졌거나 서버가 받지 않을 항목과, 그 항목을 입력하는 단계(0부터).
