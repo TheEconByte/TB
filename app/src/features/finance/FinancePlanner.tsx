@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CheckIcon } from '@/components/icons';
 import { fromInput, sameAsCalculatedInput, toInput, type FinanceForm } from './form';
 import {
   cashRunwayText,
@@ -9,6 +10,7 @@ import {
   fundingPositionText,
   revenueVerdict,
   showValue,
+  valueKind,
   type Verdict,
 } from './result-text';
 import { financeInputSchema } from './schema';
@@ -106,7 +108,7 @@ function VerdictLine({
     <div className={`verdict verdict-${verdict.tone}`}>
       <p>{verdict.text}</p>
       {verdict.tone !== 'positive' && (
-        <button type="button" className="link-button" onClick={() => onFix(fix)}>
+        <button type="button" className="text-button" onClick={() => onFix(fix)}>
           {stepTitle(fix)} 고치기
         </button>
       )}
@@ -126,14 +128,13 @@ function LedgerRow({
   value: ValueResult<string>;
   strong?: boolean;
 }) {
-  const negative = value.status === 'READY' && value.value.startsWith('-');
   return (
     <div className={strong ? 'ledger-total' : undefined}>
       <dt>
         {label}
         {note && <small>{note}</small>}
       </dt>
-      <dd className={negative ? 'negative-value' : undefined}>{showValue(value, formatWonText)}</dd>
+      <dd className={`value-${valueKind(value)}`}>{showValue(value, formatWonText)}</dd>
     </div>
   );
 }
@@ -181,9 +182,8 @@ function ScenarioTable({ scenarios }: { scenarios: ScenarioResult[] }) {
               <th scope="row">{row.label}</th>
               {scenarios.map((scenario) => {
                 const value = row.pick(scenario);
-                const negative = value.status === 'READY' && value.value.startsWith('-');
                 return (
-                  <td key={scenario.name} className={negative ? 'negative-value' : undefined}>
+                  <td key={scenario.name} className={`value-${valueKind(value)}`}>
                     {showValue(value, formatWonText)}
                   </td>
                 );
@@ -193,7 +193,9 @@ function ScenarioTable({ scenarios }: { scenarios: ScenarioResult[] }) {
           <tr>
             <th scope="row">현금이 0원 아래로 가는 달</th>
             {scenarios.map((scenario) => (
-              <td key={scenario.name}>{showValue(scenario.firstNegativeCashMonth, firstNegativeText)}</td>
+              <td key={scenario.name} className={`value-${valueKind(scenario.firstNegativeCashMonth)}`}>
+                {showValue(scenario.firstNegativeCashMonth, firstNegativeText)}
+              </td>
             ))}
           </tr>
         </tbody>
@@ -250,7 +252,7 @@ function ResultView({
         {stale && (
           <div className="stale-note">
             <p className="inline-error">지금 입력과 다른 이전 계산입니다.</p>
-            <button type="button" className="secondary-button" disabled={busy} onClick={onRecalculate}>
+            <button type="button" className="button" disabled={busy} onClick={onRecalculate}>
               다시 계산
             </button>
           </div>
@@ -259,7 +261,7 @@ function ResultView({
       {history}
 
       <div className="result-grid">
-        <div className="result-block">
+        <div className="panel result-block">
           <h3>개업 자금</h3>
           <VerdictLine verdict={fundingPositionText(result.fundingPosition)} fix={fundingFix} onFix={onFix} />
           <dl className="ledger">
@@ -285,7 +287,7 @@ function ResultView({
           </dl>
         </div>
 
-        <div className="result-block">
+        <div className="panel result-block">
           <h3>월 운영</h3>
           <VerdictLine
             verdict={revenueVerdict(
@@ -304,7 +306,7 @@ function ResultView({
       {/* 현금잔액 표의 기간은 결과를 보는 방법이라 결과 옆에서 바꾼다. 바꾸면 [다시 계산]으로 반영한다. */}
       <div className="result-setting">{cashMonthsField}</div>
       {base.cashBalances.status === 'READY' && (
-        <details className="result-details">
+        <details className="panel result-details">
           <summary>월별 현금잔액 · 기본 ({months}개월)</summary>
           <div className="table-scroll full-length">
             <table>
@@ -322,7 +324,7 @@ function ResultView({
                     <td>{row.month}개월</td>
                     <td>{formatWonText(row.loanPayment)}</td>
                     <td>{formatWonText(row.cashAfterDebtPayment)}</td>
-                    <td className={row.closingCashBalance.startsWith('-') ? 'negative-value' : undefined}>
+                    <td className={row.closingCashBalance.startsWith('-') ? 'value-negative' : undefined}>
                       {formatWonText(row.closingCashBalance)}
                     </td>
                   </tr>
@@ -332,7 +334,7 @@ function ResultView({
           </div>
         </details>
       )}
-      <details className="result-details">
+      <details className="panel result-details">
         <summary>계산에 넣지 않은 것</summary>
         <p>{result.excludedScope.join(' · ')}</p>
       </details>
@@ -346,7 +348,7 @@ function SectionTitle({ step, note }: { step: PlanStep; note?: string }) {
       <span>{stepNumber(step)}</span>
       <div>
         <h2 id={`plan-step-${step}-title`}>{stepTitle(step)}</h2>
-        {note && <p className="picker-note">{note}</p>}
+        {note && <p className="note">{note}</p>}
       </div>
     </div>
   );
@@ -554,7 +556,7 @@ export default function FinancePlanner({
   return (
     <div className="planner">
       {/* 계획 이름과 단계 목록을 한 카드에 둬, 단계 내용이 첫 화면에 더 많이 보이게 한다. */}
-      <section className="plan-head">
+      <section className="panel plan-head">
         <div className="plan-head-row">
           <div className="plan-head-title">
             <h1>재무 계획</h1>
@@ -588,7 +590,7 @@ export default function FinancePlanner({
                     aria-current={current ? 'step' : undefined}
                     onClick={() => go(item.key)}
                   >
-                    <span aria-hidden="true">{done[item.key] && !current ? '✓' : stepNumber(item.key)}</span>
+                    <span aria-hidden="true">{done[item.key] && !current ? <CheckIcon /> : stepNumber(item.key)}</span>
                     {item.title}
                     {done[item.key] && <em className="sr-only">(입력함)</em>}
                   </button>
@@ -615,7 +617,7 @@ export default function FinancePlanner({
       {panel(
         'opening',
         <div className="step-layout">
-          <section className="form-section">
+          <section className="panel">
             <SectionTitle step="opening" note="문을 열기 전까지 드는 돈과, 매출이 자리 잡을 때까지 버틸 돈입니다." />
             <div className="field-grid">
               <MoneyInput id="deposit" label="보증금" form={form} change={change} />
@@ -632,7 +634,7 @@ export default function FinancePlanner({
       {panel(
         'operating',
         <div className="step-layout">
-          <section className="form-section">
+          <section className="panel">
             <SectionTitle step="operating" note="문을 연 뒤 한 달에 들어오고 나가는 돈입니다." />
             {revenueNotice}
             <div className="field-grid">
@@ -674,7 +676,7 @@ export default function FinancePlanner({
 
       {panel(
         'financing',
-        <section className="form-section">
+        <section className="panel">
           <SectionTitle step="financing" note="가진 돈과 빌릴 돈입니다. 자금 공고는 결과를 본 뒤에 찾습니다." />
           <div className="field-grid">
             <MoneyInput id="equity" label="자기자금" form={form} change={change} />
@@ -760,7 +762,7 @@ export default function FinancePlanner({
             <p>
               개업 비용·월 운영·자금 마련을 넣고 계산하면 여기에 결과가 나옵니다. 비운 항목은 결과에 이유를 적습니다.
             </p>
-            <button type="button" disabled={busy} onClick={() => void calculate()}>
+            <button type="button" className="button primary" disabled={busy} onClick={() => void calculate()}>
               {busy ? '계산 중…' : '계산하고 결과 보기'}
             </button>
           </section>
@@ -790,28 +792,33 @@ export default function FinancePlanner({
       {/* 단계 이동은 화면에 붙어 따라오는 이 막대에서만 한다. 기본 버튼은 늘 하나다. */}
       <div className="calculate-bar">
         <div className="draft-state" aria-live="polite">
-          <strong>{revision === null ? '저장 안 됨' : dirty ? '저장하지 않은 변경이 있습니다' : '저장됨'}</strong>
+          <strong data-state={revision !== null && !dirty ? 'saved' : 'unsaved'}>
+            {revision === null ? '저장 안 됨' : dirty ? '저장하지 않은 변경이 있습니다' : '저장됨'}
+          </strong>
           {stale && result && <span>입력이 바뀌어 결과가 이전 값입니다. 다시 계산하세요.</span>}
         </div>
         <div className="button-row">
           {prev && (
-            <button className="secondary-button" type="button" onClick={() => go(prev.key)}>
+            <button className="button" type="button" onClick={() => go(prev.key)}>
               이전
             </button>
           )}
-          <button className="secondary-button" type="button" disabled={busy} onClick={() => void save()}>
+          <button className="button" type="button" disabled={busy} onClick={() => void save()}>
             초안 저장
           </button>
           {step === 'financing' ? (
-            <button type="button" disabled={busy} onClick={() => void calculate()}>
+            <button type="button" className="button primary" disabled={busy} onClick={() => void calculate()}>
               {busy ? '계산 중…' : '계산하고 결과 보기'}
             </button>
           ) : (
             next && (
-              // 01 매장에서는 사업 조건 입력의 [다음]이 기본 버튼이다. 다 채우기 전에는 건너뛰는 버튼으로 낮춰 둔다.
+              // 기본 버튼은 화면에 하나다. 01 매장을 다 채우기 전에는 사업 조건 입력의 [다음]이, 계산 전의 결과
+              // 단계에서는 [계산하고 결과 보기]가 기본 버튼이라 이 버튼을 건너뛰는 버튼으로 낮춰 둔다.
               <button
                 type="button"
-                className={step === 'business' && !businessDone ? 'secondary-button' : undefined}
+                className={
+                  (step === 'business' && !businessDone) || (step === 'result' && !result) ? 'button' : 'button primary'
+                }
                 onClick={() => go(next.key)}
               >
                 다음: {next.title}

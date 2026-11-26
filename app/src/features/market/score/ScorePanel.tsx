@@ -43,12 +43,12 @@ export default function ScorePanel({
 }) {
   const handoff = handoffFor(score);
   return (
-    <section className="score-panel" aria-labelledby="score-title">
+    <section className="panel score-panel" aria-labelledby="score-title">
       <div className="score-heading">
-        <p className="eyebrow">상권 생존점수 · {score.baseQuarterLabel} 기준</p>
         <h2 id="score-title">
-          {score.area.displayName} · {score.industry.displayName}
+          <span>상권 생존점수</span> {score.area.displayName} · {score.industry.displayName}
         </h2>
+        <p className="note">{score.baseQuarterLabel} 기준</p>
       </div>
 
       {score.status === 'OK' && score.score ? (
@@ -71,24 +71,29 @@ export default function ScorePanel({
           </div>
           <p className="score-explanation">{SCORE_EXPLANATION}</p>
 
-          <ContributionBars items={score.contributions} />
-          {score.distribution && <DistributionChart distribution={score.distribution} value={score.score.value} />}
-
-          <div className="button-row score-actions">
-            <Link href={`/plans${handoffSearch(handoff, detailedIndustryCode)}`} className="primary-link">
-              이 상권으로 재무 계획 시작
-            </Link>
-            <Link href={`/funding${handoffSearch(handoff)}`} className="secondary-link">
-              자금 후보 보기
-            </Link>
+          {/* 점수를 본 다음 할 일을 근거 차트보다 먼저 둔다. */}
+          <div className="score-next">
+            <div className="button-row">
+              <Link href={`/plans${handoffSearch(handoff, detailedIndustryCode)}`} className="button primary">
+                이 상권으로 재무 계획 시작
+              </Link>
+              <Link href={`/funding${handoffSearch(handoff)}`} className="button">
+                자금 후보 보기
+              </Link>
+            </div>
+            {score.financeDefault && (
+              <p className="note">
+                재무 계획은 월매출 {formatWon(score.financeDefault.monthlyRevenue)}(잠정, 점포당 월평균)을 채워
+                시작하며, 고칠 수 있습니다.
+              </p>
+            )}
+            {score.financeDefault?.unusual && <UnusualRevenueWarning score={score} />}
           </div>
-          {score.financeDefault && (
-            <p className="table-note">
-              재무 계획은 월매출 {formatWon(score.financeDefault.monthlyRevenue)}(잠정, 점포당 월평균)을 채워 시작하며,
-              고칠 수 있습니다.
-            </p>
-          )}
-          {score.financeDefault?.unusual && <UnusualRevenueWarning score={score} />}
+
+          <div className="score-evidence">
+            <ContributionBars items={score.contributions} />
+            {score.distribution && <DistributionChart distribution={score.distribution} value={score.score.value} />}
+          </div>
         </>
       ) : (
         <div className="score-unavailable" role="status">
@@ -148,7 +153,7 @@ function ContributionBars({ items }: { readonly items: readonly ScoreContributio
           );
         })}
       </ul>
-      <p className="table-note">막대는 가운데(0)를 기준으로 오른쪽이 점수를 올린 요인, 왼쪽이 내린 요인입니다.</p>
+      <p className="note">막대는 가운데(0)를 기준으로 오른쪽이 점수를 올린 요인, 왼쪽이 내린 요인입니다.</p>
     </div>
   );
 }
@@ -218,7 +223,7 @@ function ScoreBasis({ score }: { readonly score: MarketScoreResponse }) {
             </div>
           </dl>
           <div className="table-scroll">
-            <table className="market-table">
+            <table>
               <caption>계수표 (고폐업 확률 기준, 표준화. 점수 기여도는 −β × z)</caption>
               <thead>
                 <tr>
@@ -242,13 +247,13 @@ function ScoreBasis({ score }: { readonly score: MarketScoreResponse }) {
               </tbody>
             </table>
           </div>
-          <p className="table-note">
+          <p className="note">
             점수 = round((1 − 고폐업 확률) × 100). 등급:{' '}
             {score.model.gradeBoundaries.map((item) => `${item.grade} ${item.minScore}점 이상`).join(', ')}.
           </p>
         </>
       ) : (
-        <p className="table-note">이 업종은 점수 모델을 제공하지 않습니다.</p>
+        <p className="note">이 업종은 점수 모델을 제공하지 않습니다.</p>
       )}
       <h3>한계</h3>
       <ul>

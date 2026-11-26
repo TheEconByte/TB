@@ -42,6 +42,15 @@ export function showValue<T>(result: ValueResult<T>, render: (value: T) => strin
     : `입력 필요 · ${result.missingFields.map(fieldLabel).join(', ')}`;
 }
 
+// 값 칸에 무엇이 들어가는지. 화면은 이 종류로 칸의 모양을 정한다(`value-<종류>` 클래스). 계산하지 못한 값(pending)의 칸에는
+// 금액이 아니라 이유를 적은 글이 들어가므로 금액처럼 굵게 한 줄로 두지 않고, 음수 금액(negative)은 색으로도 알린다.
+export type ValueKind = 'amount' | 'negative' | 'pending';
+
+export function valueKind<T>(result: ValueResult<T>): ValueKind {
+  if (result.status !== 'READY') return 'pending';
+  return typeof result.value === 'string' && result.value.startsWith('-') ? 'negative' : 'amount';
+}
+
 // positive·caution·negative는 판단, missing은 판단하지 않은 상태다.
 export type Verdict = { tone: 'positive' | 'caution' | 'negative' | 'missing'; text: string };
 

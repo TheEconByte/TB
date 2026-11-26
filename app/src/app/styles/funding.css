@@ -1,0 +1,273 @@
+/* 자금 공고 맞춰 보기(ADR 0009 §4). /funding과 계획 화면의 06 자금 공고가 같은 결과를 쓴다. */
+.funding-fields {
+  display: grid;
+  gap: 16px;
+}
+/* 상권에서 넘겨받은 등급. 참고용이며 판정에 쓰지 않는다(ADR 0008). */
+.funding-grade {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: var(--fs-14);
+}
+.funding-grade p {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+/* 조회가 끝나면 스크립트가 결과로 포커스를 옮긴다. */
+.funding-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.funding-results:focus:not(:focus-visible) {
+  outline: none;
+}
+.funding-basis {
+  gap: 12px;
+  padding-block: 16px;
+}
+.funding-basis h2 {
+  font-size: var(--fs-15);
+}
+
+/* 탭. 고른 탭은 굵은 글자와 그 아래 검은 밑줄로 표시한다. */
+.funding-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.funding-tab {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: -1px;
+  padding: 10px 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+}
+.funding-tab > span {
+  font-size: var(--fs-17);
+  font-weight: 600;
+}
+.funding-tab small {
+  font-size: var(--fs-13);
+  font-weight: 500;
+}
+.funding-tab:hover {
+  color: var(--ink);
+}
+.funding-tab[aria-selected='true'] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+.funding-tab[aria-selected='true'] > span {
+  font-weight: 700;
+}
+.funding-branch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.candidate-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.candidate-group.separated-group {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-strong);
+}
+.group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.group-head h3 {
+  font-size: var(--fs-17);
+}
+.candidate-list {
+  display: grid;
+  /* 카드가 460px 이상 들어가는 폭이면 두 줄로 놓는다. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  align-items: start;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+/* 공고 카드 */
+.candidate-card {
+  gap: 14px;
+  padding: 20px;
+}
+.candidate-head {
+  display: grid;
+  gap: 10px;
+}
+.candidate-head h4 {
+  font-size: var(--fs-17);
+}
+.candidate-org {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.candidate-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.reason-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--fs-13);
+}
+.application-reasons {
+  padding: 10px 14px 10px 30px;
+  border-radius: var(--r-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.candidate-meta {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.candidate-meta > div,
+.match-condition {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 2px 12px;
+}
+.candidate-meta dt {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.candidate-meta dd {
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.match-quote {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: 400;
+  word-break: break-word;
+}
+.match-quote::before {
+  content: '“';
+}
+.match-quote::after {
+  content: '”';
+}
+.match-section-title {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+/* 조건 한 줄: 이름 | 값·인용·이유 | 판정. 카드 안에 상자를 또 만들지 않고 줄로 나눈다. */
+.match-conditions {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.match-condition {
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: start;
+  font-size: var(--fs-13);
+}
+.match-condition-head {
+  display: contents;
+}
+.match-condition-head strong {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--muted);
+  font-weight: 400;
+}
+.condition-verdict {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.match-condition > :not(.match-condition-head) {
+  grid-column: 2;
+}
+.match-condition-value {
+  font-weight: 600;
+}
+.match-evidence,
+.match-reason {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.verdict-match {
+  color: var(--positive);
+}
+.verdict-mismatch {
+  color: var(--danger);
+}
+.verdict-check {
+  color: var(--warning);
+}
+.match-limit {
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  font-size: var(--fs-13);
+}
+.match-limit p + p {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.candidate-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.candidate-foot .button {
+  margin-left: auto;
+}
+.match-ai-notice {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+@media (max-width: 640px) {
+  .candidate-card {
+    padding: 16px;
+  }
+  .candidate-meta > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .match-condition {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .match-condition-head strong {
+    grid-column: 1;
+  }
+  .condition-verdict {
+    grid-column: 2;
+  }
+  .match-condition > :not(.match-condition-head) {
+    grid-column: 1 / -1;
+  }
+}

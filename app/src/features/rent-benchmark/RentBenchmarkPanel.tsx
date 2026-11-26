@@ -80,22 +80,22 @@ export default function RentBenchmarkPanel({
 
   if (!buildingType) {
     return (
-      <section className="picker rent-panel reference-empty" aria-labelledby="rent-benchmark-title">
+      <section className="panel picker reference-empty" aria-labelledby="rent-benchmark-title">
         <h2 id="rent-benchmark-title">임대료 참고</h2>
-        <p className="picker-note">사업 조건에서 상가 유형을 고르면 한국부동산원 조사 임대료가 나옵니다.</p>
+        <p className="note">사업 조건에서 상가 유형을 고르면 한국부동산원 조사 임대료가 나옵니다.</p>
       </section>
     );
   }
 
   return (
-    <section className="picker rent-panel" aria-labelledby="rent-benchmark-title">
+    <section className="panel picker" aria-labelledby="rent-benchmark-title">
       <h2 id="rent-benchmark-title">임대료 참고</h2>
       {state.kind === 'loading' || state.kind === 'idle' ? (
-        <p className="picker-note" role="status">
+        <p className="note" role="status">
           임대료 자료를 불러오고 있습니다.
         </p>
       ) : state.kind === 'unavailable' ? (
-        <p className="picker-note" role="status">
+        <p className="note" role="status">
           임대료 자료가 아직 없습니다.
         </p>
       ) : state.kind === 'error' ? (
@@ -111,7 +111,7 @@ export default function RentBenchmarkPanel({
           onSelect={setSelectedPath}
         />
       ) : (
-        <p className="picker-note">표시할 조사 지역이 없습니다.</p>
+        <p className="note">표시할 조사 지역이 없습니다.</p>
       )}
     </section>
   );
@@ -156,7 +156,7 @@ function RentBenchmarkBody({
 
   return (
     <>
-      <p className="picker-note reference-lead">
+      <p className="note">
         {payload.source.statName} {payload.buildingType.label} {payload.source.latestQuarterLabel} 지역 평균입니다.
       </p>
       <div className="select-row reference-select-row">
@@ -238,7 +238,7 @@ function RentBenchmarkBody({
         <div>
           <h3>층별 ㎡당 월 임대료</h3>
           {region.latest.floors.length === 0 ? (
-            <p className="picker-note">층별 조사값이 없습니다.</p>
+            <p className="note">층별 조사값이 없습니다.</p>
           ) : (
             <div className="metric-bars">
               {region.latest.floors.map((item) => (

@@ -1,0 +1,153 @@
+/* 홈(/). 왼쪽은 화면 셋으로 가는 순서, 오른쪽은 내 계획이다. */
+main.home {
+  max-width: 1160px;
+}
+.home-intro {
+  padding: 20px 0 28px;
+}
+.home-intro h1 {
+  font-size: var(--fs-32);
+  font-weight: 800;
+  line-height: 1.3;
+}
+.home-intro p {
+  margin-top: 8px;
+  color: var(--ink-3);
+  font-size: 1rem;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 20px;
+  align-items: start;
+}
+.home-steps {
+  padding-block: 4px;
+}
+.home-steps ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 20px 0;
+}
+.home-step + .home-step {
+  border-top: 1px solid var(--line);
+}
+.home-step-index {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-xs);
+  background: var(--fill-strong);
+  color: var(--ink-3);
+  font-size: var(--fs-13);
+  font-weight: 700;
+}
+.home-step h2 {
+  margin-bottom: 4px;
+}
+.home-step p {
+  color: var(--ink-3);
+  font-size: var(--fs-14);
+}
+.home-step .note {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.home-account {
+  justify-items: start;
+}
+.home-account > .panel-head,
+.home-account > .recent-plans,
+.home-account > .loading-state {
+  justify-self: stretch;
+}
+.recent-plans {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recent-plan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.recent-plan:last-child {
+  padding-bottom: 0;
+}
+.recent-plan > .button {
+  grid-column: 2;
+  grid-row: 1;
+}
+.recent-plan-head {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.recent-plan-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-plan-head span,
+.recent-plan-note {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.recent-plan > .recent-plan-note,
+.recent-plan-result {
+  grid-column: 1 / -1;
+}
+.recent-plan-result dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+}
+.recent-plan-result dt {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.recent-plan-result dd:not(.value-pending) {
+  font-size: var(--fs-14);
+  font-weight: 700;
+}
+
+@media (max-width: 1023px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .home-intro {
+    padding-top: 8px;
+  }
+  .home-intro h1 {
+    font-size: var(--fs-24);
+  }
+  .home-step {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .home-step .button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .recent-plan-result dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}

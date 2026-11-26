@@ -107,7 +107,7 @@ export function FundingMatchesPanel({
   const noInput = Object.values(result.profile).every((value) => value === null);
   return (
     <>
-      <section className="release-card" aria-labelledby="funding-release">
+      <section className="panel funding-basis" aria-labelledby="funding-release">
         <h2 id="funding-release">조회 기준</h2>
         {planLabel && <p className="funding-position">{planLabel}</p>}
         <dl className="release-grid">
@@ -127,7 +127,7 @@ export function FundingMatchesPanel({
             </dd>
           </div>
         </dl>
-        <p className="picker-note">조회 조건: {fundingProfileSummary(result.profile, districtSource)}</p>
+        <p className="note">조회 조건: {fundingProfileSummary(result.profile, districtSource)}</p>
       </section>
 
       {shown === 0 ? (
@@ -152,7 +152,7 @@ export function FundingMatchesPanel({
                 id={`funding-tab-${key}`}
                 aria-selected={tab === key}
                 aria-controls={`funding-tabpanel-${key}`}
-                className={`funding-tab${tab === key ? ' active' : ''}`}
+                className="funding-tab"
                 onClick={() => setTab(key)}
               >
                 <span>{FUNDING_TAB_LABELS[key]}</span>
@@ -204,8 +204,8 @@ function TabPanel({
       aria-labelledby={`funding-tab-${tab}`}
       className="funding-branch"
     >
-      <p className="branch-note">{TAB_NOTES[tab]}</p>
-      {policy && <p className="branch-note">{LIMIT_NOTE}</p>}
+      <p className="note">{TAB_NOTES[tab]}</p>
+      {policy && <p className="note">{LIMIT_NOTE}</p>}
 
       {list.products.length === 0 ? (
         <p className="empty-state">이 탭에는 공고가 없습니다.</p>
@@ -215,7 +215,7 @@ function TabPanel({
             <div className="group-head">
               <h3>남은 공고</h3>
             </div>
-            <p className="group-note">
+            <p className="note">
               남은 공고도 선정이 보장되지 않습니다. 카드에 없는 조건은 공고문에서 못 찾은 것이니 원 공고에서 확인하세요.
             </p>
             {remaining.length === 0 ? (
@@ -232,13 +232,16 @@ function TabPanel({
             <div className="candidate-group separated-group">
               <div className="group-head">
                 <h3>조건에 안 맞아 뺀 공고</h3>
-                <button type="button" className="link-button" onClick={() => setShowEliminated((current) => !current)}>
+                <button
+                  type="button"
+                  className="button small"
+                  aria-expanded={showEliminated}
+                  onClick={() => setShowEliminated((current) => !current)}
+                >
                   {showEliminated ? '숨기기' : `${numberFormat.format(eliminated.length)}건 보기`}
                 </button>
               </div>
-              <p className="group-note">
-                AI가 조건을 잘못 읽었을 수 있습니다. 찾는 공고가 안 보이면 여기서 확인하세요.
-              </p>
+              <p className="note">AI가 조건을 잘못 읽었을 수 있습니다. 찾는 공고가 안 보이면 여기서 확인하세요.</p>
               {showEliminated && cards(eliminated)}
             </div>
           )}
@@ -247,7 +250,12 @@ function TabPanel({
             <div className="candidate-group separated-group">
               <div className="group-head">
                 <h3>마감</h3>
-                <button type="button" className="link-button" onClick={() => setShowClosed((current) => !current)}>
+                <button
+                  type="button"
+                  className="button small"
+                  aria-expanded={showClosed}
+                  onClick={() => setShowClosed((current) => !current)}
+                >
                   {showClosed ? '마감된 공고 숨기기' : `마감된 공고 ${numberFormat.format(closed.length)}건 보기`}
                 </button>
               </div>
@@ -284,7 +292,7 @@ function MatchCard({
     />
   );
   return (
-    <article className="candidate-card">
+    <article className="panel candidate-card">
       <div className="candidate-head">
         <div>
           <h4>{match.name}</h4>
@@ -377,12 +385,12 @@ function MatchCard({
         </div>
       )}
 
-      {hasAiReading(match) && <p className="match-ai-notice">{AI_READING_NOTICE}</p>}
-      <p className="source-link">
-        <a href={match.officialUrl} target="_blank" rel="noreferrer">
+      <div className="candidate-foot">
+        {hasAiReading(match) && <p className="match-ai-notice">{AI_READING_NOTICE}</p>}
+        <a className="button small" href={match.officialUrl} target="_blank" rel="noreferrer">
           원 공고 열기
         </a>
-      </p>
+      </div>
     </article>
   );
 }
@@ -403,7 +411,7 @@ function ConditionItem({
     <li className="match-condition">
       <div className="match-condition-head">
         <strong>{CONDITION_LABELS[condition.key]}</strong>
-        <span className={`verdict verdict-${condition.verdict.toLowerCase()}`}>
+        <span className={`condition-verdict verdict-${condition.verdict.toLowerCase()}`}>
           {MATCH_VERDICT_LABELS[condition.verdict]}
         </span>
       </div>

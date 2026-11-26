@@ -1,0 +1,456 @@
+/* 기본 요소: 글자, 링크, 입력란, 버튼, 표, 접는 칸. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  /* 붙어 있는 머리말에 가리지 않게 한다. */
+  scroll-padding-top: calc(var(--header-h) + 16px);
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family:
+    'Pretendard Variable',
+    Pretendard,
+    'Apple SD Gothic Neo',
+    'Malgun Gothic',
+    'Noto Sans KR',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: var(--fs-15);
+  line-height: 1.6;
+  /* 금액과 건수를 세로로 맞춰 읽는 화면이라 숫자 폭을 고정한다. */
+  font-variant-numeric: tabular-nums;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.35;
+  /* 두 줄이 되는 제목은 줄 길이를 맞춰, 마지막 줄에 한두 글자만 남지 않게 한다. */
+  text-wrap: balance;
+}
+h1 {
+  font-size: var(--fs-24);
+}
+h2 {
+  font-size: var(--fs-17);
+}
+h3,
+h4,
+h5 {
+  font-size: var(--fs-15);
+}
+p,
+dl,
+dd,
+figure {
+  margin: 0;
+}
+a {
+  color: var(--primary-strong);
+  text-underline-offset: 3px;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 입력란 */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+form {
+  display: grid;
+  gap: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field > span:first-child,
+.target-groups legend {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.field small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: 1.5;
+}
+.input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.input-wrap:hover {
+  border-color: var(--faint);
+}
+.input-wrap:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+input {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--control-h) - 2px);
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  /* 금액 입력이 기본이라 오른쪽에 붙인다. 글자를 받는 칸은 .text-input으로 왼쪽에 붙인다. */
+  text-align: right;
+}
+input::placeholder {
+  color: var(--faint);
+  font-weight: 400;
+}
+input:focus {
+  outline: none;
+}
+.text-input {
+  text-align: left;
+}
+.input-wrap b {
+  padding-right: 12px;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  white-space: nowrap;
+}
+select {
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%235f6b7a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
+  color: var(--ink);
+  font-weight: 500;
+  appearance: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+select:hover:not(:disabled) {
+  border-color: var(--faint);
+}
+select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+select:disabled {
+  background-color: var(--fill);
+  color: var(--faint);
+}
+.target-groups {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.target-groups legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: var(--fs-14);
+  cursor: pointer;
+}
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  accent-color: var(--ink);
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+/* 칸 수는 화면 폭이 아니라 입력란이 놓인 열의 폭으로 정한다. */
+@container (max-width: 640px) {
+  .field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 420px) {
+  .field-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+.select-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 버튼. 화면마다 채운 기본 버튼은 하나만 두고 나머지는 무채색이다. */
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+.button:hover:not(:disabled) {
+  background: var(--fill);
+  border-color: var(--faint);
+}
+.button:active:not(:disabled) {
+  background: var(--fill-strong);
+}
+.button:disabled {
+  opacity: 0.5;
+}
+/* brand-primary: 파랑은 TrendBench의 브랜드 색이라 화면의 기본 버튼 하나에만 채운다(사용자 결정 2026-11-25). */
+.button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+.button.primary:hover:not(:disabled) {
+  border-color: var(--primary-strong);
+  background: var(--primary-strong);
+}
+.button.primary:active:not(:disabled) {
+  background: var(--primary-strong);
+}
+.button.small {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: var(--fs-13);
+}
+/* 글자로만 보이는 보조 동작: 펼치기, 고치기, 비우기. */
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  border-radius: var(--r-xs);
+  color: var(--ink-3);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.text-button:hover:not(:disabled) {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+.text-button:disabled {
+  opacity: 0.5;
+}
+.text-button.danger {
+  color: var(--danger);
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 표. 첫 칸은 이름이라 왼쪽, 나머지는 숫자라 오른쪽에 붙인다. */
+.table-scroll {
+  overflow-x: auto;
+  max-height: 480px;
+}
+/* 행 수가 정해진 짧은 표. 높이를 묶으면 페이지를 내리던 휠이 표 안에서 멈춘다. */
+.table-scroll.full-length {
+  max-height: none;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-13);
+  white-space: nowrap;
+}
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+tbody th {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+tbody tr:last-child > * {
+  border-bottom: 0;
+}
+tbody tr:hover > * {
+  background: var(--fill);
+}
+caption {
+  caption-side: top;
+  padding-bottom: 8px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  text-align: left;
+}
+.note-cell {
+  min-width: 320px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  text-align: left;
+  white-space: normal;
+}
+.missing-value {
+  color: var(--danger);
+  font-weight: 600;
+}
+/* 값 칸의 종류(finance/result-text.ts의 valueKind). 음수 금액은 색으로도 알리고, 계산하지 못한 값의 칸에는 금액이 아니라
+   이유를 적은 글이 들어가므로 금액처럼 굵게 한 줄로 두지 않고 설명 글자로 줄을 바꾼다. */
+.value-negative {
+  color: var(--danger);
+}
+.value-pending {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  white-space: normal;
+}
+td.value-pending {
+  min-width: 140px;
+}
+
+/* 접는 칸. 브라우저 기본 세모 대신 열리면 돌아가는 화살표를 쓴다. */
+summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  background: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='m6 3.5 4.5 4.5L6 12.5' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+  transition: rotate 0.15s ease;
+}
+details[open] > summary::before {
+  rotate: 90deg;
+}
+summary:hover {
+  color: var(--ink);
+}
+details[open] > summary {
+  margin-bottom: 12px;
+}

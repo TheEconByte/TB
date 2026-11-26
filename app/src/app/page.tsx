@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import SiteHeader from '@/components/SiteHeader';
 import RecentPlans from '@/features/plans/RecentPlans';
 
 export const metadata: Metadata = {
@@ -9,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 // 서비스의 첫 화면. 화면 셋으로 가는 길과, 로그인했으면 최근 계획을 보인다. 계산·판정은 각 화면에서만 한다.
+// 순서는 창업자가 정하는 순서다: 자리를 보고, 돈을 계산하고, 모자란 돈을 채울 공고를 찾는다.
 const STEPS = [
   {
     title: '상권',
@@ -35,27 +35,36 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <main>
-      <SiteHeader />
-      <section className="hero">
+    <main className="home">
+      <section className="home-intro">
         <h1>서울 음식점·카페 창업 계획</h1>
         <p>상권 자료를 보고, 내 숫자로 필요자금을 계산하고, 신청할 만한 자금 공고를 추립니다.</p>
       </section>
 
-      <section className="home-steps" aria-label="화면 안내">
-        {STEPS.map((step) => (
-          <article key={step.href} className="home-step">
-            <h2>{step.title}</h2>
-            <p>{step.body}</p>
-            <p className="home-step-note">{step.note}</p>
-            <Link className="secondary-link" href={step.href}>
-              {step.link}
-            </Link>
-          </article>
-        ))}
-      </section>
+      <div className="home-grid">
+        <section className="panel home-steps" aria-label="화면 안내">
+          <ol>
+            {STEPS.map((step, index) => (
+              <li key={step.href} className="home-step">
+                <span className="home-step-index" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <div>
+                  <h2>{step.title}</h2>
+                  <p>{step.body}</p>
+                  <p className="note">{step.note}</p>
+                </div>
+                {/* 로그인 없이 바로 쓸 수 있는 첫 단계만 기본 버튼이다. */}
+                <Link className={index === 0 ? 'button primary' : 'button'} href={step.href}>
+                  {step.link}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-      <RecentPlans />
+        <RecentPlans />
+      </div>
     </main>
   );
 }
